@@ -86,7 +86,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { getTypeColor } from '../../utils/typeColors.js'
