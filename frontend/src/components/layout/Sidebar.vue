@@ -23,17 +23,26 @@
       <div class="conn-list">
         <!-- 未分组连接 -->
         <div
+          class="ungrouped-zone"
+          :class="{ 'drag-over': dragOverGroup === '' }"
+          @dragover.prevent="dragOverGroup = ''"
+          @dragleave="dragOverGroup = null"
+          @drop.prevent="onDropToGroup('')"
+        >
+        <div
           v-for="conn in (groupedConnections[''] || [])"
           :key="conn.id"
           :class="['conn-item', { active: activeConnID === conn.id }]"
+          draggable="true"
+          @dragstart="onDragStart(conn.id)"
+          @dragend="dragOverGroup = null"
           @contextmenu.prevent="showCtxMenu($event, conn)"
           @mouseleave="cancelDelete()"
         >
           <div class="conn-main" @click="handleConnect(conn)">
             <span class="conn-avatar" :style="{ background: connColor(conn) }">{{ connInitial(conn) }}</span>
             <span :class="['conn-dot', connectionsStore.isConnected(conn.id) ? 'connected' : 'disconnected']" />
-            <span class="conn-name">{{ conn.name }}</span>
-            <span class="conn-host">{{ conn.is_cluster ? '[Cluster]' : conn.host + ':' + conn.port }}</span>
+            <span class="conn-name">{{ conn.name || '未命名' }}</span>
           </div>
           <div class="conn-actions">
             <button
@@ -51,6 +60,7 @@
               <button class="btn-tiny btn-confirm-no" title="取消" @click.stop="cancelDelete()">✗</button>
             </template>
           </div>
+        </div>
         </div>
 
         <!-- 命名分组 -->
@@ -81,8 +91,7 @@
               <div class="conn-main" @click="handleConnect(conn)">
                 <span class="conn-avatar" :style="{ background: connColor(conn) }">{{ connInitial(conn) }}</span>
                 <span :class="['conn-dot', connectionsStore.isConnected(conn.id) ? 'connected' : 'disconnected']" />
-                <span class="conn-name">{{ conn.name }}</span>
-                <span class="conn-host">{{ conn.is_cluster ? '[Cluster]' : conn.host + ':' + conn.port }}</span>
+                <span class="conn-name">{{ conn.name || '未命名' }}</span>
               </div>
               <div class="conn-actions">
                 <button
@@ -229,7 +238,10 @@ async function onDropToGroup(targetGroup) {
 
 async function handleConnect(conn) {
   if (connectionsStore.isConnected(conn.id)) {
-    workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
+    // 已连接：重新激活，并确保 DB 切到连接配置指定的 DB
+    const initDB = conn.db || 0
+    workspaceStore.setActiveConn(conn.id, conn.name, initDB)
+    await workspaceStore.switchDB(initDB)
     await workspaceStore.fetchTotalKeys()
     await workspaceStore.search('*')
     return
@@ -272,8 +284,8 @@ async function disconnectConn(id) {
 
 <style scoped>
 .sidebar {
-  width: 240px;
-  min-width: 240px;
+  width: 200px;
+  min-width: 200px;
   background: #1e2a3a;
   color: #c9d1d9;
   display: flex;
@@ -409,8 +421,7 @@ async function disconnectConn(id) {
 }
 .conn-dot.connected { background: #4CAF50; }
 .conn-dot.disconnected { background: #9e9e9e; }
-.conn-name { font-size: 13px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
-.conn-host { font-size: 11px; color: #718096; white-space: nowrap; }
+.conn-name { font-size: 13px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 .conn-actions { display: none; gap: 2px; }
 .conn-item:hover .conn-actions { display: flex; }
 .btn-tiny {
@@ -432,7 +443,13 @@ async function disconnectConn(id) {
 .btn-confirm-no:hover { background: #dc2626; color: white; }
 .empty-hint { text-align: center; color: #4a5568; font-size: 12px; padding: 20px; }
 
-/* ===== 分组 ===== */
+/* 未分组拖拽区域 */
+.ungrouped-zone {
+  border-radius: 4px;
+  transition: background 0.15s;
+  padding: 1px 0;
+}
+.ungrouped-zone.drag-over { background: #2d4a6e; }
 .group-block { margin: 2px 0; }
 .group-header {
   display: flex;

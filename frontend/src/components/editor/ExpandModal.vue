@@ -55,21 +55,21 @@ async function copy() {
 }
 .expand-modal {
   background: white;
-  border-radius: 8px;
+  border-radius: 10px;
   width: min(820px, 90vw);
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
 }
 .expand-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid #eee;
-  background: #fafafa;
-  border-radius: 8px 8px 0 0;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 10px 10px 0 0;
   flex-shrink: 0;
 }
 .expand-title {
@@ -88,27 +88,32 @@ async function copy() {
   flex-shrink: 0;
 }
 .btn-copy-modal {
-  padding: 4px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 4px 13px;
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   font-size: 12px;
-  background: white;
-  color: #333;
-  min-width: 72px;
-}
-.btn-copy-modal:hover { background: #f0f0f0; }
-.btn-close-modal {
-  background: transparent;
-  border: 1px solid #eee;
-  border-radius: 4px;
-  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  color: #999;
-  padding: 2px 8px;
-  line-height: 1.4;
+  min-width: 74px;
+  transition: background 0.12s, border-color 0.12s;
 }
-.btn-close-modal:hover { color: #e53e3e; border-color: #e53e3e; }
+.btn-copy-modal:hover { background: #f3f4f6; border-color: #9ca3af; }
+.btn-close-modal {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 4px 9px;
+  line-height: 1.4;
+  transition: color 0.12s, border-color 0.12s;
+}
+.btn-close-modal:hover { color: #dc2626; border-color: #fca5a5; background: #fff1f2; }
 .expand-body {
   flex: 1;
   overflow-y: auto;
@@ -121,6 +126,6 @@ async function copy() {
   font-family: monospace;
   font-size: 13px;
   line-height: 1.7;
-  color: #333;
+  color: #1f2937;
 }
 </style>

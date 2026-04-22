@@ -157,22 +157,24 @@ func (m *ClientManager) SelectDB(id string, db int) error {
 		return fmt.Errorf("cluster mode does not support SELECT DB")
 	}
 
-	opts := conn.client.(*redis.Client).Options()
-	newOpts := *opts
-	newOpts.DB = db
-
-	// 如果有 SSH dialer，保留
+	// 从原始配置重建，只改 DB，避免旧连接池污染
 	var dialer func(network, addr string) (net.Conn, error)
 	if conn.sshClient != nil {
 		dialer = ssh.MakeDialer(conn.sshClient)
 	}
+
+	opts := &redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", conn.cfg.Host, conn.cfg.Port),
+		Password: conn.cfg.Password,
+		DB:       db,
+	}
 	if dialer != nil {
-		newOpts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return dialer(network, addr)
 		}
 	}
 
-	newClient := redis.NewClient(&newOpts)
+	newClient := redis.NewClient(opts)
 	ctx := context.Background()
 	if err := newClient.Ping(ctx).Err(); err != nil {
 		newClient.Close()

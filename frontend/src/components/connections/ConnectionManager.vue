@@ -23,7 +23,7 @@
               @dragleave="dragOverGroup = null"
               @drop.prevent="onDropToGroup('')"
             >
-              <div class="cm-group-label" v-if="hasNamedGroups">未分组</div>
+              <div class="cm-group-label">未分组</div>
               <div
                 v-for="conn in (groupedConnections[''] || [])"
                 :key="conn.id"
@@ -249,7 +249,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -260,7 +260,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   max-height: 88vh;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -270,36 +270,41 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
-  border-bottom: 1px solid #e8e8e8;
-  background: #fafafa;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
   flex-shrink: 0;
 }
 .cm-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: #1a202c;
+  color: #111827;
 }
 .cm-header-actions { display: flex; gap: 8px; align-items: center; }
 .btn-new {
+  display: inline-flex; align-items: center; justify-content: center;
   padding: 5px 14px;
-  background: #4e9af1;
+  background: #3b82f6;
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.15s;
 }
-.btn-new:hover { background: #3a85e0; }
+.btn-new:hover { background: #2563eb; }
 .btn-close {
+  display: inline-flex; align-items: center; justify-content: center;
   padding: 4px 10px;
   background: transparent;
-  color: #666;
-  border: 1px solid #ddd;
+  color: #9ca3af;
+  border: 1px solid #e5e7eb;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
+  transition: color 0.12s, border-color 0.12s;
 }
-.btn-close:hover { background: #f0f0f0; }
+.btn-close:hover { color: #dc2626; border-color: #fca5a5; background: #fff1f2; }
 .cm-body {
   display: flex;
   flex: 1;
@@ -309,21 +314,21 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 .cm-sidebar {
   width: 260px;
   flex-shrink: 0;
-  border-right: 1px solid #e8e8e8;
+  border-right: 1px solid #e5e7eb;
   overflow-y: auto;
   padding: 8px 0;
-  background: #f9f9f9;
+  background: #f9fafb;
 }
 .cm-group-zone {
   padding: 2px 0;
   border-radius: 4px;
   transition: background 0.15s;
 }
-.cm-group-zone.drag-over { background: #ebf4ff; }
+.cm-group-zone.drag-over { background: #dbeafe; }
 .cm-group-label {
   font-size: 10px;
-  font-weight: 600;
-  color: #aaa;
+  font-weight: 700;
+  color: #9ca3af;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   padding: 4px 14px 2px;
@@ -334,22 +339,22 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   gap: 8px;
   padding: 7px 14px;
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: 6px;
   margin: 1px 6px;
   transition: background 0.12s;
 }
 .cm-conn-item:hover { background: #e8edf3; }
 .cm-conn-item.selected { background: #dbeafe; }
 .conn-dot {
-  width: 8px; height: 8px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.conn-dot.connected { background: #4CAF50; }
-.conn-dot.disconnected { background: #bbb; }
+.conn-dot.connected { background: #22c55e; }
+.conn-dot.disconnected { background: #d1d5db; }
 .conn-info { min-width: 0; flex: 1; }
-.conn-name { display: block; font-size: 13px; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.conn-host { display: block; font-size: 11px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conn-name { display: block; font-size: 13px; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conn-host { display: block; font-size: 11px; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cm-group-block { margin: 4px 0; }
 .cm-group-header {
   display: flex;
@@ -362,13 +367,13 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-radius: 4px;
+  border-radius: 5px;
   margin: 0 6px;
   user-select: none;
   transition: background 0.12s;
 }
 .cm-group-header:hover { background: #e8edf3; }
-.cm-group-header.drag-over { background: #dbeafe; border: 1px dashed #4e9af1; }
+.cm-group-header.drag-over { background: #dbeafe; border: 1px dashed #3b82f6; }
 .arrow { font-size: 9px; }
 .gname { flex: 1; }
 .gcount {
@@ -382,7 +387,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 .cm-group-conns { padding-left: 10px; }
 .cm-empty {
   text-align: center;
-  color: #bbb;
+  color: #d1d5db;
   font-size: 13px;
   padding: 30px 16px;
 }
@@ -397,16 +402,16 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   position: fixed;
   z-index: 2000;
   background: white;
-  border: 1px solid #e0e0e0;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
   min-width: 160px;
   padding: 4px 0;
 }
 .ctx-section-label {
   font-size: 10px;
-  color: #aaa;
-  font-weight: 600;
+  color: #9ca3af;
+  font-weight: 700;
   text-transform: uppercase;
   padding: 4px 14px 2px;
   letter-spacing: 0.5px;
@@ -414,12 +419,12 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 .ctx-item {
   padding: 7px 14px;
   font-size: 13px;
-  color: #333;
+  color: #374151;
   cursor: pointer;
   white-space: nowrap;
 }
-.ctx-item:hover { background: #f0f0f0; }
-.ctx-divider { height: 1px; background: #eee; margin: 4px 0; }
-.ctx-danger { color: #e53e3e; }
-.ctx-danger:hover { background: #fff5f5; }
+.ctx-item:hover { background: #f3f4f6; }
+.ctx-divider { height: 1px; background: #e5e7eb; margin: 4px 0; }
+.ctx-danger { color: #dc2626; }
+.ctx-danger:hover { background: #fff1f2; color: #dc2626; }
 </style>

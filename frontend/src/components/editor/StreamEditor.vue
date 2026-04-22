@@ -82,49 +82,56 @@ function openExpand(key, val) {
 <style scoped>
 .stream-editor { display: flex; flex-direction: column; height: 100%; gap: 8px; }
 .toolbar { display: flex; align-items: center; }
-.count { font-size: 12px; color: #999; margin-left: auto; }
+.count { font-size: 12px; color: #9ca3af; margin-left: auto; }
 .stream-wrap { flex: 1; overflow-y: auto; }
-.stream-entry { border-bottom: 1px solid #f0f0f0; padding: 6px 8px; font-size: 12px; }
-.stream-entry:hover { background: #fafafa; }
-.entry-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.stream-entry { border-bottom: 1px solid #f0f0f0; padding: 7px 10px; font-size: 12px; }
+.stream-entry:hover { background: #f9fafb; }
+.entry-header { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
 .entry-num {
-  background: #e0f7fa;
-  color: #006064;
-  padding: 1px 5px;
-  border-radius: 3px;
+  background: #ecfeff;
+  color: #0e7490;
+  padding: 1px 6px;
+  border-radius: 4px;
   font-size: 11px;
   min-width: 24px;
   text-align: center;
   flex-shrink: 0;
+  font-weight: 500;
 }
-.entry-id { font-family: monospace; color: #006064; font-weight: 500; font-size: 11px; flex: 1; }
+.entry-id { font-family: monospace; color: #0e7490; font-weight: 500; font-size: 11px; flex: 1; }
 .btn-entry-copy {
   margin-left: auto;
-  padding: 1px 8px;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 2px 9px;
+  background: #fff;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
   font-size: 11px;
-  background: white;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  white-space: nowrap;
   flex-shrink: 0;
 }
-.btn-entry-copy:hover { background: #f0f0f0; }
+.btn-entry-copy:hover { background: #f3f4f6; border-color: #d1d5db; color: #374151; }
 .entry-fields { display: flex; flex-wrap: wrap; gap: 6px; }
-.field-pair { display: flex; align-items: baseline; gap: 2px; background: #e0f7fa; padding: 2px 6px; border-radius: 3px; flex-wrap: wrap; }
-.field-key { color: #006064; font-weight: 500; }
-.field-sep { color: #aaa; }
-.field-val { color: #333; font-family: monospace; word-break: break-all; max-width: 200px; }
-.val-ellipsis { font-size: 11px; color: #4e9af1; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.field-pair { display: flex; align-items: baseline; gap: 2px; background: #ecfeff; padding: 2px 7px; border-radius: 4px; flex-wrap: wrap; border: 1px solid #cffafe; }
+.field-key { color: #0e7490; font-weight: 600; font-size: 11px; }
+.field-sep { color: #94a3b8; }
+.field-val { color: #1f2937; font-family: monospace; word-break: break-all; max-width: 200px; font-size: 11px; }
+.val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .val-ellipsis:hover { text-decoration: underline; }
-.load-more { display: flex; justify-content: center; padding: 4px 0; flex-shrink: 0; }
+.load-more { display: flex; justify-content: center; padding: 6px 0; flex-shrink: 0; }
 .btn-load-more {
-  padding: 4px 16px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 4px 18px;
+  background: #fff;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
   font-size: 12px;
-  background: white;
-  color: #555;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
 }
-.btn-load-more:hover { background: #f0f0f0; }
+.btn-load-more:hover { background: #f9fafb; border-color: #9ca3af; color: #374151; }
 </style>

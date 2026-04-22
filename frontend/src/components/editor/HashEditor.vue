@@ -109,7 +109,7 @@ const isSearching   = ref(false)
 const sortOrder = ref('none')   // 'none' | 'asc' | 'desc'
 const sortIcon = computed(() => ({ none: '⇅', asc: '↑', desc: '↓' })[sortOrder.value])
 function cycleSortOrder() {
-  sortOrder.value = { none: 'asc', asc: 'desc', desc: 'none' }[sortOrder.value]
+  sortOrder.value = { none: 'desc', desc: 'asc', asc: 'none' }[sortOrder.value]
 }
 
 // expand modal
@@ -241,60 +241,40 @@ async function addField() {
 <style scoped>
 .hash-editor { display: flex; flex-direction: column; height: 100%; gap: 8px; }
 .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.btn-add { padding: 4px 10px; background: #4e9af1; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; flex-shrink: 0; }
-.btn-add:hover { background: #3a85e0; }
 .search-bar { display: flex; align-items: center; }
 .search-input {
   width: 130px; padding: 3px 8px;
-  border: 1px solid #ddd; border-right: none;
-  border-radius: 4px 0 0 4px; font-size: 12px; outline: none; color: #333;
+  border: 1px solid #d1d5db; border-right: none;
+  border-radius: 5px 0 0 5px; font-size: 12px; outline: none; color: #333;
 }
-.search-input:focus { border-color: #4e9af1; }
-.btn-search {
-  padding: 3px 8px; cursor: pointer; font-size: 12px;
-  border: 1px solid #ddd; border-radius: 0 4px 4px 0;
-  background: #f5f5f5; color: #555; white-space: nowrap;
-}
-.btn-search:hover:not(:disabled) { background: #e8e8e8; }
-.btn-search:disabled { opacity: 0.6; cursor: default; }
-.btn-clear-search {
-  padding: 3px 6px; margin-left: 4px; border: 1px solid #ddd; border-radius: 4px;
-  cursor: pointer; font-size: 11px; background: #fff3e0; color: #e65100;
-}
-.btn-clear-search:hover { background: #ffe0b2; }
-.count { font-size: 12px; color: #999; margin-left: auto; white-space: nowrap; }
-.add-row { display: flex; gap: 6px; padding: 6px; background: #f9f9f9; border-radius: 4px; }
-.add-row input { flex: 1; padding: 4px 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 12px; }
-.add-row button { padding: 4px 10px; border: 1px solid #ddd; border-radius: 3px; cursor: pointer; font-size: 12px; }
+.search-input:focus { border-color: #3b82f6; }
+.count { font-size: 12px; color: #9ca3af; margin-left: auto; white-space: nowrap; }
+.add-row { display: flex; gap: 6px; padding: 6px; background: #f9fafb; border-radius: 6px; border: 1px solid #e5e7eb; }
+.add-row input { flex: 1; padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 5px; font-size: 12px; outline: none; }
+.add-row input:focus { border-color: #3b82f6; }
+.add-row button { padding: 4px 10px; border: 1px solid #d1d5db; border-radius: 5px; cursor: pointer; font-size: 12px; background: #fff; color: #374151; }
+.add-row button:hover { background: #f3f4f6; }
 .hash-table-wrap { flex: 1; overflow-y: auto; }
 .hash-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.hash-table th { background: #f5f5f5; padding: 5px 8px; text-align: left; border-bottom: 1px solid #e0e0e0; font-weight: 500; color: #555; }
-.hash-table td { padding: 4px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
-.num-col { width: 36px; text-align: center; color: #bbb; font-weight: 400; }
-.num-cell { width: 36px; text-align: center; color: #bbb; font-size: 11px; }
-.field-cell { color: #1565c0; font-weight: 500; max-width: 150px; word-break: break-all; }
+.hash-table th { background: #f9fafb; padding: 6px 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+.hash-table td { padding: 5px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+.num-col { width: 36px; text-align: center; }
+.num-cell { width: 36px; text-align: center; color: #d1d5db; font-size: 11px; }
+.field-cell { color: #1d4ed8; font-weight: 500; max-width: 150px; word-break: break-all; }
 .value-cell { max-width: 300px; }
 .value-text { cursor: pointer; display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; }
-.val-preview { font-family: monospace; font-size: 12px; word-break: break-all; color: #333; }
-.val-ellipsis { font-size: 11px; color: #4e9af1; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.val-preview { font-family: monospace; font-size: 12px; word-break: break-all; color: #374151; }
+.val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .val-ellipsis:hover { text-decoration: underline; }
-.value-cell input { width: 100%; padding: 2px 4px; border: 1px solid #4e9af1; border-radius: 2px; font-size: 12px; }
+.value-cell input { width: 100%; padding: 3px 6px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 12px; outline: none; }
 .action-cell { text-align: right; white-space: nowrap; }
-.action-btns { display: inline-flex; gap: 3px; justify-content: flex-end; }
-.btn-tiny { padding: 2px 6px; border: 1px solid #ddd; border-radius: 3px; cursor: pointer; font-size: 11px; background: white; margin-right: 3px; }
-.btn-tiny:hover { background: #f0f0f0; }
-.btn-tiny.danger:hover { background: #e53e3e; color: white; border-color: #e53e3e; }
+.action-btns { display: inline-flex; gap: 4px; justify-content: flex-end; }
 .sortable-col { cursor: pointer; user-select: none; }
-.sortable-col:hover { background: #ebebeb !important; }
-.sort-icon { display: inline-block; margin-left: 4px; font-size: 11px; color: #bbb; }
-.sort-icon.asc, .sort-icon.desc { color: #4e9af1; font-weight: bold; }
-.load-more { display: flex; justify-content: center; padding: 4px 0; flex-shrink: 0; }
-.btn-load-more {
-  padding: 4px 16px; border: 1px solid #ddd; border-radius: 4px;
-  cursor: pointer; font-size: 12px; background: white; color: #555;
-}
-.btn-load-more:hover { background: #f0f0f0; }
-.msg { font-size: 12px; padding: 4px 8px; border-radius: 4px; }
-.ok { background: #e8f5e9; color: #2e7d32; }
-.err { background: #fce4ec; color: #b71c1c; }
+.sortable-col:hover { background: #f3f4f6 !important; }
+.sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; color: #d1d5db; }
+.sort-icon.asc, .sort-icon.desc { color: #3b82f6; font-weight: bold; }
+.load-more { display: flex; justify-content: center; padding: 6px 0; flex-shrink: 0; }
+.msg { font-size: 12px; padding: 5px 10px; border-radius: 6px; }
+.ok { background: #f0fdf4; color: #166534; }
+.err { background: #fff1f2; color: #991b1b; }
 </style>

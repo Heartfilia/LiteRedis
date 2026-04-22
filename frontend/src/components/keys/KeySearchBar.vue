@@ -48,7 +48,13 @@ async function doSearch() {
   if (loading.value) return
   loading.value = true
   try {
-    await workspaceStore.search(pattern.value)
+    const p = pattern.value.trim() || '*'
+    // 没有通配符且不为空：构造只含这一个 key 的搜索 session，并直接选中展示 value
+    if (p !== '*' && !p.includes('*') && !p.includes('?') && !p.includes('[')) {
+      await workspaceStore.searchExact(p)
+    } else {
+      await workspaceStore.search(p)
+    }
   } finally {
     loading.value = false
   }
@@ -57,39 +63,45 @@ async function doSearch() {
 
 <style scoped>
 .key-search-bar {
-  padding: 8px 12px;
-  border-bottom: 1px solid #eee;
-  background: #fafafa;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
 }
 .search-input-row {
   display: flex;
-  gap: 6px;
+  gap: 0;
 }
 .search-input-row input {
   flex: 1;
-  padding: 5px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 13px;
+  padding: 5px 10px;
+  border: 1px solid #d1d5db;
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  font-size: 12px;
   outline: none;
+  color: #1f2937;
+  transition: border-color 0.15s;
 }
-.search-input-row input:focus { border-color: #4e9af1; }
+.search-input-row input:focus { border-color: #3b82f6; }
 .btn-search {
+  display: inline-flex; align-items: center; justify-content: center;
   padding: 5px 14px;
-  background: #4e9af1;
+  background: #3b82f6;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 0 6px 6px 0;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
+  transition: background 0.15s;
 }
-.btn-search:hover { background: #3a85e0; }
-.btn-search:disabled { background: #aaa; cursor: default; }
+.btn-search:hover:not(:disabled) { background: #2563eb; }
+.btn-search:disabled { background: #93c5fd; cursor: not-allowed; }
 .search-options { margin-top: 5px; }
 .keep-label {
   font-size: 12px;
-  color: #666;
+  color: #6b7280;
   display: flex;
   align-items: center;
   gap: 4px;

@@ -160,21 +160,24 @@ async function doSave() {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #e5e7eb;
   font-weight: 600;
   font-size: 14px;
-  color: #333;
-  background: #fafafa;
+  color: #111827;
+  background: #f9fafb;
 }
 .btn-close {
   background: transparent;
-  border: none;
-  font-size: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
   cursor: pointer;
-  color: #999;
-  padding: 2px 6px;
+  color: #9ca3af;
+  padding: 2px 8px;
+  line-height: 1.4;
+  transition: color 0.12s, border-color 0.12s;
 }
-.btn-close:hover { color: #e53e3e; }
+.btn-close:hover { color: #dc2626; border-color: #fca5a5; background: #fff1f2; }
 
 .settings-body {
   flex: 1;
@@ -185,7 +188,7 @@ async function doSave() {
 .section-title {
   font-size: 11px;
   font-weight: 700;
-  color: #9e9e9e;
+  color: #9ca3af;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   margin-bottom: 10px;
@@ -197,7 +200,7 @@ async function doSave() {
   align-items: center;
   justify-content: space-between;
   padding: 8px 0;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid #f3f4f6;
   gap: 12px;
 }
 .setting-item label {
@@ -207,13 +210,13 @@ async function doSave() {
 .label-text {
   display: block;
   font-size: 13px;
-  color: #333;
+  color: #1f2937;
   font-weight: 500;
 }
 .label-hint {
   display: block;
   font-size: 11px;
-  color: #999;
+  color: #9ca3af;
   margin-top: 2px;
 }
 .input-unit {
@@ -225,16 +228,17 @@ async function doSave() {
 .input-unit input {
   width: 80px;
   padding: 5px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   font-size: 13px;
   text-align: right;
   outline: none;
+  transition: border-color 0.15s;
 }
-.input-unit input:focus { border-color: #4e9af1; }
+.input-unit input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
 .unit {
   font-size: 12px;
-  color: #666;
+  color: #6b7280;
   white-space: nowrap;
 }
 
@@ -243,44 +247,53 @@ async function doSave() {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid #eee;
-  background: #fafafa;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
 }
 .save-msg {
   flex: 1;
   font-size: 12px;
 }
-.save-msg.ok { color: #2e7d32; }
-.save-msg.err { color: #b71c1c; }
+.save-msg.ok { color: #166534; }
+.save-msg.err { color: #991b1b; }
 .btn-save {
+  display: inline-flex; align-items: center; justify-content: center;
   padding: 6px 18px;
-  background: #4e9af1;
+  background: #3b82f6;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s;
 }
-.btn-save:hover { background: #3a85e0; }
-.btn-save:disabled { background: #aaa; cursor: default; }
+.btn-save:hover { background: #2563eb; }
+.btn-save:disabled { background: #93c5fd; cursor: not-allowed; }
 .btn-cancel {
+  display: inline-flex; align-items: center; justify-content: center;
   padding: 6px 14px;
-  background: #f5f5f5;
-  color: #555;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 500;
+  transition: background 0.12s, border-color 0.12s;
 }
-.btn-cancel:hover { background: #eee; }
+.btn-cancel:hover { background: #f3f4f6; border-color: #9ca3af; }
 .btn-close-modal {
+  display: inline-flex; align-items: center; justify-content: center;
   padding: 6px 14px;
-  background: #f5f5f5;
-  color: #555;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 500;
+  transition: background 0.12s, border-color 0.12s;
 }
-.btn-close-modal:hover { background: #eee; }
+.btn-close-modal:hover { background: #f3f4f6; border-color: #9ca3af; }
 </style>

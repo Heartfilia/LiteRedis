@@ -1,0 +1,170 @@
+/* ============================================================
+   全局通用按钮样式
+   引入方式：在需要的组件 <style> 里 @import '../../assets/btn.css';
+   或在 main.js 里全局引入
+   ============================================================ */
+
+/* ------ 主色按钮（蓝） ------ */
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 5px 14px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+.btn-primary:hover { background: #2563eb; box-shadow: 0 1px 4px rgba(37,99,235,.25); }
+.btn-primary:active { background: #1d4ed8; }
+.btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+
+/* ------ 次级按钮（灰边框） ------ */
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 5px 12px;
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.btn-secondary:hover { background: #f3f4f6; border-color: #9ca3af; }
+.btn-secondary:active { background: #e5e7eb; }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ------ 危险按钮（红） ------ */
+.btn-danger {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 5px 12px;
+  background: #fff;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.btn-danger:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
+.btn-danger:active { background: #b91c1c; border-color: #b91c1c; }
+
+/* ------ 危险确认按钮（实红） ------ */
+.btn-danger-confirm {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 5px 12px;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-danger-confirm:hover { background: #b91c1c; }
+
+/* ------ 微型操作按钮（表格内） ------ */
+.btn-tiny {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 2px 7px;
+  background: #fff;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+.btn-tiny:hover { background: #f9fafb; border-color: #d1d5db; color: #374151; }
+.btn-tiny.danger { color: #dc2626; border-color: #fca5a5; }
+.btn-tiny.danger:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
+.btn-tiny.success { color: #059669; border-color: #6ee7b7; }
+.btn-tiny.success:hover { background: #059669; color: #fff; border-color: #059669; }
+
+/* ------ + 添加按钮（toolbar） ------ */
+.btn-add {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 4px 11px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-add:hover { background: #2563eb; }
+
+/* ------ 搜索按钮 ------ */
+.btn-search {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 3px 10px;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-left: none;
+  border-radius: 0 5px 5px 0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+.btn-search:hover:not(:disabled) { background: #e5e7eb; }
+.btn-search:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ------ 清除搜索按钮 ------ */
+.btn-clear-search {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 2px 7px;
+  margin-left: 4px;
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.btn-clear-search:hover { background: #ffedd5; }
+
+/* ------ 显示更多按钮 ------ */
+.btn-load-more {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 4px 18px;
+  background: #fff;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.btn-load-more:hover { background: #f9fafb; border-color: #9ca3af; color: #374151; }
+
+/* ------ icon 按钮（圆角小方块，侧边栏用） ------ */
+.btn-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  background: rgba(255,255,255,.12);
+  color: #e2e8f0;
+  border: none;
+  border-radius: 5px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.btn-icon:hover { background: rgba(255,255,255,.2); }

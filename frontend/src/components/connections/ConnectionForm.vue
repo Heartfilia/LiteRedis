@@ -12,10 +12,11 @@
       <input
         v-model="form.group"
         type="text"
-        placeholder="留空则不分组，同名即同组"
+        placeholder="未分组"
         list="group-datalist"
       />
       <datalist id="group-datalist">
+        <option value="" label="未分组" />
         <option v-for="g in existingGroups" :key="g" :value="g" />
       </datalist>
     </div>
@@ -225,14 +226,15 @@ async function handleSave() {
   padding: 16px;
   max-width: 480px;
 }
-h3 { margin: 0 0 16px; font-size: 16px; color: #333; }
+h3 { margin: 0 0 16px; font-size: 15px; color: #111827; font-weight: 600; }
 .form-group { margin-bottom: 12px; }
-.form-group label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
+.form-group label { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; font-weight: 500; }
 input[type=text], input[type=password], input[type=number], textarea {
-  width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px;
-  font-size: 13px; box-sizing: border-box; outline: none;
+  width: 100%; padding: 6px 9px; border: 1px solid #d1d5db; border-radius: 6px;
+  font-size: 13px; box-sizing: border-box; outline: none; color: #1f2937;
+  transition: border-color 0.15s;
 }
-input:focus, textarea:focus { border-color: #4e9af1; }
+input:focus, textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.12); }
 textarea { resize: vertical; font-family: monospace; }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; }
 .toggle-row input[type=checkbox] { width: auto; }
@@ -240,16 +242,38 @@ textarea { resize: vertical; font-family: monospace; }
 .flex1 { flex: 1; }
 .w100 { width: 100px; }
 .w80 { width: 80px; }
-.ssh-section { border-top: 1px solid #eee; padding-top: 12px; margin-top: 4px; }
-.ssh-panel { background: #f9f9f9; padding: 12px; border-radius: 4px; margin-top: 8px; }
+.ssh-section { border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 4px; }
+.ssh-panel { background: #f9fafb; padding: 12px; border-radius: 6px; margin-top: 8px; border: 1px solid #e5e7eb; }
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-.btn-primary { padding: 6px 16px; background: #4e9af1; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
-.btn-primary:hover { background: #3a85e0; }
-.btn-primary:disabled { background: #aaa; cursor: default; }
-.btn-secondary { padding: 6px 16px; background: #f5f5f5; color: #333; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 13px; }
-.btn-secondary:hover { background: #eee; }
-.btn-secondary:disabled { opacity: 0.6; cursor: default; }
-.test-msg { margin-top: 8px; padding: 6px 10px; border-radius: 4px; font-size: 12px; }
-.test-msg.ok { background: #e8f5e9; color: #2e7d32; }
-.test-msg.err { background: #fce4ec; color: #b71c1c; }
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 6px 18px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: #2563eb; }
+.btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 6px 14px;
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.12s, border-color 0.12s;
+}
+.btn-secondary:hover { background: #f3f4f6; border-color: #9ca3af; }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+.test-msg { margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 12px; }
+.test-msg.ok { background: #f0fdf4; color: #166534; }
+.test-msg.err { background: #fff1f2; color: #991b1b; }
 </style>

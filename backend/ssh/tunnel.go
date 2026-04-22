@@ -27,6 +27,17 @@ func NewSSHTunnel(host string, port int, user string, password string) (*gossh.C
 	return client, nil
 }
 
+// deadlineConn 包装 SSH channel 连接，将不支持的 deadline 方法变为 no-op
+// go-redis 内部会调用 SetDeadline/SetReadDeadline/SetWriteDeadline，
+// 而 SSH channel 不实现这些接口，会返回 "deadline not supported" 错误。
+type deadlineConn struct {
+	net.Conn
+}
+
+func (c *deadlineConn) SetDeadline(_ time.Time) error      { return nil }
+func (c *deadlineConn) SetReadDeadline(_ time.Time) error  { return nil }
+func (c *deadlineConn) SetWriteDeadline(_ time.Time) error { return nil }
+
 // MakeDialer 返回一个使用 SSH 客户端拨号的 Dialer 函数
 // 如果 sshClient 为 nil，则走正常 TCP
 func MakeDialer(sshClient *gossh.Client) func(network, addr string) (net.Conn, error) {
@@ -34,6 +45,10 @@ func MakeDialer(sshClient *gossh.Client) func(network, addr string) (net.Conn, e
 		return nil
 	}
 	return func(network, addr string) (net.Conn, error) {
-		return sshClient.Dial(network, addr)
+		conn, err := sshClient.Dial(network, addr)
+		if err != nil {
+			return nil, err
+		}
+		return &deadlineConn{conn}, nil
 	}
 }

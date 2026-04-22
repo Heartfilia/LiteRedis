@@ -69,23 +69,45 @@ async function save() {
 
 <style scoped>
 .string-editor { display: flex; flex-direction: column; gap: 8px; height: 100%; }
-textarea { flex: 1; resize: none; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 13px; outline: none; }
-textarea:focus { border-color: #4e9af1; }
+textarea {
+  flex: 1; resize: none; padding: 10px 12px;
+  border: 1px solid #d1d5db; border-radius: 6px;
+  font-family: monospace; font-size: 13px; outline: none;
+  line-height: 1.6; color: #1f2937;
+  transition: border-color 0.15s;
+}
+textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
 .editor-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .btn-action {
-  padding: 5px 14px;
-  background: white;
-  color: #555;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 5px 13px;
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  font-size: 13px;
+  transition: background 0.12s, border-color 0.12s;
+  white-space: nowrap;
 }
-.btn-action:hover { background: #f0f0f0; }
-.btn-primary { padding: 5px 16px; background: #4e9af1; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
-.btn-primary:hover { background: #3a85e0; }
-.btn-primary:disabled { background: #aaa; }
-.msg { font-size: 12px; padding: 4px 8px; border-radius: 4px; }
-.ok { background: #e8f5e9; color: #2e7d32; }
-.err { background: #fce4ec; color: #b71c1c; }
+.btn-action:hover { background: #f3f4f6; border-color: #9ca3af; }
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 5px 16px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-primary:hover { background: #2563eb; }
+.btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+.msg { font-size: 12px; padding: 5px 10px; border-radius: 6px; }
+.ok { background: #f0fdf4; color: #166534; }
+.err { background: #fff1f2; color: #991b1b; }
 </style>

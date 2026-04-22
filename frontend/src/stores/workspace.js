@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { scanKeys, getValue, deleteKey, renameKey, setTTL, selectDB, dbSize } from '../api/wails.js'
+import { scanKeys, getValue, getKeyInfo, deleteKey, renameKey, setTTL, selectDB, dbSize } from '../api/wails.js'
 import { buildKeyTree } from '../utils/keyTree.js'
 import { useSettingsStore } from './settings.js'
 
@@ -95,6 +95,58 @@ export const useWorkspaceStore = defineStore('workspace', {
             treeData: buildKeyTree(keys || []),
             loading: false,
           }
+        }
+      } catch (e) {
+        const idx = this.searchSessions.findIndex(s => s.id === sessionId)
+        if (idx !== -1) {
+          this.searchSessions[idx] = {
+            ...this.searchSessions[idx],
+            loading: false,
+            error: e.message || String(e),
+          }
+        }
+      }
+    },
+
+    /**
+     * 精确 key 搜索：不走 SCAN，直接用 GetKeyInfo 构造只含这一个 key 的 session，
+     * 并同时触发右侧 value 加载。key 不存在时 session 显示为空列表。
+     */
+    async searchExact(key) {
+      if (!this.activeConnID) return
+      const sessionId = Date.now().toString()
+      const session = {
+        id: sessionId,
+        pattern: key,
+        keys: [],
+        treeData: [],
+        loading: true,
+        error: null,
+      }
+      if (!this.keepPrevSearch) {
+        this.searchSessions = [session]
+      } else {
+        this.searchSessions = this.searchSessions.filter(s => s.pattern !== key)
+        this.searchSessions.push(session)
+      }
+      this.activeSessionId = sessionId
+
+      try {
+        const info = await getKeyInfo(this.activeConnID, key)
+        const idx = this.searchSessions.findIndex(s => s.id === sessionId)
+        // info.name 是 key 名，info.type === 'none' 表示 key 不存在
+        const exists = info && info.name && info.type && info.type !== 'none'
+        if (idx !== -1) {
+          const keys = exists ? [info] : []
+          this.searchSessions[idx] = {
+            ...this.searchSessions[idx],
+            keys,
+            treeData: buildKeyTree(keys),
+            loading: false,
+          }
+        }
+        if (exists) {
+          await this.selectKey(key)
         }
       } catch (e) {
         const idx = this.searchSessions.findIndex(s => s.id === sessionId)
