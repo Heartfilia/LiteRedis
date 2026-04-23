@@ -46,11 +46,11 @@ jobs:
           path: build/bin/LiteRedis-macos-arm64.zip
 
   # ─────────────────────────────────────────
-  # macOS x64 (Intel)
+  # Linux x64
   # ─────────────────────────────────────────
-  build-macos-amd64:
-    name: Build macOS (Intel)
-    runs-on: macos-13
+  build-linux-amd64:
+    name: Build Linux (x86_64)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -65,21 +65,30 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.0-dev \
+            build-essential \
+            pkg-config
+
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       - name: Build
-        run: wails build -platform darwin/amd64 -clean
+        run: wails build -platform linux/amd64 -clean
 
-      - name: Package .app → zip
+      - name: Package → tar.gz
         run: |
           cd build/bin
-          zip -r LiteRedis-macos-amd64.zip LiteRedis.app
+          tar -czf LiteRedis-linux-amd64.tar.gz LiteRedis
 
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-amd64
-          path: build/bin/LiteRedis-macos-amd64.zip
+          name: linux-amd64
+          path: build/bin/LiteRedis-linux-amd64.tar.gz
 
   # ─────────────────────────────────────────
   # Windows x64
@@ -119,7 +128,7 @@ jobs:
   # ─────────────────────────────────────────
   release:
     name: Create GitHub Release
-    needs: [build-macos-arm64, build-macos-amd64, build-windows]
+    needs: [build-macos-arm64, build-linux-amd64, build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -137,6 +146,6 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/macos-arm64/LiteRedis-macos-arm64.zip
-            artifacts/macos-amd64/LiteRedis-macos-amd64.zip
+            artifacts/linux-amd64/LiteRedis-linux-amd64.tar.gz
             artifacts/windows-amd64/LiteRedis.exe
             artifacts/windows-amd64/LiteRedis-amd64-installer.exe
