@@ -126,11 +126,11 @@ func (a *App) SelectDB(id string, db int) config.OperationResult {
 // Key 操作
 // ============================================================
 
-// ScanKeys 扫描 key（SCAN + Pipeline 批量 TYPE/TTL），count<=0 时使用设置中的值
-func (a *App) ScanKeys(connID string, pattern string, count int64) ([]config.RedisKey, error) {
+// ScanKeys 扫描 key（SCAN + Pipeline 批量 TYPE/TTL），支持 cursor 分页。count<=0 时使用设置中的值，cursor=0 表示第一页。
+func (a *App) ScanKeys(connID string, pattern string, count int64, cursor uint64) (config.ScanResult, error) {
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
-		return nil, err
+		return config.ScanResult{}, err
 	}
 	if count <= 0 {
 		settings, _ := config.GetSettings()
@@ -139,7 +139,7 @@ func (a *App) ScanKeys(connID string, pattern string, count int64) ([]config.Red
 			count = 100
 		}
 	}
-	return redisbackend.ScanKeys(a.ctx, client, pattern, count)
+	return redisbackend.ScanKeys(a.ctx, client, pattern, count, cursor)
 }
 
 // GetKeyInfo 获取单个 key 元信息
@@ -201,8 +201,8 @@ func (a *App) DBSize(connID string) int64 {
 // Value CRUD
 // ============================================================
 
-// GetValue 读取完整 Value
-func (a *App) GetValue(connID, key string) (config.KeyValue, error) {
+// GetValue 读取 Value（支持 cursor/offset 分页）。cursor=0, offset=0 表示第一页。
+func (a *App) GetValue(connID, key string, cursor uint64, offset int) (config.KeyValue, error) {
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.KeyValue{}, err
@@ -211,7 +211,7 @@ func (a *App) GetValue(connID, key string) (config.KeyValue, error) {
 	// 每次读取用独立超时 context，防止大 key 阻塞整个应用
 	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
 	defer cancel()
-	return redisbackend.GetValue(ctx, client, key, settings)
+	return redisbackend.GetValue(ctx, client, key, settings, cursor, offset)
 }
 
 // SearchValue 按 pattern 搜索 key 内成员（Hash/Set/ZSet 使用 Redis glob，List 使用子串匹配）

@@ -10,17 +10,19 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// GetValue 读取 key 的完整值（按类型分支），loadCount 控制每次加载条数（≤0 取默认）
-func GetValue(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings) (config.KeyValue, error) {
+// GetValue 读取 key 的值（按类型分支），支持 cursor/offset 分页。
+// cursor=0, offset=0 表示第一页。loadCount 控制每次加载条数（≤0 取默认）。
+func GetValue(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings, cursor uint64, offset int) (config.KeyValue, error) {
 	keyInfo, err := GetKeyInfo(ctx, client, key)
 	if err != nil {
 		return config.KeyValue{}, err
 	}
 
 	kv := config.KeyValue{
-		Key:  key,
-		Type: keyInfo.Type,
-		TTL:  keyInfo.TTL,
+		Key:        key,
+		Type:       keyInfo.Type,
+		TTL:        keyInfo.TTL,
+		TotalCount: -1,
 	}
 
 	def := config.DefaultSettings()
@@ -53,11 +55,10 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 			return kv, err
 		}
 		kv.StringVal = val
+		kv.HasMore = false
 
 	case "hash":
-		// HSCAN 支持按量加载，防止超大 hash 阻塞
 		result := make(map[string]string)
-		var cursor uint64
 		loaded := int64(0)
 		for {
 			keys, newCursor, err := client.HScan(ctx, key, cursor, "*", hashCount).Result()
@@ -74,33 +75,45 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 			}
 		}
 		kv.HashVal = result
+		kv.NextCursor = cursor
+		kv.HasMore = cursor != 0
 
 	case "list":
-		val, err := client.LRange(ctx, key, 0, listCount-1).Result()
+		end := int64(offset) + listCount - 1
+		val, err := client.LRange(ctx, key, int64(offset), end).Result()
 		if err != nil {
 			return kv, err
 		}
+		total, _ := client.LLen(ctx, key).Result()
 		kv.ListVal = val
+		kv.NextOffset = offset + len(val)
+		kv.TotalCount = total
+		kv.HasMore = int64(offset+len(val)) < total
 
 	case "set":
 		var members []string
-		iter := client.SScan(ctx, key, 0, "*", setCount).Iterator()
-		for iter.Next(ctx) {
-			members = append(members, iter.Val())
-			if int64(len(members)) >= setCount {
+		for {
+			batch, newCursor, err := client.SScan(ctx, key, cursor, "*", setCount).Result()
+			if err != nil {
+				return kv, err
+			}
+			members = append(members, batch...)
+			cursor = newCursor
+			if cursor == 0 || int64(len(members)) >= setCount {
 				break
 			}
 		}
-		if err := iter.Err(); err != nil {
-			return kv, err
-		}
 		kv.SetVal = members
+		kv.NextCursor = cursor
+		kv.HasMore = cursor != 0
 
 	case "zset":
-		vals, err := client.ZRangeWithScores(ctx, key, 0, zsetCount-1).Result()
+		end := int64(offset) + zsetCount - 1
+		vals, err := client.ZRangeWithScores(ctx, key, int64(offset), end).Result()
 		if err != nil {
 			return kv, err
 		}
+		total, _ := client.ZCard(ctx, key).Result()
 		members := make([]config.ZSetMember, len(vals))
 		for i, z := range vals {
 			members[i] = config.ZSetMember{
@@ -109,6 +122,9 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 			}
 		}
 		kv.ZSetVal = members
+		kv.NextOffset = offset + len(vals)
+		kv.TotalCount = total
+		kv.HasMore = int64(offset+len(vals)) < total
 
 	case "stream":
 		vals, err := client.XRevRangeN(ctx, key, "+", "-", streamCount).Result()
@@ -127,6 +143,7 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 			}
 		}
 		kv.StreamVal = entries
+		kv.HasMore = false
 	}
 
 	return kv, nil

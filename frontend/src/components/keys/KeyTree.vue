@@ -30,11 +30,22 @@
                   :depth="0"
                 />
               </div>
+              <div class="section-load-more">
+                <button
+                  v-if="sess.hasMore"
+                  class="btn-load-more"
+                  :disabled="sess.loading"
+                  @click="workspaceStore.loadMoreKeys(sess.id)"
+                >
+                  {{ sess.loading ? '加载中...' : '加载更多' }}
+                </button>
+                <span v-else-if="sess.keys?.length > 0" class="load-more-hint">已加载全部 {{ sess.keys.length }} 个 key</span>
+              </div>
             </div>
           </div>
         </template>
 
-        <!-- 单session模式：keepPrevSearch = false（原逻辑不变） -->
+        <!-- 单session模式：keepPrevSearch = false -->
         <template v-else>
           <div v-if="session?.loading" class="loading">加载中...</div>
           <div v-else-if="!session" class="empty-state">输入关键词搜索 key</div>
@@ -46,6 +57,17 @@
               :node="node"
               :depth="0"
             />
+            <div class="tree-load-more">
+              <button
+                v-if="session.hasMore"
+                class="btn-load-more"
+                :disabled="session.loading"
+                @click="workspaceStore.loadMoreKeys(session.id)"
+              >
+                {{ session.loading ? '加载中...' : '加载更多' }}
+              </button>
+              <span v-else class="load-more-hint">已加载全部 {{ session.keys.length }} 个 key</span>
+            </div>
           </div>
         </template>
       </div>
@@ -138,6 +160,41 @@ async function switchDB(db) {
 }
 .section-close:hover { color: #e53e3e; }
 .section-tip { padding: 10px 16px; color: #bbb; font-size: 12px; }
+
+.section-load-more,
+.tree-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+  flex-shrink: 0;
+}
+
+.btn-load-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 20px;
+  background: #fff;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-load-more:hover:not(:disabled) {
+  background: #eff6ff;
+}
+.btn-load-more:disabled {
+  color: #9ca3af;
+  border-color: #d1d5db;
+  cursor: not-allowed;
+  background: #f9fafb;
+}
+.load-more-hint {
+  font-size: 12px;
+  color: #9ca3af;
+}
 
 .db-bar {
   display: flex;

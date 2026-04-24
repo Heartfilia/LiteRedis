@@ -23,12 +23,6 @@
       </div>
     </div>
 
-    <!-- 显示更多 -->
-    <div v-if="entries.length > displayLimit" class="load-more">
-      <button class="btn-load-more" @click="displayLimit += loadCount">
-        显示更多（{{ displayLimit }}/{{ entries.length }}）
-      </button>
-    </div>
 
     <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" @close="expandShow = false" />
   </div>
@@ -49,16 +43,11 @@ const expandShow = ref(false)
 const expandTitle = ref('')
 const expandContent = ref('')
 
-const loadCount = computed(() => settingsStore.streamLoadCount)
-const displayLimit = ref(0)
-
-watch(loadCount, (v) => { displayLimit.value = v }, { immediate: true })
-
-const displayEntries = computed(() => entries.value.slice(0, displayLimit.value))
+// Stream 暂不分页，直接显示全部
+const displayEntries = computed(() => entries.value)
 
 watch(() => props.keyValue, kv => {
   entries.value = kv?.stream_val || []
-  displayLimit.value = loadCount.value
 }, { immediate: true })
 
 async function copyEntry(entry) {

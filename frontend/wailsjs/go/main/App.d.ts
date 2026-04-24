@@ -17,7 +17,7 @@ export function GetKeyInfo(arg1:string,arg2:string):Promise<config.RedisKey>;
 
 export function GetSettings():Promise<config.AppSettings>;
 
-export function GetValue(arg1:string,arg2:string):Promise<config.KeyValue>;
+export function GetValue(arg1:string,arg2:string,arg3:number,arg4:number):Promise<config.KeyValue>;
 
 export function HDel(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
@@ -45,7 +45,7 @@ export function SaveConnection(arg1:config.ConnectionConfig):Promise<config.Oper
 
 export function SaveSettings(arg1:config.AppSettings):Promise<config.OperationResult>;
 
-export function ScanKeys(arg1:string,arg2:string,arg3:number):Promise<Array<config.RedisKey>>;
+export function ScanKeys(arg1:string,arg2:string,arg3:number,arg4:number):Promise<config.ScanResult>;
 
 export function SearchValue(arg1:string,arg2:string,arg3:string,arg4:string):Promise<config.KeyValue>;
 

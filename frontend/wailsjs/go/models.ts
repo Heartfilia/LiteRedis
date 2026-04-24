@@ -134,6 +134,10 @@ export namespace config {
 	    set_val?: string[];
 	    zset_val?: ZSetMember[];
 	    stream_val?: StreamEntry[];
+	    has_more: boolean;
+	    next_cursor: number;
+	    next_offset: number;
+	    total_count: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new KeyValue(source);
@@ -150,6 +154,10 @@ export namespace config {
 	        this.set_val = source["set_val"];
 	        this.zset_val = this.convertValues(source["zset_val"], ZSetMember);
 	        this.stream_val = this.convertValues(source["stream_val"], StreamEntry);
+	        this.has_more = source["has_more"];
+	        this.next_cursor = source["next_cursor"];
+	        this.next_offset = source["next_offset"];
+	        this.total_count = source["total_count"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -201,6 +209,40 @@ export namespace config {
 	    }
 	}
 	
+	export class ScanResult {
+	    keys: RedisKey[];
+	    next_cursor: number;
+	    has_more: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScanResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.keys = this.convertValues(source["keys"], RedisKey);
+	        this.next_cursor = source["next_cursor"];
+	        this.has_more = source["has_more"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 
 }

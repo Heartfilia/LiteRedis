@@ -18,7 +18,7 @@ export const isConnected = (id) => callGo('IsConnected', id)
 export const selectDB = (id, db) => callGo('SelectDB', id, db)
 
 // ===== Key 操作 =====
-export const scanKeys = (connID, pattern, count) => callGo('ScanKeys', connID, pattern, count)
+export const scanKeys = (connID, pattern, count, cursor) => callGo('ScanKeys', connID, pattern, count, cursor)
 export const getKeyInfo = (connID, key) => callGo('GetKeyInfo', connID, key)
 export const deleteKey = (connID, key) => callGo('DeleteKey', connID, key)
 export const renameKey = (connID, oldKey, newKey) => callGo('RenameKey', connID, oldKey, newKey)
@@ -26,7 +26,7 @@ export const setTTL = (connID, key, ttl) => callGo('SetTTL', connID, key, ttl)
 export const dbSize = (connID) => callGo('DBSize', connID)
 
 // ===== Value CRUD =====
-export const getValue = (connID, key) => callGo('GetValue', connID, key)
+export const getValue = (connID, key, cursor, offset) => callGo('GetValue', connID, key, cursor, offset)
 export const searchValue = (connID, key, keyType, pattern) => callGo('SearchValue', connID, key, keyType, pattern)
 export const setString = (connID, key, value, ttl) => callGo('SetString', connID, key, value, ttl)
 export const hSet = (connID, key, field, value) => callGo('HSet', connID, key, field, value)

@@ -4,24 +4,41 @@ import { buildKeyTree } from '../utils/keyTree.js'
 import { useSettingsStore } from './settings.js'
 
 export const useWorkspaceStore = defineStore('workspace', {
-  state: () => ({
-    activeConnID: null,
-    activeConnName: '',
-    currentDB: 0,
-    totalKeys: 0,
+  state: () => {
+    // 从 localStorage 加载持久化的搜索历史
+    let persistedHistory = {}
+    try {
+      const raw = localStorage.getItem('liteRedis_searchHistory')
+      if (raw) persistedHistory = JSON.parse(raw)
+    } catch (e) {}
 
-    keepPrevSearch: false,
-    searchSessions: [],
-    activeSessionId: null,
+    return {
+      activeConnID: null,
+      activeConnName: '',
+      currentDB: 0,
+      totalKeys: 0,
 
-    selectedKey: null,
-    keyValue: null,
-    keyValueLoading: false,
-    keyValueError: null,   // 加载失败的错误信息
+      keepPrevSearch: false,
+      searchSessions: [],
+      activeSessionId: null,
 
-    // 竞态控制：记录当前"有效"请求的 key，旧请求结果自动丢弃
-    _loadingKey: null,
-  }),
+      selectedKey: null,
+      keyValue: null,
+      keyValueLoading: false,
+      keyValueError: null,   // 加载失败的错误信息
+
+      // 竞态控制：记录当前"有效"请求的 key，旧请求结果自动丢弃
+      _loadingKey: null,
+
+      // 每个连接的状态快照，key 为 connID
+      connStates: {},
+
+      // 每个连接的搜索历史，key 为 connID，value 为 pattern 数组（最多10条）
+      connSearchHistory: persistedHistory,
+    }
+  },
+
+  persistHistory: true,
 
   getters: {
     activeSession: (state) => state.searchSessions.find(s => s.id === state.activeSessionId),
@@ -37,8 +54,37 @@ export const useWorkspaceStore = defineStore('workspace', {
 
   actions: {
     setActiveConn(id, name, initDB = 0) {
+      // 保存当前连接的状态快照
+      if (this.activeConnID) {
+        this.connStates[this.activeConnID] = {
+          currentDB: this.currentDB,
+          searchSessions: this.searchSessions,
+          activeSessionId: this.activeSessionId,
+          selectedKey: this.selectedKey,
+          keyValue: this.keyValue,
+          keyValueError: this.keyValueError,
+          keyValueLoading: false,
+        }
+      }
+
       this.activeConnID = id
       this.activeConnName = name
+      this._loadingKey = null
+
+      // 若该连接有历史快照，恢复之
+      if (id && this.connStates[id]) {
+        const s = this.connStates[id]
+        this.currentDB = s.currentDB
+        this.searchSessions = s.searchSessions
+        this.activeSessionId = s.activeSessionId
+        this.selectedKey = s.selectedKey
+        this.keyValue = s.keyValue
+        this.keyValueError = s.keyValueError
+        this.keyValueLoading = false
+        return true
+      }
+
+      // 首次激活：使用默认初始状态
       this.currentDB = initDB
       this.searchSessions = []
       this.activeSessionId = null
@@ -46,7 +92,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       this.keyValue = null
       this.keyValueError = null
       this.keyValueLoading = false
-      this._loadingKey = null
+      return false
     },
 
     async fetchTotalKeys() {
@@ -58,8 +104,38 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
     },
 
+    _loadSearchHistory() {
+      try {
+        const raw = localStorage.getItem('liteRedis_searchHistory')
+        if (raw) {
+          this.connSearchHistory = JSON.parse(raw)
+        }
+      } catch (e) {
+        this.connSearchHistory = {}
+      }
+    },
+
+    _saveSearchHistory() {
+      try {
+        localStorage.setItem('liteRedis_searchHistory', JSON.stringify(this.connSearchHistory))
+      } catch (e) {}
+    },
+
+    _recordSearchHistory(pattern) {
+      if (!this.activeConnID || !pattern) return
+      const p = pattern.trim()
+      if (!p || p === '*') return
+      let list = this.connSearchHistory[this.activeConnID] || []
+      list = list.filter(item => item !== p)
+      list.unshift(p)
+      if (list.length > 10) list = list.slice(0, 10)
+      this.connSearchHistory[this.activeConnID] = list
+      this._saveSearchHistory()
+    },
+
     async search(pattern) {
       if (!this.activeConnID) return
+      this._recordSearchHistory(pattern)
       const settingsStore = useSettingsStore()
       const sessionId = Date.now().toString()
       const session = {
@@ -69,6 +145,8 @@ export const useWorkspaceStore = defineStore('workspace', {
         treeData: [],
         loading: true,
         error: null,
+        cursor: 0,
+        hasMore: false,
       }
 
       if (!this.keepPrevSearch) {
@@ -86,18 +164,55 @@ export const useWorkspaceStore = defineStore('workspace', {
 
       try {
         const count = settingsStore.loaded ? settingsStore.keyScanCount : 0
-        const keys = await scanKeys(this.activeConnID, pattern || '*', count)
+        const result = await scanKeys(this.activeConnID, pattern || '*', count, 0)
         const idx = this.searchSessions.findIndex(s => s.id === sessionId)
         if (idx !== -1) {
           this.searchSessions[idx] = {
             ...this.searchSessions[idx],
-            keys: keys || [],
-            treeData: buildKeyTree(keys || []),
+            keys: result.keys || [],
+            treeData: buildKeyTree(result.keys || []),
             loading: false,
+            cursor: result.next_cursor || 0,
+            hasMore: result.has_more || false,
           }
         }
       } catch (e) {
         const idx = this.searchSessions.findIndex(s => s.id === sessionId)
+        if (idx !== -1) {
+          this.searchSessions[idx] = {
+            ...this.searchSessions[idx],
+            loading: false,
+            error: e.message || String(e),
+          }
+        }
+      }
+    },
+
+    async loadMoreKeys(sessionId) {
+      const session = this.searchSessions.find(s => s.id === sessionId)
+      if (!session || !session.hasMore || session.loading) return
+      const settingsStore = useSettingsStore()
+      const count = settingsStore.loaded ? settingsStore.keyScanCount : 0
+
+      const idx = this.searchSessions.findIndex(s => s.id === sessionId)
+      if (idx !== -1) {
+        this.searchSessions[idx] = { ...this.searchSessions[idx], loading: true }
+      }
+
+      try {
+        const result = await scanKeys(this.activeConnID, session.pattern, count, session.cursor)
+        if (idx !== -1) {
+          const mergedKeys = [...this.searchSessions[idx].keys, ...(result.keys || [])]
+          this.searchSessions[idx] = {
+            ...this.searchSessions[idx],
+            keys: mergedKeys,
+            treeData: buildKeyTree(mergedKeys),
+            loading: false,
+            cursor: result.next_cursor || 0,
+            hasMore: result.has_more || false,
+          }
+        }
+      } catch (e) {
         if (idx !== -1) {
           this.searchSessions[idx] = {
             ...this.searchSessions[idx],
@@ -114,6 +229,7 @@ export const useWorkspaceStore = defineStore('workspace', {
      */
     async searchExact(key) {
       if (!this.activeConnID) return
+      this._recordSearchHistory(key)
       const sessionId = Date.now().toString()
       const session = {
         id: sessionId,
@@ -185,7 +301,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       this._loadingKey = key   // 设置本次令牌
 
       try {
-        const result = await getValue(this.activeConnID, key)
+        const result = await getValue(this.activeConnID, key, 0, 0)
 
         // 竞态检查：如果用户在等待过程中又点击了别的 key，丢弃本次结果
         if (this._loadingKey !== key) return
@@ -255,6 +371,12 @@ export const useWorkspaceStore = defineStore('workspace', {
         await this.fetchTotalKeys()
       }
       return result
+    },
+
+    clearSearchHistory(connId) {
+      if (!connId) return
+      delete this.connSearchHistory[connId]
+      this._saveSearchHistory()
     },
   },
 })

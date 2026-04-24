@@ -30,8 +30,8 @@ export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
 
-export function GetValue(arg1, arg2) {
-  return window['go']['main']['App']['GetValue'](arg1, arg2);
+export function GetValue(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetValue'](arg1, arg2, arg3, arg4);
 }
 
 export function HDel(arg1, arg2, arg3) {
@@ -86,8 +86,8 @@ export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
 }
 
-export function ScanKeys(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ScanKeys'](arg1, arg2, arg3);
+export function ScanKeys(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ScanKeys'](arg1, arg2, arg3, arg4);
 }
 
 export function SearchValue(arg1, arg2, arg3, arg4) {

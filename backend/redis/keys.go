@@ -9,8 +9,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// ScanKeys 扫描 key，通过 Pipeline 批量获取 TYPE 和 TTL
-func ScanKeys(ctx context.Context, client redis.UniversalClient, pattern string, count int64) ([]config.RedisKey, error) {
+// ScanKeys 扫描 key（支持 cursor 分页），通过 Pipeline 批量获取 TYPE 和 TTL
+func ScanKeys(ctx context.Context, client redis.UniversalClient, pattern string, count int64, cursor uint64) (config.ScanResult, error) {
+	result := config.ScanResult{Keys: []config.RedisKey{}}
 	if pattern == "" {
 		pattern = "*"
 	}
@@ -19,21 +20,28 @@ func ScanKeys(ctx context.Context, client redis.UniversalClient, pattern string,
 	}
 
 	var keyNames []string
+	var nextCursor uint64
 
-	// 使用 SCAN 避免阻塞（不使用 KEYS）
-	iter := client.Scan(ctx, 0, pattern, count).Iterator()
-	for iter.Next(ctx) {
-		keyNames = append(keyNames, iter.Val())
-		if int64(len(keyNames)) >= count {
+	// 使用 SCAN 避免阻塞，循环直到获取到数据或 cursor 回到 0
+	for {
+		keys, newCursor, err := client.Scan(ctx, cursor, pattern, count).Result()
+		if err != nil {
+			return result, err
+		}
+		keyNames = append(keyNames, keys...)
+		cursor = newCursor
+		if cursor == 0 || int64(len(keyNames)) >= count {
+			nextCursor = cursor
 			break
 		}
-	}
-	if err := iter.Err(); err != nil {
-		return nil, err
+		// 如果一批返回空但 cursor 不为 0，继续 scan
+		if len(keys) == 0 {
+			continue
+		}
 	}
 
 	if len(keyNames) == 0 {
-		return []config.RedisKey{}, nil
+		return result, nil
 	}
 
 	// Pipeline 批量获取 TYPE + TTL
@@ -47,7 +55,7 @@ func ScanKeys(ctx context.Context, client redis.UniversalClient, pattern string,
 	}
 	_, err := pipe.Exec(ctx)
 	if err != nil && err != redis.Nil {
-		return nil, err
+		return result, err
 	}
 
 	keys := make([]config.RedisKey, len(keyNames))
@@ -65,7 +73,11 @@ func ScanKeys(ctx context.Context, client redis.UniversalClient, pattern string,
 			TTL:  ttlSec,
 		}
 	}
-	return keys, nil
+
+	result.Keys = keys
+	result.NextCursor = nextCursor
+	result.HasMore = nextCursor != 0
+	return result, nil
 }
 
 // GetKeyInfo 获取单个 key 的元信息

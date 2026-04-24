@@ -1,15 +1,33 @@
 <template>
   <div class="key-search-bar">
-    <div class="search-input-row">
+    <div class="search-input-row" ref="inputRowRef">
       <input
         v-model="pattern"
         type="text"
         placeholder="搜索 key，支持 * 通配符，如 user:*"
-        @keydown.enter="doSearch"
+        @keydown.enter="onEnter"
+        @keydown.down.prevent="onArrowDown"
+        @keydown.up.prevent="onArrowUp"
+        @keydown.esc="showHistory = false"
+        @focus="onFocus"
+        @blur="onBlur"
       />
       <button class="btn-search" @click="doSearch" :disabled="loading">
         {{ loading ? '...' : '搜索' }}
       </button>
+
+      <!-- 历史记录下拉 -->
+      <div v-if="showHistory && filteredHistory.length" class="history-dropdown">
+        <div
+          v-for="(item, idx) in filteredHistory"
+          :key="item"
+          :class="['history-item', { active: idx === activeIndex }]"
+          @mousedown.prevent="selectHistory(item)"
+          @mouseenter="activeIndex = idx"
+        >
+          {{ item }}
+        </div>
+      </div>
     </div>
     <div class="search-options">
       <label class="keep-label">
@@ -21,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 
 const workspaceStore = useWorkspaceStore()
@@ -29,27 +47,77 @@ const workspaceStore = useWorkspaceStore()
 const pattern = ref('*')
 const keep = ref(workspaceStore.keepPrevSearch)
 const loading = ref(false)
+const showHistory = ref(false)
+const activeIndex = ref(-1)
+const inputRowRef = ref(null)
+
+const filteredHistory = computed(() => {
+  const id = workspaceStore.activeConnID
+  if (!id) return []
+  const list = workspaceStore.connSearchHistory[id] || []
+  const term = pattern.value.trim()
+  if (!term || term === '*') return list.slice(0, 10)
+  return list.filter(h => h.toLowerCase().includes(term.toLowerCase())).slice(0, 10)
+})
 
 watch(keep, val => {
   workspaceStore.keepPrevSearch = val
 })
 
-// 切换连接或切换 DB 时，重置搜索框为 *
 watch(() => workspaceStore.activeConnID, () => {
   pattern.value = '*'
   loading.value = false
+  showHistory.value = false
+  activeIndex.value = -1
 })
 watch(() => workspaceStore.currentDB, () => {
-  pattern.value = '*'
-  loading.value = false
+  showHistory.value = false
+  activeIndex.value = -1
 })
+
+function onFocus() {
+  const id = workspaceStore.activeConnID
+  if (id && (workspaceStore.connSearchHistory[id] || []).length > 0) {
+    showHistory.value = true
+    activeIndex.value = -1
+  }
+}
+
+function onBlur() {
+  showHistory.value = false
+  activeIndex.value = -1
+}
+
+function onArrowDown() {
+  if (!showHistory.value || !filteredHistory.value.length) return
+  activeIndex.value = (activeIndex.value + 1) % filteredHistory.value.length
+}
+
+function onArrowUp() {
+  if (!showHistory.value || !filteredHistory.value.length) return
+  activeIndex.value = (activeIndex.value - 1 + filteredHistory.value.length) % filteredHistory.value.length
+}
+
+function onEnter() {
+  if (showHistory.value && activeIndex.value >= 0 && filteredHistory.value[activeIndex.value]) {
+    selectHistory(filteredHistory.value[activeIndex.value])
+  } else {
+    doSearch()
+  }
+}
+
+function selectHistory(item) {
+  pattern.value = item
+  showHistory.value = false
+  activeIndex.value = -1
+  doSearch()
+}
 
 async function doSearch() {
   if (loading.value) return
   loading.value = true
   try {
     const p = pattern.value.trim() || '*'
-    // 没有通配符且不为空：构造只含这一个 key 的搜索 session，并直接选中展示 value
     if (p !== '*' && !p.includes('*') && !p.includes('?') && !p.includes('[')) {
       await workspaceStore.searchExact(p)
     } else {
@@ -70,6 +138,7 @@ async function doSearch() {
 .search-input-row {
   display: flex;
   gap: 0;
+  position: relative;
 }
 .search-input-row input {
   flex: 1;
@@ -106,5 +175,34 @@ async function doSearch() {
   align-items: center;
   gap: 4px;
   cursor: pointer;
+}
+
+.history-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 36px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 100;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.history-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.history-item:hover,
+.history-item.active {
+  background: #eff6ff;
+  color: #2563eb;
 }
 </style>

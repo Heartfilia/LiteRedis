@@ -238,12 +238,17 @@ async function onDropToGroup(targetGroup) {
 
 async function handleConnect(conn) {
   if (connectionsStore.isConnected(conn.id)) {
-    // 已连接：重新激活，并确保 DB 切到连接配置指定的 DB
-    const initDB = conn.db || 0
-    workspaceStore.setActiveConn(conn.id, conn.name, initDB)
-    await workspaceStore.switchDB(initDB)
-    await workspaceStore.fetchTotalKeys()
-    await workspaceStore.search('*')
+    // 已连接：重新激活，恢复该连接的历史状态（如有）
+    const restored = workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
+    if (restored) {
+      // 恢复了历史状态，只需刷新 key 数量
+      await workspaceStore.fetchTotalKeys()
+    } else {
+      // 首次激活：按连接配置的 DB 初始化
+      await workspaceStore.switchDB(conn.db || 0)
+      await workspaceStore.fetchTotalKeys()
+      await workspaceStore.search('*')
+    }
     return
   }
   const result = await connectionsStore.connect(conn.id)
@@ -258,10 +263,12 @@ async function handleConnect(conn) {
 
 async function removeConnection(id) {
   ctxMenu.value.visible = false
-  const result = await connectionsStore.remove(id)
   if (activeConnID.value === id) {
     workspaceStore.setActiveConn(null, '')
   }
+  delete workspaceStore.connStates[id]
+  workspaceStore.clearSearchHistory(id)
+  const result = await connectionsStore.remove(id)
   if (!result?.success) {
     alert('删除失败: ' + (result?.message || '未知错误'))
   }
@@ -279,6 +286,7 @@ async function disconnectConn(id) {
   if (activeConnID.value === id) {
     workspaceStore.setActiveConn(null, '')
   }
+  delete workspaceStore.connStates[id]
 }
 </script>
 

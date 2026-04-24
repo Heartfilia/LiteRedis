@@ -76,15 +76,26 @@ type KeyNode struct {
 
 // KeyValue Value（按类型按需填充）
 type KeyValue struct {
-	Key       string            `json:"key"`
-	Type      string            `json:"type"`
-	TTL       int64             `json:"ttl"`
-	StringVal string            `json:"string_val,omitempty"`
-	HashVal   map[string]string `json:"hash_val,omitempty"`
-	ListVal   []string          `json:"list_val,omitempty"`
-	SetVal    []string          `json:"set_val,omitempty"`
-	ZSetVal   []ZSetMember      `json:"zset_val,omitempty"`
-	StreamVal []StreamEntry     `json:"stream_val,omitempty"`
+	Key        string            `json:"key"`
+	Type       string            `json:"type"`
+	TTL        int64             `json:"ttl"`
+	StringVal  string            `json:"string_val,omitempty"`
+	HashVal    map[string]string `json:"hash_val,omitempty"`
+	ListVal    []string          `json:"list_val,omitempty"`
+	SetVal     []string          `json:"set_val,omitempty"`
+	ZSetVal    []ZSetMember      `json:"zset_val,omitempty"`
+	StreamVal  []StreamEntry     `json:"stream_val,omitempty"`
+	HasMore    bool              `json:"has_more"`    // 是否还有更多数据
+	NextCursor uint64            `json:"next_cursor"` // Hash/Set 下一页 cursor
+	NextOffset int               `json:"next_offset"` // List/ZSet 下一页 offset
+	TotalCount int64             `json:"total_count"` // 总元素数（-1 表示未知）
+}
+
+// ScanResult key 扫描结果（支持分页）
+type ScanResult struct {
+	Keys       []RedisKey `json:"keys"`
+	NextCursor uint64     `json:"next_cursor"`
+	HasMore    bool       `json:"has_more"`
 }
 
 // ZSetMember zset 成员

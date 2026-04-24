@@ -66,11 +66,19 @@
       </div>
     </div>
 
-    <!-- 显示更多 -->
-    <div v-if="(searchResults !== null ? searchResults.length : sourceItems.length) > displayLimit" class="load-more">
-      <button class="btn-load-more" @click="displayLimit += loadCount">
-        显示更多（{{ displayLimit }}/{{ searchResults !== null ? searchResults.length : sourceItems.length }}）
+    <!-- 加载更多 -->
+    <div class="load-more">
+      <button
+        v-if="searchResults === null && hasMore"
+        class="btn-load-more"
+        :disabled="valueLoading"
+        @click="loadMore"
+      >
+        {{ valueLoading ? '加载中...' : '加载更多' }}
       </button>
+      <span v-else-if="searchResults === null && !hasMore && rawItems.length > 0" class="load-more-hint">
+        已加载全部 {{ rawItems.length }} 条
+      </span>
     </div>
 
     <div v-if="msg" :class="['msg', ok ? 'ok' : 'err']">{{ msg }}</div>
@@ -84,7 +92,7 @@ import { ref, computed, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
-import { lPush, rPush, lSet, lRem, searchValue } from '../../api/wails.js'
+import { lPush, rPush, lSet, lRem, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 
 const props = defineProps({ keyValue: Object })
@@ -119,10 +127,10 @@ const expandShow = ref(false)
 const expandTitle = ref('')
 const expandContent = ref('')
 
-const loadCount = computed(() => settingsStore.listLoadCount)
-const displayLimit = ref(0)
-
-watch(loadCount, (v) => { displayLimit.value = v }, { immediate: true })
+// 服务端分页状态
+const hasMore = ref(false)
+const nextOffset = ref(0)
+const valueLoading = ref(false)
 
 // 数据源（搜索激活时不保留原始索引）
 const sourceItems = computed(() =>
@@ -145,22 +153,42 @@ const sortedIndexed = computed(() => {
   return indexed
 })
 
+// 直接显示所有已加载的数据
 const displayItems = computed(() =>
-  sortedIndexed.value.slice(0, displayLimit.value).map(({ item }) => item)
+  sortedIndexed.value.map(({ item }) => item)
 )
 const displayOriginalIndices = computed(() =>
-  sortedIndexed.value.slice(0, displayLimit.value).map(({ origIdx }) => origIdx)
+  sortedIndexed.value.map(({ origIdx }) => origIdx)
 )
 
 watch(() => props.keyValue, kv => {
   rawItems.value = [...(kv?.list_val || [])]
+  hasMore.value = kv?.has_more || false
+  nextOffset.value = kv?.next_offset || 0
   searchQuery.value = ''
   searchResults.value = null
   sortOrder.value = 'none'
-  displayLimit.value = loadCount.value
   msg.value = ''
   editingIdx.value = -1
 }, { immediate: true })
+
+async function loadMore() {
+  if (!hasMore.value || valueLoading.value || !props.keyValue?.key) return
+  valueLoading.value = true
+  try {
+    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, 0, nextOffset.value)
+    if (result.list_val) {
+      rawItems.value.push(...result.list_val)
+    }
+    hasMore.value = result.has_more || false
+    nextOffset.value = result.next_offset || 0
+  } catch (e) {
+    ok.value = false
+    msg.value = e.message || String(e)
+  } finally {
+    valueLoading.value = false
+  }
+}
 
 async function executeSearch() {
   const pattern = searchQuery.value.trim()
@@ -286,6 +314,32 @@ async function addItem() {
 .sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; color: #d1d5db; }
 .sort-icon.asc, .sort-icon.desc { color: #3b82f6; font-weight: bold; }
 .load-more { display: flex; justify-content: center; padding: 6px 0; flex-shrink: 0; }
+.btn-load-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 20px;
+  background: #fff;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-load-more:hover:not(:disabled) {
+  background: #eff6ff;
+}
+.btn-load-more:disabled {
+  color: #9ca3af;
+  border-color: #d1d5db;
+  cursor: not-allowed;
+  background: #f9fafb;
+}
+.load-more-hint {
+  font-size: 12px;
+  color: #9ca3af;
+}
 .msg { font-size: 12px; padding: 5px 10px; border-radius: 6px; }
 .ok { background: #f0fdf4; color: #166534; }
 .err { background: #fff1f2; color: #991b1b; }
