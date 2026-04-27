@@ -120,9 +120,10 @@
 
       <!-- 底部操作区 -->
       <div class="sidebar-footer">
-        <button class="btn-icon btn-collapse" title="折叠连接列表" @click="sidebarCollapsed = true">◀</button>
-        <button class="btn-icon btn-settings" title="设置" @click="openSettings()">⚙</button>
+        <button class="btn-icon btn-github" title="GitHub" @click="openGitHub()">⌘</button>
         <button class="btn-icon" title="管理连接" @click="openConnManager()">＋</button>
+        <button class="btn-icon btn-settings" title="设置" @click="openSettings()">⚙</button>
+        <button class="btn-icon btn-collapse" title="折叠连接列表" @click="sidebarCollapsed = true">◀</button>
       </div>
     </template>
 
@@ -200,6 +201,10 @@ onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
 // 编辑连接（打开 ConnectionManager）
 function openEdit(conn) {
   openConnManager()
+}
+
+function openGitHub() {
+  window.open('https://github.com/Heartfilia/LiteRedis', '_blank')
 }
 
 // 分组折叠状态
@@ -388,8 +393,10 @@ async function disconnectConn(id) {
 .btn-icon:hover { background: #3a85e0; }
 .btn-settings { background: #4a5568; }
 .btn-settings:hover { background: #718096; }
-.btn-collapse { background: #4a5568; font-size: 10px; }
-.btn-collapse:hover { background: #718096; }
+.btn-collapse { background: #718096; font-size: 10px; }
+.btn-collapse:hover { background: #a0aec0; }
+.btn-github { background: #4a5568; font-size: 12px; }
+.btn-github:hover { background: #718096; }
 
 /* ===== 连接列表 ===== */
 .conn-list { flex: 1; overflow-y: auto; padding: 8px 0; }
