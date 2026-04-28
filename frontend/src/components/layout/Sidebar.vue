@@ -15,7 +15,7 @@
           {{ connInitial(conn) }}
         </div>
       </div>
-      <button class="btn-expand-bottom" title="展开连接列表" @click="sidebarCollapsed = false">▶</button>
+      <button class="btn-expand-bottom" :title="t('sidebar.expand')" @click="sidebarCollapsed = false">▶</button>
     </div>
 
     <template v-else>
@@ -42,23 +42,29 @@
           <div class="conn-main" @click="handleConnect(conn)">
             <span class="conn-avatar" :style="{ background: connColor(conn) }">{{ connInitial(conn) }}</span>
             <span :class="['conn-dot', connectionsStore.isConnected(conn.id) ? 'connected' : 'disconnected']" />
-            <span class="conn-name">{{ conn.name || '未命名' }}</span>
+            <span class="conn-name">{{ conn.name || t('sidebar.unnamed') }}</span>
           </div>
           <div class="conn-actions">
             <button
               v-if="connectionsStore.isConnected(conn.id)"
               class="btn-tiny btn-disconnect"
-              title="断开连接"
+              :title="t('sidebar.disconnect')"
               @click.stop="disconnectConn(conn.id)"
             >⊘</button>
-            <button class="btn-tiny" title="编辑" @click.stop="openEdit(conn)">✎</button>
-            <template v-if="confirmDeleteId !== conn.id">
-              <button class="btn-tiny danger" title="删除" @click.stop="requestDelete(conn.id)">✕</button>
-            </template>
-            <template v-else>
-              <button class="btn-tiny btn-confirm-yes" title="确认删除" @click.stop="confirmDelete(conn.id)">✓</button>
-              <button class="btn-tiny btn-confirm-no" title="取消" @click.stop="cancelDelete()">✗</button>
-            </template>
+            <button class="btn-tiny" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
+            <div class="delete-wrap">
+              <button class="btn-tiny danger" :title="t('sidebar.delete')" @click.stop="requestDelete(conn.id)">✕</button>
+              <div v-if="confirmDeleteId === conn.id" class="delete-popover">
+                <div class="delete-popover-arrow"></div>
+                <div class="delete-popover-content">
+                  <span class="delete-popover-text">{{ t('sidebar.confirmDelete') }}</span>
+                  <div class="delete-popover-btns">
+                    <button class="btn-tiny btn-confirm-yes" @click.stop="confirmDelete(conn.id)">✓</button>
+                    <button class="btn-tiny btn-confirm-no" @click.stop="cancelDelete()">✗</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         </div>
@@ -91,43 +97,51 @@
               <div class="conn-main" @click="handleConnect(conn)">
                 <span class="conn-avatar" :style="{ background: connColor(conn) }">{{ connInitial(conn) }}</span>
                 <span :class="['conn-dot', connectionsStore.isConnected(conn.id) ? 'connected' : 'disconnected']" />
-                <span class="conn-name">{{ conn.name || '未命名' }}</span>
+                <span class="conn-name">{{ conn.name || t('sidebar.unnamed') }}</span>
               </div>
               <div class="conn-actions">
                 <button
                   v-if="connectionsStore.isConnected(conn.id)"
                   class="btn-tiny btn-disconnect"
-                  title="断开连接"
+                  :title="t('sidebar.disconnect')"
                   @click.stop="disconnectConn(conn.id)"
                 >⊘</button>
-                <button class="btn-tiny" title="编辑" @click.stop="openEdit(conn)">✎</button>
-                <template v-if="confirmDeleteId !== conn.id">
-                  <button class="btn-tiny danger" title="删除" @click.stop="requestDelete(conn.id)">✕</button>
-                </template>
-                <template v-else>
-                  <button class="btn-tiny btn-confirm-yes" title="确认删除" @click.stop="confirmDelete(conn.id)">✓</button>
-                  <button class="btn-tiny btn-confirm-no" title="取消" @click.stop="cancelDelete()">✗</button>
-                </template>
+                <button class="btn-tiny" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
+                <div class="delete-wrap">
+                  <button class="btn-tiny danger" :title="t('sidebar.delete')" @click.stop="requestDelete(conn.id)">✕</button>
+                  <div v-if="confirmDeleteId === conn.id" class="delete-popover">
+                    <div class="delete-popover-arrow"></div>
+                    <div class="delete-popover-content">
+                      <span class="delete-popover-text">{{ t('sidebar.confirmDelete') }}</span>
+                      <div class="delete-popover-btns">
+                        <button class="btn-tiny btn-confirm-yes" @click.stop="confirmDelete(conn.id)">✓</button>
+                        <button class="btn-tiny btn-confirm-no" @click.stop="cancelDelete()">✗</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <div v-if="connectionsStore.connections.length === 0" class="empty-hint">
-          点击 ＋ 管理连接
+          {{ t('sidebar.emptyHint') }}
         </div>
       </div>
 
       <!-- 底部操作区 -->
       <div class="sidebar-footer">
-        <button class="btn-icon btn-github" title="GitHub" @click="openGitHub()">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+        <a class="github-logo" title="GitHub" @click="openGitHub()">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
             <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
           </svg>
-        </button>
-        <button class="btn-icon" title="管理连接" @click="openConnManager()">＋</button>
-        <button class="btn-icon btn-settings" title="设置" @click="openSettings()">⚙</button>
-        <button class="btn-icon btn-collapse" title="折叠连接列表" @click="sidebarCollapsed = true">◀</button>
+        </a>
+        <div class="footer-actions">
+          <button class="btn-icon" :title="t('sidebar.manageConn')" @click="openConnManager()">＋</button>
+          <button class="btn-icon btn-settings" :title="t('sidebar.settings')" @click="openSettings()">⚙</button>
+          <button class="btn-icon btn-collapse" :title="t('sidebar.collapse')" @click="sidebarCollapsed = true">◀</button>
+        </div>
       </div>
     </template>
 
@@ -138,9 +152,9 @@
       :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
       @click.stop
     >
-      <div class="ctx-item" @click="openEdit(ctxMenu.conn); ctxMenu.visible = false">✎ 编辑</div>
+      <div class="ctx-item" @click="openEdit(ctxMenu.conn); ctxMenu.visible = false">✎ {{ t('sidebar.edit') }}</div>
       <div class="ctx-divider" />
-      <div class="ctx-item ctx-danger" @click="removeConnection(ctxMenu.conn.id); ctxMenu.visible = false">✕ 删除</div>
+      <div class="ctx-item ctx-danger" @click="removeConnection(ctxMenu.conn.id); ctxMenu.visible = false">✕ {{ t('sidebar.delete') }}</div>
     </div>
   </div>
 </template>
@@ -149,7 +163,10 @@
 import { computed, ref, inject, onMounted, onBeforeUnmount } from 'vue'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useI18n } from '../../i18n/index.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
+
+const { t } = useI18n()
 
 const connectionsStore = useConnectionsStore()
 const workspaceStore = useWorkspaceStore()
@@ -380,10 +397,25 @@ async function disconnectConn(id) {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 4px;
   padding: 8px 12px;
   border-top: 1px solid #2d3748;
+}
+.github-logo {
+  color: #718096;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+  text-decoration: none;
+}
+.github-logo:hover { color: #a0aec0; }
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .btn-icon {
   background: #4e9af1;
@@ -400,8 +432,6 @@ async function disconnectConn(id) {
 .btn-settings:hover { background: #718096; }
 .btn-collapse { background: #718096; font-size: 10px; }
 .btn-collapse:hover { background: #a0aec0; }
-.btn-github { background: #4a5568; padding: 0; }
-.btn-github:hover { background: #718096; }
 
 /* ===== 连接列表 ===== */
 .conn-list { flex: 1; overflow-y: auto; padding: 8px 0; }
@@ -523,4 +553,46 @@ async function disconnectConn(id) {
 .ctx-danger { color: #e53e3e; }
 .ctx-danger:hover { background: #fff5f5; color: #e53e3e; }
 .ctx-divider { height: 1px; background: #eee; margin: 3px 0; }
+
+.delete-wrap { position: relative; display: inline-flex; }
+.delete-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.delete-popover-arrow {
+  position: absolute;
+  top: -5px;
+  right: 10px;
+  width: 10px;
+  height: 10px;
+  background: white;
+  border-left: 1px solid #e5e7eb;
+  border-top: 1px solid #e5e7eb;
+  transform: rotate(45deg);
+}
+.delete-popover-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.delete-popover-text {
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 500;
+}
+.delete-popover-btns {
+  display: flex;
+  gap: 4px;
+}
 </style>

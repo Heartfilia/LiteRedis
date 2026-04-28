@@ -2,9 +2,9 @@
   <div class="string-editor">
     <textarea v-model="localVal" rows="10" :disabled="saving" />
     <div class="editor-actions">
-      <button class="btn-action" @click="openExpand">⛶ 展开</button>
-      <button class="btn-action" @click="copyValue">{{ copied ? '✓ 已复制' : '📋 复制' }}</button>
-      <button class="btn-primary" @click="save" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
+      <button class="btn-action" @click="openExpand">⛶ {{ t('keyEditor.expand') }}</button>
+      <button class="btn-action" @click="copyValue">{{ copied ? '✓ ' + t('keyEditor.copied') : '📋 ' + t('keyEditor.copy') }}</button>
+      <button class="btn-primary" @click="save" :disabled="saving">{{ saving ? t('keyEditor.saving') : t('keyEditor.save') }}</button>
     </div>
     <div v-if="msg" :class="['msg', ok ? 'ok' : 'err']">{{ msg }}</div>
 
@@ -20,12 +20,14 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { setString } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
+const { t } = useI18n()
 
 const localVal = ref(props.keyValue?.string_val || '')
 const saving = ref(false)
@@ -57,7 +59,7 @@ async function save() {
   try {
     const result = await setString(workspaceStore.activeConnID, props.keyValue.key, localVal.value, props.keyValue.ttl)
     ok.value = result.success
-    msg.value = result.success ? '保存成功' : (result.message || '保存失败')
+    msg.value = result.success ? t('keyEditor.saveSuccess') : (result.message || t('keyEditor.saveFailed'))
   } catch(e) {
     ok.value = false
     msg.value = e.message || String(e)

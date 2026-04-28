@@ -1,29 +1,29 @@
 <template>
   <div class="connection-form">
-    <h3>{{ isEdit ? '编辑连接' : '新建连接' }}</h3>
+    <h3>{{ isEdit ? t('connManager.editConn') : t('connManager.newConn') }}</h3>
 
     <div class="form-group">
-      <label>连接名称 *</label>
+      <label>{{ t('connManager.nameRequired') }}</label>
       <input v-model="form.name" type="text" placeholder="My Redis" />
     </div>
 
     <div class="form-group">
-      <label>分组（可选）</label>
+      <label>{{ t('connManager.groupOptional') }}</label>
       <input
         v-model="form.group"
         type="text"
-        placeholder="未分组"
+        :placeholder="t('connManager.groupPlaceholder')"
         list="group-datalist"
       />
       <datalist id="group-datalist">
-        <option value="" label="未分组" />
+        <option value="" :label="t('connManager.groupPlaceholder')" />
         <option v-for="g in existingGroups" :key="g" :value="g" />
       </datalist>
     </div>
 
     <!-- 集群模式切换 -->
     <div class="form-group toggle-row">
-      <label>集群模式 (Cluster)</label>
+      <label>{{ t('connManager.clusterMode') }}</label>
       <input type="checkbox" v-model="form.isCluster" />
     </div>
 
@@ -41,10 +41,10 @@
       </div>
       <div class="form-group">
         <label>Password</label>
-        <input v-model="form.password" type="password" placeholder="(无密码则留空)" />
+        <input v-model="form.password" type="password" :placeholder="t('connManager.passwordPlaceholder')" />
       </div>
       <div class="form-group w80">
-        <label>DB Index</label>
+        <label>{{ t('connManager.dbIndex') }}</label>
         <input v-model.number="form.db" type="number" min="0" max="15" placeholder="0" />
       </div>
     </template>
@@ -52,19 +52,19 @@
     <!-- 集群模式地址列表 -->
     <template v-else>
       <div class="form-group">
-        <label>集群节点地址（每行一个，格式 host:port）</label>
+        <label>{{ t('connManager.clusterAddrsLabel') }}</label>
         <textarea v-model="clusterAddrsText" rows="4" placeholder="127.0.0.1:7000&#10;127.0.0.1:7001&#10;127.0.0.1:7002" />
       </div>
       <div class="form-group">
         <label>Password</label>
-        <input v-model="form.password" type="password" placeholder="(无密码则留空)" />
+        <input v-model="form.password" type="password" :placeholder="t('connManager.passwordPlaceholder')" />
       </div>
     </template>
 
     <!-- SSH 配置 -->
     <div class="ssh-section">
       <div class="form-group toggle-row">
-        <label>启用 SSH 隧道</label>
+        <label>{{ t('connManager.sshEnabled') }}</label>
         <input type="checkbox" v-model="form.sshEnabled" />
       </div>
 
@@ -72,7 +72,7 @@
         <div class="ssh-panel">
           <div class="form-row">
             <div class="form-group flex1">
-              <label>SSH Host *</label>
+              <label>{{ t('connManager.sshHostRequired') }}</label>
               <input v-model="form.ssh.host" type="text" placeholder="jump.example.com" />
             </div>
             <div class="form-group w80">
@@ -82,12 +82,12 @@
           </div>
           <div class="form-row">
             <div class="form-group flex1">
-              <label>SSH User *</label>
+              <label>{{ t('connManager.sshUserRequired') }}</label>
               <input v-model="form.ssh.user" type="text" placeholder="ubuntu" />
             </div>
             <div class="form-group flex1">
               <label>SSH Password</label>
-              <input v-model="form.ssh.password" type="password" placeholder="密码" />
+              <input v-model="form.ssh.password" type="password" :placeholder="t('connManager.sshPasswordPlaceholder')" />
             </div>
           </div>
         </div>
@@ -96,12 +96,12 @@
 
     <!-- 操作按钮 -->
     <div class="form-actions">
-      <button class="btn-secondary" @click="$emit('cancel')">取消</button>
+      <button class="btn-secondary" @click="$emit('cancel')">{{ t('connManager.cancel') }}</button>
       <button class="btn-secondary" :disabled="testing" @click="handleTest">
-        {{ testing ? '测试中...' : '测试连接' }}
+        {{ testing ? t('connManager.testing') : t('connManager.testConn') }}
       </button>
       <button class="btn-primary" :disabled="saving" @click="handleSave">
-        {{ saving ? '保存中...' : '保存' }}
+        {{ saving ? t('connManager.saving') : t('connManager.save') }}
       </button>
     </div>
 
@@ -113,12 +113,14 @@
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
 import { useConnectionsStore } from '../../stores/connections.js'
+import { useI18n } from '../../i18n/index.js'
 const props = defineProps({
   connection: { type: Object, default: null },
 })
 const emit = defineEmits(['cancel', 'saved'])
 
 const connectionsStore = useConnectionsStore()
+const { t } = useI18n()
 
 const isEdit = computed(() => !!props.connection?.id)
 const existingGroups = computed(() => Object.keys(connectionsStore.groupedConnections).filter(g => g))
@@ -191,7 +193,7 @@ async function handleTest() {
   try {
     const result = await connectionsStore.test(buildCfg())
     testOk.value = result.success
-    testMsg.value = result.success ? '✓ ' + (result.message || '连接成功') : '✗ ' + (result.message || '连接失败')
+    testMsg.value = result.success ? '✓ ' + (result.message || t('connManager.testOk')) : '✗ ' + (result.message || t('connManager.testFailed'))
   } catch (e) {
     testOk.value = false
     testMsg.value = '✗ ' + (e.message || String(e))
@@ -202,8 +204,8 @@ async function handleTest() {
 
 async function handleSave() {
   saveMsg.value = ''
-  if (!form.name.trim()) { saveMsg.value = '请填写连接名称'; return }
-  if (!form.isCluster && !form.host.trim()) { saveMsg.value = '请填写 Host'; return }
+  if (!form.name.trim()) { saveMsg.value = t('connManager.nameRequiredErr'); return }
+  if (!form.isCluster && !form.host.trim()) { saveMsg.value = t('connManager.hostRequiredErr'); return }
 
   saving.value = true
   try {
@@ -211,7 +213,7 @@ async function handleSave() {
     if (result.success) {
       emit('saved')
     } else {
-      saveMsg.value = result.message || '保存失败'
+      saveMsg.value = result.message || t('connManager.saveFailed')
     }
   } catch (e) {
     saveMsg.value = e.message || String(e)

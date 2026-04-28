@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { getTypeColor } from '../../utils/typeColors.js'
 
@@ -52,7 +52,11 @@ const props = defineProps({
 const workspaceStore = useWorkspaceStore()
 const selectedKey = computed(() => workspaceStore.selectedKey)
 
-const isExpanded = ref(props.depth < 1) // 第一层默认展开
+const isExpanded = ref(props.depth < 1 || workspaceStore.keepPrevSearch) // 第一层默认展开，保留搜索模式全部展开
+
+watch(() => workspaceStore.keepPrevSearch, (val) => {
+  if (val) isExpanded.value = true
+})
 
 function toggle() {
   isExpanded.value = !isExpanded.value

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { getSettings, saveSettings } from '../api/wails.js'
+import { setLanguage } from '../i18n/index.js'
 
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
@@ -10,6 +11,8 @@ export const useSettingsStore = defineStore('settings', {
     setLoadCount: 20,
     zsetLoadCount: 20,
     streamLoadCount: 20,
+    searchHistoryLimit: 10,
+    language: 'zh',
   }),
 
   actions: {
@@ -22,6 +25,9 @@ export const useSettingsStore = defineStore('settings', {
         this.setLoadCount = s.set_load_count || 20
         this.zsetLoadCount = s.zset_load_count || 20
         this.streamLoadCount = s.stream_load_count || 20
+        this.searchHistoryLimit = s.search_history_limit || 10
+        this.language = s.language || 'zh'
+        setLanguage(this.language)
         this.loaded = true
       } catch (e) {
         console.error('load settings failed', e)
@@ -36,6 +42,8 @@ export const useSettingsStore = defineStore('settings', {
         set_load_count: values.setLoadCount,
         zset_load_count: values.zsetLoadCount,
         stream_load_count: values.streamLoadCount,
+        search_history_limit: values.searchHistoryLimit,
+        language: values.language,
       }
       const result = await saveSettings(payload)
       if (result.success) {

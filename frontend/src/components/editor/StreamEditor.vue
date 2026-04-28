@@ -1,7 +1,7 @@
 <template>
   <div class="stream-editor">
     <div class="toolbar">
-      <span class="count">{{ displayEntries.length }} / {{ entries.length }} 条</span>
+      <span class="count">{{ displayEntries.length }} / {{ entries.length }} {{ t('settings.unitItem') }}</span>
     </div>
     <div class="stream-wrap">
       <div v-for="(entry, idx) in displayEntries" :key="entry.id" class="stream-entry">
@@ -9,7 +9,7 @@
           <span class="entry-num">{{ idx + 1 }}</span>
           <span class="entry-id">{{ entry.id }}</span>
           <button class="btn-entry-copy" @click="copyEntry(entry)">
-            {{ copiedEntry === entry.id ? '✓ 已复制' : '复制' }}
+            {{ copiedEntry === entry.id ? '✓ ' + t('keyEditor.copied') : t('keyEditor.copy') }}
           </button>
         </div>
         <div class="entry-fields">
@@ -17,7 +17,7 @@
             <span class="field-key">{{ key }}</span>
             <span class="field-sep">:</span>
             <span class="field-val">{{ truncate(val) }}</span>
-            <span v-if="val.length > 80" class="val-ellipsis" @click="openExpand(key, val)">…展开</span>
+            <span v-if="val.length > 80" class="val-ellipsis" @click="openExpand(key, val)">…{{ t('keyEditor.expand') }}</span>
           </span>
         </div>
       </div>
@@ -31,11 +31,13 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
+import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import ExpandModal from './ExpandModal.vue'
 
 const props = defineProps({ keyValue: Object })
 const settingsStore = useSettingsStore()
+const { t } = useI18n()
 
 const entries = ref([])
 const copiedEntry = ref(null)

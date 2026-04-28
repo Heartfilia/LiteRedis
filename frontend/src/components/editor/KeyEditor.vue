@@ -2,20 +2,20 @@
   <div class="key-editor">
     <!-- 未选中 key -->
     <div v-if="!selectedKey" class="empty-state">
-      从左侧选择一个 key 查看详情
+      {{ t('keyEditor.selectKeyHint') }}
     </div>
 
     <!-- 加载中 -->
     <div v-else-if="keyValueLoading" class="empty-state loading-state">
       <div class="spinner"></div>
-      <span>加载中...</span>
+      <span>{{ t('keyEditor.loading') }}</span>
     </div>
 
     <!-- 加载错误 -->
     <div v-else-if="keyValueError" class="empty-state error-state">
       <div class="error-icon">⚠</div>
       <div class="error-text">{{ keyValueError }}</div>
-      <button class="btn-retry" @click="refreshKey">重试</button>
+      <button class="btn-retry" @click="refreshKey">{{ t('keyEditor.retry') }}</button>
     </div>
 
     <!-- key 详情 -->
@@ -26,7 +26,7 @@
           <!-- key 名点击即复制 -->
           <span
             class="key-name"
-            :title="keyCopied ? '已复制！' : '点击复制 key 名'"
+            :title="keyCopied ? t('keyEditor.copiedKeyName') : t('keyEditor.copyKeyName')"
             :class="{ copied: keyCopied }"
             @click="copyKeyName"
           >{{ keyValue.key }}</span>
@@ -34,36 +34,41 @@
             {{ typeColor.label }}
           </span>
           <span class="ttl-info">
-            TTL:
+            {{ t('keyEditor.ttl') }}:
             <span v-if="editingTTL">
               <input v-model.number="ttlInput" type="number" class="ttl-input" />
               <button class="btn-xs" @click="saveTTL">✓</button>
               <button class="btn-xs" @click="editingTTL = false">✕</button>
             </span>
             <span v-else class="ttl-val" @click="startTTLEdit">
-              {{ keyValue.ttl === -1 ? '永久' : keyValue.ttl + 's' }}
+              {{ displayTTL }}
             </span>
           </span>
         </div>
         <div class="key-actions">
-          <button class="btn-sm" @click="startRename">重命名</button>
-          <button class="btn-sm" @click="refreshKey">刷新</button>
-          <template v-if="!confirmingDelete">
-            <button class="btn-sm danger" @click="confirmingDelete = true">删除</button>
-          </template>
-          <template v-else>
-            <span class="delete-confirm-tip">确认删除？</span>
-            <button class="btn-sm danger-confirm" @click="doDelete">✓ 确认</button>
-            <button class="btn-sm" @click="confirmingDelete = false">✕ 取消</button>
-          </template>
+          <button class="btn-sm" @click="startRename">{{ t('keyEditor.rename') }}</button>
+          <button class="btn-sm" @click="refreshKey">{{ t('keyEditor.refresh') }}</button>
+          <div class="delete-wrap">
+            <button class="btn-sm danger" @click="confirmingDelete = true">{{ t('keyEditor.delete') }}</button>
+            <div v-if="confirmingDelete" class="delete-popover">
+              <div class="delete-popover-arrow"></div>
+              <div class="delete-popover-content">
+                <span class="delete-popover-text">{{ t('keyEditor.confirmDelete') }}</span>
+                <div class="delete-popover-btns">
+                  <button class="btn-xs btn-confirm-yes" @click="doDelete">✓</button>
+                  <button class="btn-xs btn-confirm-no" @click="confirmingDelete = false">✕</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- 重命名输入 -->
       <div v-if="renamingKey" class="rename-bar">
-        <input v-model="newKeyName" placeholder="新 key 名称" @keydown.enter="doRename" @keydown.esc="renamingKey = false" />
-        <button class="btn-xs" @click="doRename">确认</button>
-        <button class="btn-xs" @click="renamingKey = false">取消</button>
+        <input v-model="newKeyName" :placeholder="t('keyEditor.renameInput')" @keydown.enter="doRename" @keydown.esc="renamingKey = false" />
+        <button class="btn-xs" @click="doRename">{{ t('keyEditor.renameConfirm') }}</button>
+        <button class="btn-xs" @click="renamingKey = false">{{ t('keyEditor.renameCancel') }}</button>
         <span v-if="renameMsg" class="rename-msg">{{ renameMsg }}</span>
       </div>
 
@@ -75,19 +80,20 @@
         <SetEditor    v-else-if="keyValue.type === 'set'"    :keyValue="keyValue" />
         <ZSetEditor   v-else-if="keyValue.type === 'zset'"   :keyValue="keyValue" />
         <StreamEditor v-else-if="keyValue.type === 'stream'" :keyValue="keyValue" />
-        <div v-else class="empty-state">暂不支持类型: {{ keyValue.type }}</div>
+        <div v-else class="empty-state">{{ t('keyEditor.unsupportedType', { type: keyValue.type }) }}</div>
       </div>
     </template>
 
     <div v-else class="empty-state">
-      <button class="btn-retry" @click="refreshKey">重新加载</button>
+      <button class="btn-retry" @click="refreshKey">{{ t('keyEditor.reload') }}</button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { getTypeColor } from '../../utils/typeColors.js'
 import StringEditor from './StringEditor.vue'
@@ -96,6 +102,8 @@ import ListEditor from './ListEditor.vue'
 import SetEditor from './SetEditor.vue'
 import ZSetEditor from './ZSetEditor.vue'
 import StreamEditor from './StreamEditor.vue'
+
+const { t } = useI18n()
 
 const workspaceStore = useWorkspaceStore()
 const selectedKey = computed(() => workspaceStore.selectedKey)
@@ -144,7 +152,7 @@ async function doRename() {
   if (result?.success) {
     renamingKey.value = false
   } else {
-    renameMsg.value = result?.message || '重命名失败'
+    renameMsg.value = result?.message || t('keyEditor.renameFailed')
   }
 }
 
@@ -162,6 +170,36 @@ async function doDelete() {
   confirmingDelete.value = false
   await workspaceStore.deleteCurrentKey()
 }
+
+// TTL 自动更新
+const liveTTL = ref(null)
+let ttlTimer = null
+
+const displayTTL = computed(() => {
+  if (keyValue.value?.ttl === -1) return t('keyEditor.permanent')
+  const ttl = liveTTL.value !== null ? liveTTL.value : keyValue.value?.ttl
+  if (ttl === null || ttl === undefined) return '—'
+  return ttl + 's'
+})
+
+watch(() => keyValue.value?.ttl, (ttl) => {
+  liveTTL.value = ttl ?? null
+  if (ttlTimer) { clearInterval(ttlTimer); ttlTimer = null }
+  if (typeof ttl === 'number' && ttl > 0) {
+    ttlTimer = setInterval(() => {
+      if (liveTTL.value > 0) {
+        liveTTL.value--
+      } else {
+        clearInterval(ttlTimer)
+        ttlTimer = null
+      }
+    }, 1000)
+  }
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  if (ttlTimer) { clearInterval(ttlTimer); ttlTimer = null }
+})
 </script>
 
 <style scoped>
@@ -269,7 +307,57 @@ async function doDelete() {
 .btn-sm.danger:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
 .btn-sm.danger-confirm { background: #dc2626; color: white; border-color: #dc2626; }
 .btn-sm.danger-confirm:hover { background: #b91c1c; border-color: #b91c1c; }
-.delete-confirm-tip { font-size: 12px; color: #dc2626; white-space: nowrap; font-weight: 500; }
+.delete-wrap { position: relative; display: inline-flex; }
+.delete-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.delete-popover-arrow {
+  position: absolute;
+  top: -5px;
+  right: 10px;
+  width: 10px;
+  height: 10px;
+  background: white;
+  border-left: 1px solid #e5e7eb;
+  border-top: 1px solid #e5e7eb;
+  transform: rotate(45deg);
+}
+.delete-popover-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.delete-popover-text {
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 500;
+}
+.delete-popover-btns {
+  display: flex;
+  gap: 4px;
+}
+.btn-confirm-yes {
+  color: #16a34a;
+  border-color: #16a34a;
+}
+.btn-confirm-yes:hover { background: #16a34a; color: white; }
+.btn-confirm-no {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+.btn-confirm-no:hover { background: #dc2626; color: white; }
 .btn-xs {
   padding: 2px 8px;
   border: 1px solid #d1d5db;

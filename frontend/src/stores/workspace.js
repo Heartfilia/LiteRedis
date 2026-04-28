@@ -58,6 +58,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       if (this.activeConnID) {
         this.connStates[this.activeConnID] = {
           currentDB: this.currentDB,
+          keepPrevSearch: this.keepPrevSearch,
           searchSessions: this.searchSessions,
           activeSessionId: this.activeSessionId,
           selectedKey: this.selectedKey,
@@ -75,6 +76,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       if (id && this.connStates[id]) {
         const s = this.connStates[id]
         this.currentDB = s.currentDB
+        this.keepPrevSearch = s.keepPrevSearch ?? false
         this.searchSessions = s.searchSessions
         this.activeSessionId = s.activeSessionId
         this.selectedKey = s.selectedKey
@@ -125,10 +127,12 @@ export const useWorkspaceStore = defineStore('workspace', {
       if (!this.activeConnID || !pattern) return
       const p = pattern.trim()
       if (!p || p === '*') return
+      const settingsStore = useSettingsStore()
+      const limit = settingsStore.loaded ? settingsStore.searchHistoryLimit : 10
       let list = this.connSearchHistory[this.activeConnID] || []
       list = list.filter(item => item !== p)
       list.unshift(p)
-      if (list.length > 10) list = list.slice(0, 10)
+      if (list.length > limit) list = list.slice(0, limit)
       this.connSearchHistory[this.activeConnID] = list
       this._saveSearchHistory()
     },

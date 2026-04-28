@@ -4,7 +4,7 @@
       <input
         v-model="pattern"
         type="text"
-        placeholder="搜索 key，支持 * 通配符，如 user:*"
+        :placeholder="t('keyTree.searchPlaceholder')"
         @keydown.enter="onEnter"
         @keydown.down.prevent="onArrowDown"
         @keydown.up.prevent="onArrowUp"
@@ -13,7 +13,7 @@
         @blur="onBlur"
       />
       <button class="btn-search" @click="doSearch" :disabled="loading">
-        {{ loading ? '...' : '搜索' }}
+        {{ loading ? '...' : t('keyTree.searchBtn') }}
       </button>
 
       <!-- 历史记录下拉 -->
@@ -32,7 +32,7 @@
     <div class="search-options">
       <label class="keep-label">
         <input type="checkbox" v-model="keep" />
-        保留上次搜索
+        {{ t('keyTree.keepPrev') }}
       </label>
     </div>
   </div>
@@ -41,7 +41,9 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useI18n } from '../../i18n/index.js'
 
+const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 
 const pattern = ref('*')
@@ -66,6 +68,7 @@ watch(keep, val => {
 
 watch(() => workspaceStore.activeConnID, () => {
   pattern.value = '*'
+  keep.value = workspaceStore.keepPrevSearch
   loading.value = false
   showHistory.value = false
   activeIndex.value = -1

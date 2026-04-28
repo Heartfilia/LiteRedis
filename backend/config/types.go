@@ -29,23 +29,27 @@ type SSHConfig struct {
 
 // AppSettings 全局应用设置
 type AppSettings struct {
-	KeyScanCount    int64 `json:"key_scan_count"`    // 每次扫描 key 的数量，默认 20
-	HashLoadCount   int64 `json:"hash_load_count"`   // Hash 每次加载 field 数，默认 20
-	ListLoadCount   int64 `json:"list_load_count"`   // List 每次加载条数，默认 20
-	SetLoadCount    int64 `json:"set_load_count"`    // Set 每次加载成员数，默认 20
-	ZSetLoadCount   int64 `json:"zset_load_count"`   // ZSet 每次加载条数，默认 20
-	StreamLoadCount int64 `json:"stream_load_count"` // Stream 每次加载条数，默认 20
+	KeyScanCount       int64  `json:"key_scan_count"`       // 每次扫描 key 的数量，默认 20
+	HashLoadCount      int64  `json:"hash_load_count"`      // Hash 每次加载 field 数，默认 20
+	ListLoadCount      int64  `json:"list_load_count"`      // List 每次加载条数，默认 20
+	SetLoadCount       int64  `json:"set_load_count"`       // Set 每次加载成员数，默认 20
+	ZSetLoadCount      int64  `json:"zset_load_count"`      // ZSet 每次加载条数，默认 20
+	StreamLoadCount    int64  `json:"stream_load_count"`    // Stream 每次加载条数，默认 20
+	SearchHistoryLimit int    `json:"search_history_limit"` // 保留最近查询历史条数，默认 10
+	Language           string `json:"language"`             // 界面语言，默认 zh
 }
 
 // DefaultSettings 返回默认设置
 func DefaultSettings() AppSettings {
 	return AppSettings{
-		KeyScanCount:    20,
-		HashLoadCount:   20,
-		ListLoadCount:   20,
-		SetLoadCount:    20,
-		ZSetLoadCount:   20,
-		StreamLoadCount: 20,
+		KeyScanCount:       20,
+		HashLoadCount:      20,
+		ListLoadCount:      20,
+		SetLoadCount:       20,
+		ZSetLoadCount:      20,
+		StreamLoadCount:    20,
+		SearchHistoryLimit: 10,
+		Language:           "zh",
 	}
 }
 

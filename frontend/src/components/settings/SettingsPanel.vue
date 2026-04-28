@@ -1,87 +1,119 @@
 <template>
   <div class="settings-panel">
     <div class="settings-header">
-      <span>⚙️ 设置</span>
+      <span>⚙️ {{ t('settings.title') }}</span>
       <button class="btn-close" @click="$emit('close')">✕</button>
     </div>
 
     <div class="settings-body">
-      <div class="section-title">Key 加载数量</div>
+      <div class="section-title">{{ t('settings.keyLoadCount') }}</div>
 
       <div class="setting-item">
         <label>
-          <span class="label-text">Key 列表每次加载</span>
-          <span class="label-hint">每次 SCAN 返回的最大 key 数量</span>
+          <span class="label-text">{{ t('settings.keyScanCount') }}</span>
+          <span class="label-hint">{{ t('settings.keyScanHint') }}</span>
         </label>
         <div class="input-unit">
           <input v-model.number="form.keyScanCount" type="number" min="10" max="10000" step="10" />
-          <span class="unit">个</span>
+          <span class="unit">{{ t('settings.unitCount') }}</span>
         </div>
       </div>
 
-      <div class="section-title mt">Value 加载数量</div>
+      <div class="section-title mt">{{ t('settings.valueLoadCount') }}</div>
 
       <div class="setting-item">
         <label>
-          <span class="label-text">Hash 每次加载 Field 数</span>
-          <span class="label-hint">使用 HSCAN 分批读取，防止大 Hash 阻塞</span>
+          <span class="label-text">{{ t('settings.hashLoadCount') }}</span>
+          <span class="label-hint">{{ t('settings.hashLoadHint') }}</span>
         </label>
         <div class="input-unit">
           <input v-model.number="form.hashLoadCount" type="number" min="10" max="100000" step="50" />
-          <span class="unit">条</span>
+          <span class="unit">{{ t('settings.unitItem') }}</span>
         </div>
       </div>
 
       <div class="setting-item">
         <label>
-          <span class="label-text">List 每次加载元素数</span>
-          <span class="label-hint">使用 LRANGE 0 N-1 读取前 N 条</span>
+          <span class="label-text">{{ t('settings.listLoadCount') }}</span>
+          <span class="label-hint">{{ t('settings.listLoadHint') }}</span>
         </label>
         <div class="input-unit">
           <input v-model.number="form.listLoadCount" type="number" min="10" max="10000" step="50" />
-          <span class="unit">条</span>
+          <span class="unit">{{ t('settings.unitItem') }}</span>
         </div>
       </div>
 
       <div class="setting-item">
         <label>
-          <span class="label-text">Set 每次加载成员数</span>
-          <span class="label-hint">使用 SSCAN 迭代读取，不阻塞</span>
+          <span class="label-text">{{ t('settings.setLoadCount') }}</span>
+          <span class="label-hint">{{ t('settings.setLoadHint') }}</span>
         </label>
         <div class="input-unit">
           <input v-model.number="form.setLoadCount" type="number" min="10" max="10000" step="50" />
-          <span class="unit">个</span>
+          <span class="unit">{{ t('settings.unitMember') }}</span>
         </div>
       </div>
 
       <div class="setting-item">
         <label>
-          <span class="label-text">ZSet 每次加载成员数</span>
-          <span class="label-hint">使用 ZRANGE 0 N-1 按分数升序读取</span>
+          <span class="label-text">{{ t('settings.zsetLoadCount') }}</span>
+          <span class="label-hint">{{ t('settings.zsetLoadHint') }}</span>
         </label>
         <div class="input-unit">
           <input v-model.number="form.zsetLoadCount" type="number" min="10" max="10000" step="50" />
-          <span class="unit">个</span>
+          <span class="unit">{{ t('settings.unitMember') }}</span>
         </div>
       </div>
 
       <div class="setting-item">
         <label>
-          <span class="label-text">Stream 每次加载条目数</span>
-          <span class="label-hint">使用 XREVRANGE 读取最新 N 条</span>
+          <span class="label-text">{{ t('settings.streamLoadCount') }}</span>
+          <span class="label-hint">{{ t('settings.streamLoadHint') }}</span>
         </label>
         <div class="input-unit">
           <input v-model.number="form.streamLoadCount" type="number" min="10" max="10000" step="50" />
-          <span class="unit">条</span>
+          <span class="unit">{{ t('settings.unitItem') }}</span>
+        </div>
+      </div>
+
+      <div class="section-title mt">{{ t('settings.other') }}</div>
+
+      <div class="setting-item">
+        <label>
+          <span class="label-text">{{ t('settings.searchHistoryLimit') }}</span>
+          <span class="label-hint">{{ t('settings.searchHistoryHint') }}</span>
+        </label>
+        <div class="input-unit">
+          <input v-model.number="form.searchHistoryLimit" type="number" min="1" max="100" step="1" />
+          <span class="unit">{{ t('settings.unitItem') }}</span>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <label>
+          <span class="label-text">{{ t('settings.language') }}</span>
+          <span class="label-hint">{{ t('settings.languageHint') }}</span>
+        </label>
+        <div class="input-unit">
+          <select v-model="form.language" class="lang-select">
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
         </div>
       </div>
     </div>
 
+    <!-- floating toast -->
+    <Teleport to="body">
+      <Transition name="toast">
+        <div v-if="msg" class="settings-toast" :class="ok ? 'ok' : 'err'">{{ msg }}</div>
+      </Transition>
+    </Teleport>
+
     <div class="settings-footer">
-      <span v-if="msg" :class="['save-msg', ok ? 'ok' : 'err']">{{ msg }}</span>
-      <button class="btn-cancel" @click="reset">重置默认</button>
-      <button class="btn-close-modal" @click="$emit('close')">取消</button>
-      <button class="btn-save" :disabled="saving" @click="doSave">{{ saving ? '保存中...' : '保存设置' }}</button>
+      <button class="btn-cancel" @click="reset">{{ t('settings.reset') }}</button>
+      <button class="btn-close-modal" @click="$emit('close')">{{ t('settings.close') }}</button>
+      <button class="btn-save" :disabled="saving" @click="doSave">{{ saving ? t('settings.saving') : t('settings.save') }}</button>
     </div>
   </div>
 </template>
@@ -89,6 +121,9 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
+import { useI18n } from '../../i18n/index.js'
+
+const { t, setLanguage } = useI18n()
 
 const emit = defineEmits(['close'])
 const settingsStore = useSettingsStore()
@@ -100,6 +135,8 @@ const form = reactive({
   setLoadCount: 20,
   zsetLoadCount: 20,
   streamLoadCount: 20,
+  searchHistoryLimit: 10,
+  language: 'zh',
 })
 
 const saving = ref(false)
@@ -118,6 +155,8 @@ function syncFromStore() {
   form.setLoadCount = settingsStore.setLoadCount
   form.zsetLoadCount = settingsStore.zsetLoadCount
   form.streamLoadCount = settingsStore.streamLoadCount
+  form.searchHistoryLimit = settingsStore.searchHistoryLimit
+  form.language = settingsStore.language
 }
 
 function reset() {
@@ -127,6 +166,8 @@ function reset() {
   form.setLoadCount = 20
   form.zsetLoadCount = 20
   form.streamLoadCount = 20
+  form.searchHistoryLimit = 10
+  form.language = 'zh'
 }
 
 async function doSave() {
@@ -135,8 +176,9 @@ async function doSave() {
   try {
     const result = await settingsStore.save({ ...form })
     ok.value = result.success
-    msg.value = result.success ? '✓ 已保存，下次加载 key 时生效' : (result.message || '保存失败')
+    msg.value = result.success ? '✓ ' + t('settings.saveOk') : (result.message || t('settings.saveErr'))
     if (result.success) {
+      setLanguage(form.language)
       setTimeout(() => { msg.value = '' }, 3000)
     }
   } catch (e) {
@@ -241,6 +283,17 @@ async function doSave() {
   color: #6b7280;
   white-space: nowrap;
 }
+.lang-select {
+  padding: 5px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  background: white;
+  color: #1f2937;
+  cursor: pointer;
+}
+.lang-select:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
 
 .settings-footer {
   display: flex;
@@ -296,4 +349,21 @@ async function doSave() {
   transition: background 0.12s, border-color 0.12s;
 }
 .btn-close-modal:hover { background: #f3f4f6; border-color: #9ca3af; }
+.settings-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  pointer-events: none;
+}
+.settings-toast.ok { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+.settings-toast.err { background: #fff1f2; color: #991b1b; border: 1px solid #fecaca; }
+.toast-enter-active, .toast-leave-active { transition: opacity 0.25s, transform 0.25s; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-12px); }
 </style>

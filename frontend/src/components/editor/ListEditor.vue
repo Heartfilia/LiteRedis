@@ -1,35 +1,36 @@
 <template>
   <div class="list-editor">
     <div class="toolbar">
-      <button class="btn-add" @click="showAdd = !showAdd">+ 添加元素</button>
+      <button class="btn-add" @click="showAdd = !showAdd">+ {{ t('keyEditor.addElement') }}</button>
       <div class="search-bar">
         <input
           v-model="searchQuery"
           class="search-input"
-          placeholder="搜索元素..."
+          :placeholder="t('keyEditor.searchElement')"
           @keydown.enter="executeSearch"
         />
         <button class="btn-search" :disabled="isSearching" @click="executeSearch">
-          {{ isSearching ? '…' : '搜索' }}
+          {{ isSearching ? '…' : t('keyTree.searchBtn') }}
         </button>
         <button v-if="searchResults !== null" class="btn-clear-search" @click="clearSearch">✕</button>
       </div>
       <span class="count">
-        <template v-if="searchResults !== null">搜索: {{ displayItems.length }}/{{ searchResults.length }}</template>
-        <template v-else>{{ sourceItems.length }}/{{ rawItems.length }} 条</template>
+        <template v-if="searchResults !== null">{{ t('keyEditor.searchResult', { current: displayItems.length, total: searchResults.length }) }}</template>
+        <template v-else>{{ t('keyEditor.itemsCount', { current: sourceItems.length, total: rawItems.length }) }}</template>
       </span>
     </div>
     <div v-if="showAdd" class="add-row">
-      <select v-model="pushDir"><option value="lpush">头部插入 (LPUSH)</option><option value="rpush">尾部插入 (RPUSH)</option></select>
+      <select v-model="pushDir"><option value="lpush">{{ t('keyEditor.lpush') }}</option><option value="rpush">{{ t('keyEditor.rpush') }}</option></select>
       <input v-model="newValue" placeholder="value" @keydown.enter="addItem" />
-      <button @click="addItem">添加</button>
-      <button @click="showAdd = false">取消</button>
+      <button @click="addItem">{{ t('keyEditor.add') }}</button>
+      <button @click="showAdd = false">{{ t('keyEditor.cancel') }}</button>
     </div>
 
+    <div v-if="msg" :class="['msg-bar', ok ? 'ok' : 'err']">{{ msg }}</div>
     <!-- sort header -->
     <div class="list-header">
       <span class="sortable-col" @click="cycleSortOrder">
-        值 <span class="sort-icon" :class="sortOrder">{{ sortIcon }}</span>
+        {{ t('keyEditor.value') }} <span class="sort-icon" :class="sortOrder">{{ sortIcon }}</span>
       </span>
     </div>
 
@@ -44,7 +45,7 @@
           @dblclick="searchResults === null && sortOrder === 'none' && startEdit(displayOriginalIndices[idx], item)"
         >
           <span class="val-preview">{{ truncate(item) }}</span>
-          <span v-if="item.length > 80" class="val-ellipsis" @click="openExpand(idx, item)">…展开</span>
+          <span v-if="item.length > 80" class="val-ellipsis" @click="openExpand(idx, item)">…{{ t('keyEditor.expand') }}</span>
         </span>
         <input
           v-else
@@ -54,14 +55,15 @@
           @keydown.esc="editingIdx = -1"
         />
         <div class="item-actions">
-          <button class="btn-tiny" @click="copyItem(item, idx)">{{ copiedItem === item + idx ? '✓' : '复制' }}</button>
-          <button class="btn-tiny" @click="openExpand(idx, item)">展开</button>
-          <button
-            v-if="searchResults === null && sortOrder === 'none'"
-            class="btn-tiny"
-            @click="startEdit(displayOriginalIndices[idx], item)"
-          >编辑</button>
-          <button class="btn-tiny danger" @click="removeItem(item, displayOriginalIndices[idx])">删除</button>
+          <template v-if="editingIdx !== displayOriginalIndices[idx]">
+            <button class="btn-tiny" @click="copyItem(item, idx)">{{ copiedItem === item + idx ? '✓' : t('keyEditor.copy') }}</button>
+            <button v-if="searchResults === null && sortOrder === 'none'" class="btn-tiny" @click="openEdit(displayOriginalIndices[idx], item)">{{ t('keyEditor.edit') }}</button>
+            <button class="btn-tiny danger" @click="removeItem(item, displayOriginalIndices[idx])">{{ t('keyEditor.delete') }}</button>
+          </template>
+          <template v-else>
+            <button class="btn-tiny btn-confirm-yes" @click="saveEdit(displayOriginalIndices[idx])">✅</button>
+            <button class="btn-tiny btn-confirm-no" @click="cancelEdit()">❌</button>
+          </template>
         </div>
       </div>
     </div>
@@ -74,16 +76,14 @@
         :disabled="valueLoading"
         @click="loadMore"
       >
-        {{ valueLoading ? '加载中...' : '加载更多' }}
+        {{ valueLoading ? t('keyEditor.loading') : t('keyTree.loadMore') }}
       </button>
       <span v-else-if="searchResults === null && !hasMore && rawItems.length > 0" class="load-more-hint">
-        已加载全部 {{ rawItems.length }} 条
+        {{ t('keyEditor.allItemsLoaded', { count: rawItems.length }) }}
       </span>
     </div>
 
-    <div v-if="msg" :class="['msg', ok ? 'ok' : 'err']">{{ msg }}</div>
-
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" @close="expandShow = false" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" @close="expandShow = false" @save="saveFromModal" />
   </div>
 </template>
 
@@ -91,6 +91,7 @@
 import { ref, computed, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
+import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { lPush, rPush, lSet, lRem, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
@@ -98,6 +99,7 @@ import ExpandModal from './ExpandModal.vue'
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
 const settingsStore = useSettingsStore()
+const { t } = useI18n()
 
 const rawItems = ref([])      // 原始加载的 items（保留原始索引）
 const showAdd = ref(false)
@@ -126,6 +128,9 @@ function cycleSortOrder() {
 const expandShow = ref(false)
 const expandTitle = ref('')
 const expandContent = ref('')
+const expandEditable = ref(false)
+const expandSaving = ref(false)
+const editModalIdx = ref(-1)
 
 // 服务端分页状态
 const hasMore = ref(false)
@@ -197,7 +202,6 @@ async function executeSearch() {
   try {
     const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'list', pattern)
     searchResults.value = kv.list_val || []
-    displayLimit.value = loadCount.value
     editingIdx.value = -1
   } catch(e) { ok.value = false; msg.value = e.message }
   finally { isSearching.value = false }
@@ -206,7 +210,6 @@ async function executeSearch() {
 function clearSearch() {
   searchQuery.value = ''
   searchResults.value = null
-  displayLimit.value = loadCount.value
 }
 
 function truncate(val, max = 80) {
@@ -219,11 +222,42 @@ function startEdit(idx, val) {
   editingIdx.value = idx
   editValue.value = val
 }
+function cancelEdit() { editingIdx.value = -1 }
 
 function openExpand(idx, val) {
   expandTitle.value = `item[${idx + 1}]`
   expandContent.value = val
+  expandEditable.value = false
   expandShow.value = true
+}
+
+function openEdit(idx, val) {
+  if (idx === -1) return
+  expandTitle.value = `item[${idx + 1}]`
+  expandContent.value = val
+  editModalIdx.value = idx
+  expandEditable.value = true
+  expandShow.value = true
+}
+
+async function saveFromModal(newVal) {
+  const idx = editModalIdx.value
+  if (idx === -1) return
+  expandSaving.value = true
+  try {
+    const result = await lSet(workspaceStore.activeConnID, props.keyValue.key, idx, newVal)
+    ok.value = result.success
+    msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
+    if (result.success) {
+      rawItems.value[idx] = newVal
+      expandShow.value = false
+    }
+  } catch (e) {
+    ok.value = false
+    msg.value = e.message
+  } finally {
+    expandSaving.value = false
+  }
 }
 
 async function copyItem(item, idx) {
@@ -237,7 +271,7 @@ async function saveEdit(idx) {
   editingIdx.value = -1
   try {
     const result = await lSet(workspaceStore.activeConnID, props.keyValue.key, idx, editValue.value)
-    ok.value = result.success; msg.value = result.success ? '已更新' : (result.message || '失败')
+    ok.value = result.success; msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) rawItems.value[idx] = editValue.value
   } catch(e) { ok.value = false; msg.value = e.message }
 }
@@ -245,7 +279,7 @@ async function saveEdit(idx) {
 async function removeItem(val, origIdx) {
   try {
     const result = await lRem(workspaceStore.activeConnID, props.keyValue.key, 1, val)
-    ok.value = result.success; msg.value = result.success ? '已删除' : (result.message || '失败')
+    ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
       if (origIdx !== -1) {
         rawItems.value.splice(origIdx, 1)
@@ -267,7 +301,7 @@ async function addItem() {
   try {
     const fn = pushDir.value === 'lpush' ? lPush : rPush
     const result = await fn(workspaceStore.activeConnID, props.keyValue.key, newValue.value)
-    ok.value = result.success; msg.value = result.success ? '已添加' : (result.message || '失败')
+    ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
       if (pushDir.value === 'lpush') rawItems.value.unshift(newValue.value)
       else rawItems.value.push(newValue.value)
@@ -343,4 +377,20 @@ async function addItem() {
 .msg { font-size: 12px; padding: 5px 10px; border-radius: 6px; }
 .ok { background: #f0fdf4; color: #166534; }
 .err { background: #fff1f2; color: #991b1b; }
+
+.msg-bar {
+  text-align: center;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  margin: 0 6px;
+}
+.msg-bar.ok { background: #f0fdf4; color: #166534; }
+.msg-bar.err { background: #fff1f2; color: #991b1b; }
+
+
+.btn-confirm-yes { color: #16a34a; border-color: #16a34a; }
+.btn-confirm-yes:hover { background: #16a34a; color: white; }
+.btn-confirm-no { color: #dc2626; border-color: #dc2626; }
+.btn-confirm-no:hover { background: #dc2626; color: white; }
 </style>

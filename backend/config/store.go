@@ -42,7 +42,7 @@ func loadStore() (*ConfigStore, error) {
 		return &ConfigStore{Version: 1, Connections: []ConnectionConfig{}, Settings: DefaultSettings()}, nil
 	}
 	// 迁移：若旧数据没有 Settings 字段，补默认值
-	if store.Settings.KeyScanCount == 0 {
+	if store.Settings.KeyScanCount == 0 || store.Settings.SearchHistoryLimit == 0 {
 		store.Settings = DefaultSettings()
 	}
 	return &store, nil
@@ -188,6 +188,15 @@ func SaveSettings(s AppSettings) error {
 	}
 	if s.StreamLoadCount <= 0 {
 		s.StreamLoadCount = 100
+	}
+	if s.SearchHistoryLimit <= 0 {
+		s.SearchHistoryLimit = 10
+	}
+	if s.SearchHistoryLimit > 100 {
+		s.SearchHistoryLimit = 100
+	}
+	if s.Language == "" {
+		s.Language = "zh"
 	}
 	store.Settings = s
 	return saveStore(store)

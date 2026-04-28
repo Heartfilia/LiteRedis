@@ -1,22 +1,22 @@
 <template>
   <div class="hash-editor">
     <div class="toolbar">
-      <button class="btn-add" @click="showAdd = !showAdd">+ 添加 Field</button>
+      <button class="btn-add" @click="showAdd = !showAdd">+ {{ t('keyEditor.addField') }}</button>
       <div class="search-bar">
         <input
           v-model="searchQuery"
           class="search-input"
-          placeholder="搜索 field..."
+          :placeholder="t('keyEditor.searchField')"
           @keydown.enter="executeSearch"
         />
         <button class="btn-search" :disabled="isSearching" @click="executeSearch">
-          {{ isSearching ? '…' : '搜索' }}
+          {{ isSearching ? '…' : t('keyTree.searchBtn') }}
         </button>
         <button v-if="searchResults !== null" class="btn-clear-search" @click="clearSearch">✕</button>
       </div>
       <span class="count">
-        <template v-if="searchResults !== null">搜索: {{ displayEntries.length }}/{{ searchResults.length }}</template>
-        <template v-else>{{ sourceEntries.length }}/{{ fieldCount }} 个 field</template>
+        <template v-if="searchResults !== null">{{ t('keyEditor.searchResult', { current: displayEntries.length, total: searchResults.length }) }}</template>
+        <template v-else>{{ t('keyEditor.fieldsCount', { current: sourceEntries.length, total: fieldCount }) }}</template>
       </span>
     </div>
 
@@ -24,9 +24,12 @@
     <div v-if="showAdd" class="add-row">
       <input v-model="newField" placeholder="field" @keydown.enter="addField" />
       <input v-model="newValue" placeholder="value" @keydown.enter="addField" />
-      <button @click="addField">添加</button>
-      <button @click="showAdd = false">取消</button>
+      <button @click="addField">{{ t('keyEditor.add') }}</button>
+      <button @click="showAdd = false">{{ t('keyEditor.cancel') }}</button>
     </div>
+
+    <!-- 操作提示 -->
+    <div v-if="msg" :class="['msg-bar', ok ? 'ok' : 'err']">{{ msg }}</div>
 
     <!-- hash 表格 -->
     <div class="hash-table-wrap">
@@ -34,30 +37,36 @@
         <thead>
           <tr>
             <th class="num-col">#</th>
-            <th class="sortable-col" @click="cycleSortOrder">
-              Field <span class="sort-icon" :class="sortOrder">{{ sortIcon }}</span>
+            <th class="sortable-col field-th" @click="cycleSortOrder" :style="{ width: fieldWidth + 'px' }">
+              <span class="th-content">Field <span class="sort-icon" :class="sortOrder">{{ sortIcon }}</span></span>
+              <span class="col-resizer" @mousedown.stop="startResizeField" />
             </th>
-            <th>Value</th>
-            <th>操作</th>
+            <th class="value-th">Value</th>
+            <th class="action-th">{{ t('keyEditor.action') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="([field, val], idx) in displayEntries" :key="field">
             <td class="num-cell">{{ idx + 1 }}</td>
-            <td class="field-cell">{{ field }}</td>
+            <td class="field-cell" :style="{ width: fieldWidth + 'px' }">{{ field }}</td>
             <td class="value-cell">
               <span v-if="editingField !== field" class="value-text" @dblclick="startEdit(field, val)">
                 <span class="val-preview">{{ truncate(val) }}</span>
-                <span v-if="val.length > 80" class="val-ellipsis" @click="openExpand(field, val)">…展开</span>
+                <span v-if="val.length > 80" class="val-ellipsis" @click="openExpand(field, val)">…{{ t('keyEditor.expand') }}</span>
               </span>
-              <input v-else v-model="editValue" @blur="saveEdit(field)" @keydown.enter="saveEdit(field)" @keydown.esc="editingField = null" />
+              <input v-else v-model="editValue" @keydown.enter="saveEdit(field)" @keydown.esc="cancelEdit()" />
             </td>
             <td class="action-cell">
               <div class="action-btns">
-                <button class="btn-tiny" @click="copyVal(val, field)">{{ copiedField === field ? '✓' : '复制' }}</button>
-                <button class="btn-tiny" @click="openExpand(field, val)">展开</button>
-                <button class="btn-tiny" @click="startEdit(field, val)">编辑</button>
-                <button class="btn-tiny danger" @click="deleteField(field)">删除</button>
+                <template v-if="editingField !== field">
+                  <button class="btn-tiny" @click="copyVal(val, field)">{{ copiedField === field ? '✓' : t('keyEditor.copy') }}</button>
+                  <button class="btn-tiny" @click="openEdit(field, val)">{{ t('keyEditor.edit') }}</button>
+                  <button class="btn-tiny danger" @click="deleteField(field)">{{ t('keyEditor.delete') }}</button>
+                </template>
+                <template v-else>
+                  <button class="btn-tiny btn-confirm-yes" @click="saveEdit(field)">✅</button>
+                  <button class="btn-tiny btn-confirm-no" @click="cancelEdit()">❌</button>
+                </template>
               </div>
             </td>
           </tr>
@@ -73,16 +82,14 @@
         :disabled="valueLoading"
         @click="loadMore"
       >
-        {{ valueLoading ? '加载中...' : '加载更多' }}
+        {{ valueLoading ? t('keyEditor.loading') : t('keyTree.loadMore') }}
       </button>
       <span v-else-if="searchResults === null && !hasMore && fieldCount > 0" class="load-more-hint">
-        已加载全部 {{ fieldCount }} 个 field
+        {{ t('keyEditor.allFieldsLoaded', { count: fieldCount }) }}
       </span>
     </div>
 
-    <div v-if="msg" :class="['msg', ok ? 'ok' : 'err']">{{ msg }}</div>
-
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" @close="expandShow = false" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" @close="expandShow = false" @save="saveFromModal" />
   </div>
 </template>
 
@@ -90,6 +97,7 @@
 import { ref, computed, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
+import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { hSet, hDel, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
@@ -97,6 +105,7 @@ import ExpandModal from './ExpandModal.vue'
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
 const settingsStore = useSettingsStore()
+const { t } = useI18n()
 
 const rawHashVal = ref({})
 const showAdd = ref(false)
@@ -107,6 +116,26 @@ const editValue = ref('')
 const msg = ref('')
 const ok = ref(true)
 const copiedField = ref(null)
+const fieldWidth = ref(220)
+
+function startResizeField(e) {
+  const startX = e.clientX
+  const startWidth = fieldWidth.value
+  function onMove(ev) {
+    const delta = ev.clientX - startX
+    fieldWidth.value = Math.max(80, Math.min(400, startWidth + delta))
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
 
 // 搜索状态
 const searchQuery   = ref('')
@@ -124,6 +153,9 @@ function cycleSortOrder() {
 const expandShow = ref(false)
 const expandTitle = ref('')
 const expandContent = ref('')
+const expandEditable = ref(false)
+const expandSaving = ref(false)
+const editModalField = ref('')
 
 // 服务端分页状态
 const hasMore = ref(false)
@@ -187,7 +219,6 @@ async function executeSearch() {
   try {
     const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'hash', pattern)
     searchResults.value = Object.entries(kv.hash_val || {})
-    displayLimit.value = loadCount.value
   } catch(e) { ok.value = false; msg.value = e.message }
   finally { isSearching.value = false }
 }
@@ -195,7 +226,6 @@ async function executeSearch() {
 function clearSearch() {
   searchQuery.value = ''
   searchResults.value = null
-  displayLimit.value = loadCount.value
 }
 
 function truncate(val, max = 80) {
@@ -208,10 +238,43 @@ function startEdit(field, val) {
   editValue.value = val
 }
 
+function cancelEdit() {
+  editingField.value = null
+}
+
 function openExpand(field, val) {
   expandTitle.value = field
   expandContent.value = val
+  expandEditable.value = false
   expandShow.value = true
+}
+
+function openEdit(field, val) {
+  expandTitle.value = field
+  expandContent.value = val
+  editModalField.value = field
+  expandEditable.value = true
+  expandShow.value = true
+}
+
+async function saveFromModal(newVal) {
+  const field = editModalField.value
+  if (!field) return
+  expandSaving.value = true
+  try {
+    const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, field, newVal)
+    ok.value = result.success
+    msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
+    if (result.success) {
+      rawHashVal.value[field] = newVal
+      expandShow.value = false
+    }
+  } catch (e) {
+    ok.value = false
+    msg.value = e.message
+  } finally {
+    expandSaving.value = false
+  }
 }
 
 async function copyVal(val, field) {
@@ -226,7 +289,7 @@ async function saveEdit(field) {
   try {
     const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, field, editValue.value)
     ok.value = result.success
-    msg.value = result.success ? '已更新' : (result.message || '失败')
+    msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) rawHashVal.value[field] = editValue.value
   } catch(e) {
     ok.value = false; msg.value = e.message
@@ -237,7 +300,7 @@ async function deleteField(field) {
   try {
     const result = await hDel(workspaceStore.activeConnID, props.keyValue.key, field)
     ok.value = result.success
-    msg.value = result.success ? '已删除' : (result.message || '失败')
+    msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
       delete rawHashVal.value[field]
       // 同步从搜索结果中移除
@@ -255,7 +318,7 @@ async function addField() {
   try {
     const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, newField.value, newValue.value)
     ok.value = result.success
-    msg.value = result.success ? '已添加' : (result.message || '失败')
+    msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
       rawHashVal.value[newField.value] = newValue.value
       newField.value = ''; newValue.value = ''; showAdd.value = false
@@ -288,8 +351,26 @@ async function addField() {
 .hash-table td { padding: 5px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
 .num-col { width: 36px; text-align: center; }
 .num-cell { width: 36px; text-align: center; color: #d1d5db; font-size: 11px; }
-.field-cell { color: #1d4ed8; font-weight: 500; max-width: 150px; word-break: break-all; }
-.value-cell { max-width: 300px; }
+.field-th { position: relative; min-width: 80px; }
+.value-th { width: auto; }
+.action-th { width: 1px; white-space: nowrap; }
+.th-content { display: inline-block; }
+.col-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  background: #f3f4f6;
+  border-left: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+  transition: background 0.15s, border-color 0.15s;
+  z-index: 5;
+}
+.col-resizer:hover { background: #3b82f6; border-color: #3b82f6; }
+.field-cell { color: #1d4ed8; font-weight: 500; word-break: break-all; }
+.value-cell { max-width: none; }
 .value-text { cursor: pointer; display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; }
 .val-preview { font-family: monospace; font-size: 12px; word-break: break-all; color: #374151; }
 .val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
@@ -331,4 +412,21 @@ async function addField() {
 .msg { font-size: 12px; padding: 5px 10px; border-radius: 6px; }
 .ok { background: #f0fdf4; color: #166534; }
 .err { background: #fff1f2; color: #991b1b; }
+
+.msg-bar {
+  text-align: center;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  margin: 0 6px;
+}
+.msg-bar.ok { background: #f0fdf4; color: #166534; }
+.msg-bar.err { background: #fff1f2; color: #991b1b; }
+
+.value-cell { background: #f8fafc; }
+
+.btn-confirm-yes { color: #16a34a; border-color: #16a34a; }
+.btn-confirm-yes:hover { background: #16a34a; color: white; }
+.btn-confirm-no { color: #dc2626; border-color: #dc2626; }
+.btn-confirm-no:hover { background: #dc2626; color: white; }
 </style>

@@ -1,34 +1,35 @@
 <template>
   <div class="set-editor">
     <div class="toolbar">
-      <button class="btn-add" @click="showAdd = !showAdd">+ 添加成员</button>
+      <button class="btn-add" @click="showAdd = !showAdd">+ {{ t('keyEditor.addMember') }}</button>
       <div class="search-bar">
         <input
           v-model="searchQuery"
           class="search-input"
-          placeholder="搜索成员..."
+          :placeholder="t('keyEditor.searchMember')"
           @keydown.enter="executeSearch"
         />
         <button class="btn-search" :disabled="isSearching" @click="executeSearch">
-          {{ isSearching ? '…' : '搜索' }}
+          {{ isSearching ? '…' : t('keyTree.searchBtn') }}
         </button>
         <button v-if="searchResults !== null" class="btn-clear-search" @click="clearSearch">✕</button>
       </div>
       <span class="count">
-        <template v-if="searchResults !== null">搜索: {{ displayMembers.length }}/{{ searchResults.length }}</template>
-        <template v-else>{{ sourceMembers.length }}/{{ rawMembers.length }} 个</template>
+        <template v-if="searchResults !== null">{{ t('keyEditor.searchResult', { current: displayMembers.length, total: searchResults.length }) }}</template>
+        <template v-else>{{ t('keyEditor.membersCount', { current: sourceMembers.length, total: rawMembers.length }) }}</template>
       </span>
     </div>
     <div v-if="showAdd" class="add-row">
       <input v-model="newMember" placeholder="member" @keydown.enter="addMember" />
-      <button @click="addMember">添加</button>
-      <button @click="showAdd = false">取消</button>
+      <button @click="addMember">{{ t('keyEditor.add') }}</button>
+      <button @click="showAdd = false">{{ t('keyEditor.cancel') }}</button>
     </div>
 
+    <div v-if="msg" :class="['msg-bar', ok ? 'ok' : 'err']">{{ msg }}</div>
     <!-- sort header -->
     <div class="set-header">
       <span class="sortable-col" @click="cycleSortOrder">
-        成员 <span class="sort-icon" :class="sortOrder">{{ sortIcon }}</span>
+        {{ t('keyEditor.member') }} <span class="sort-icon" :class="sortOrder">{{ sortIcon }}</span>
       </span>
     </div>
 
@@ -37,12 +38,12 @@
         <span class="num-badge">{{ idx + 1 }}</span>
         <span class="member-val">
           <span class="val-preview">{{ truncate(m) }}</span>
-          <span v-if="m.length > 80" class="val-ellipsis" @click="openExpand(idx, m)">…展开</span>
+          <span v-if="m.length > 80" class="val-ellipsis" @click="openExpand(idx, m)">…{{ t('keyEditor.expand') }}</span>
         </span>
         <div class="item-actions">
-          <button class="btn-tiny" @click="copyMember(m, idx)">{{ copiedMember === m + idx ? '✓' : '复制' }}</button>
-          <button class="btn-tiny" @click="openExpand(idx, m)">展开</button>
-          <button class="btn-tiny danger" @click="removeMember(m)">删除</button>
+          <button class="btn-tiny" @click="copyMember(m, idx)">{{ copiedMember === m + idx ? '✓' : t('keyEditor.copy') }}</button>
+          <button class="btn-tiny" @click="openEdit(idx, m)">{{ t('keyEditor.edit') }}</button>
+          <button class="btn-tiny danger" @click="removeMember(m)">{{ t('keyEditor.delete') }}</button>
         </div>
       </div>
     </div>
@@ -55,16 +56,14 @@
         :disabled="valueLoading"
         @click="loadMore"
       >
-        {{ valueLoading ? '加载中...' : '加载更多' }}
+        {{ valueLoading ? t('keyEditor.loading') : t('keyTree.loadMore') }}
       </button>
       <span v-else-if="searchResults === null && !hasMore && rawMembers.length > 0" class="load-more-hint">
-        已加载全部 {{ rawMembers.length }} 个
+        {{ t('keyEditor.allMembersLoaded', { count: rawMembers.length }) }}
       </span>
     </div>
 
-    <div v-if="msg" :class="['msg', ok ? 'ok' : 'err']">{{ msg }}</div>
-
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" @close="expandShow = false" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" @close="expandShow = false" @save="saveFromModal" />
   </div>
 </template>
 
@@ -72,6 +71,7 @@
 import { ref, computed, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
+import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { sAdd, sRem, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
@@ -79,6 +79,7 @@ import ExpandModal from './ExpandModal.vue'
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
 const settingsStore = useSettingsStore()
+const { t } = useI18n()
 
 const rawMembers = ref([])
 const showAdd = ref(false)
@@ -103,6 +104,9 @@ function cycleSortOrder() {
 const expandShow = ref(false)
 const expandTitle = ref('')
 const expandContent = ref('')
+const expandEditable = ref(false)
+const expandSaving = ref(false)
+const editModalMember = ref('')
 
 // 服务端分页状态
 const hasMore = ref(false)
@@ -159,7 +163,6 @@ async function executeSearch() {
   try {
     const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'set', pattern)
     searchResults.value = kv.set_val || []
-    displayLimit.value = loadCount.value
   } catch(e) { ok.value = false; msg.value = e.message }
   finally { isSearching.value = false }
 }
@@ -167,7 +170,6 @@ async function executeSearch() {
 function clearSearch() {
   searchQuery.value = ''
   searchResults.value = null
-  displayLimit.value = loadCount.value
 }
 
 function truncate(val, max = 80) {
@@ -178,7 +180,47 @@ function truncate(val, max = 80) {
 function openExpand(idx, val) {
   expandTitle.value = `member[${idx + 1}]`
   expandContent.value = val
+  expandEditable.value = false
   expandShow.value = true
+}
+
+function openEdit(idx, val) {
+  expandTitle.value = `member[${idx + 1}]`
+  expandContent.value = val
+  editModalMember.value = val
+  expandEditable.value = true
+  expandShow.value = true
+}
+
+async function saveFromModal(newVal) {
+  const oldMember = editModalMember.value
+  if (!oldMember) return
+  expandSaving.value = true
+  try {
+    let result = await sRem(workspaceStore.activeConnID, props.keyValue.key, oldMember)
+    if (!result.success) {
+      ok.value = false
+      msg.value = result.message || t('keyEditor.deleteOldFailed')
+      return
+    }
+    result = await sAdd(workspaceStore.activeConnID, props.keyValue.key, newVal)
+    ok.value = result.success
+    msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
+    if (result.success) {
+      const idx = rawMembers.value.indexOf(oldMember)
+      if (idx !== -1) rawMembers.value[idx] = newVal
+      if (searchResults.value !== null) {
+        const sidx = searchResults.value.indexOf(oldMember)
+        if (sidx !== -1) searchResults.value[sidx] = newVal
+      }
+      expandShow.value = false
+    }
+  } catch (e) {
+    ok.value = false
+    msg.value = e.message
+  } finally {
+    expandSaving.value = false
+  }
 }
 
 async function copyMember(m, idx) {
@@ -191,7 +233,7 @@ async function addMember() {
   if (!newMember.value.trim()) return
   try {
     const result = await sAdd(workspaceStore.activeConnID, props.keyValue.key, newMember.value)
-    ok.value = result.success; msg.value = result.success ? '已添加' : (result.message || '失败')
+    ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) { rawMembers.value.push(newMember.value); newMember.value = ''; showAdd.value = false }
   } catch(e) { ok.value = false; msg.value = e.message }
 }
@@ -199,7 +241,7 @@ async function addMember() {
 async function removeMember(m) {
   try {
     const result = await sRem(workspaceStore.activeConnID, props.keyValue.key, m)
-    ok.value = result.success; msg.value = result.success ? '已删除' : (result.message || '失败')
+    ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
       rawMembers.value = rawMembers.value.filter(i => i !== m)
       if (searchResults.value !== null) {
@@ -275,4 +317,20 @@ async function removeMember(m) {
 .msg { font-size: 12px; padding: 5px 10px; border-radius: 6px; }
 .ok { background: #f0fdf4; color: #166534; }
 .err { background: #fff1f2; color: #991b1b; }
+
+.msg-bar {
+  text-align: center;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  margin: 0 6px;
+}
+.msg-bar.ok { background: #f0fdf4; color: #166534; }
+.msg-bar.err { background: #fff1f2; color: #991b1b; }
+
+
+.btn-confirm-yes { color: #16a34a; border-color: #16a34a; }
+.btn-confirm-yes:hover { background: #16a34a; color: white; }
+.btn-confirm-no { color: #dc2626; border-color: #dc2626; }
+.btn-confirm-no:hover { background: #dc2626; color: white; }
 </style>

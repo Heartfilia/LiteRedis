@@ -4,9 +4,9 @@
       <div class="cm-card">
         <!-- 顶部 header -->
         <div class="cm-header">
-          <span class="cm-title">连接管理</span>
+          <span class="cm-title">{{ t('connManager.title') }}</span>
           <div class="cm-header-actions">
-            <button class="btn-new" @click="newConnection">＋ 新建连接</button>
+            <button class="btn-new" @click="newConnection">＋ {{ t('connManager.newConn') }}</button>
             <button class="btn-close" @click="$emit('close')">✕</button>
           </div>
         </div>
@@ -23,7 +23,7 @@
               @dragleave="dragOverGroup = null"
               @drop.prevent="onDropToGroup('')"
             >
-              <div class="cm-group-label">未分组</div>
+              <div class="cm-group-label">{{ t('connManager.ungrouped') }}</div>
               <div
                 v-for="conn in (groupedConnections[''] || [])"
                 :key="conn.id"
@@ -77,7 +77,7 @@
             </div>
 
             <div v-if="connectionsStore.connections.length === 0" class="cm-empty">
-              暂无连接，点击「＋ 新建连接」
+              {{ t('connManager.noConnections') }}
             </div>
           </div>
 
@@ -99,17 +99,17 @@
         :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
         @click.stop
       >
-        <div class="ctx-section-label">移动到分组</div>
-        <div class="ctx-item" @click="moveToGroup(ctxMenu.conn, '')">（未分组）</div>
+        <div class="ctx-section-label">{{ t('connManager.moveToGroup') }}</div>
+        <div class="ctx-item" @click="moveToGroup(ctxMenu.conn, '')">（{{ t('connManager.ungrouped') }}）</div>
         <div
           v-for="g in existingGroups"
           :key="g"
           class="ctx-item"
           @click="moveToGroup(ctxMenu.conn, g)"
         >{{ g }}</div>
-        <div class="ctx-item" @click="moveToNewGroup(ctxMenu.conn)">＋ 新分组…</div>
+        <div class="ctx-item" @click="moveToNewGroup(ctxMenu.conn)">{{ t('connManager.newGroup') }}</div>
         <div class="ctx-divider" />
-        <div class="ctx-item ctx-danger" @click="deleteConn(ctxMenu.conn)">删除连接</div>
+        <div class="ctx-item ctx-danger" @click="deleteConn(ctxMenu.conn)">{{ t('connManager.deleteConn') }}</div>
       </div>
     </div>
   </Teleport>
@@ -120,10 +120,12 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import ConnectionForm from './ConnectionForm.vue'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useI18n } from '../../i18n/index.js'
 
 const emit = defineEmits(['close'])
 const connectionsStore = useConnectionsStore()
 const workspaceStore = useWorkspaceStore()
+const { t } = useI18n()
 
 const selectedConn = ref(null)
 const collapsed = ref({})
@@ -205,7 +207,7 @@ async function moveToGroup(conn, targetGroup) {
 
 async function moveToNewGroup(conn) {
   closeCtxMenu()
-  const name = prompt('请输入新分组名称：')
+  const name = prompt(t('connManager.newGroupPrompt'))
   if (name && name.trim()) {
     await connectionsStore.save(buildCfg(conn, name.trim()))
   }

@@ -1,7 +1,7 @@
 <template>
   <div class="key-tree">
     <div v-if="!activeConnID" class="empty-state">
-      请在左侧选择一个连接
+      {{ t('keyTree.selectConn') }}
     </div>
     <template v-else>
       <KeySearchBar />
@@ -11,17 +11,17 @@
       <div class="tree-content">
         <!-- 合并模式：keepPrevSearch = true -->
         <template v-if="workspaceStore.keepPrevSearch">
-          <div v-if="displaySessions.length === 0" class="empty-state">输入关键词搜索 key</div>
+          <div v-if="displaySessions.length === 0" class="empty-state">{{ t('keyTree.searchHint') }}</div>
           <div v-else class="merged-scroll">
             <div v-for="sess in displaySessions" :key="sess.id" class="search-section">
               <div class="search-section-header">
                 <span class="section-pattern">🔍 {{ sess.pattern }}</span>
-                <span v-if="sess.loading" class="section-status">加载中...</span>
-                <span v-else class="section-status">{{ sess.keys?.length ?? 0 }} 个</span>
+                <span v-if="sess.loading" class="section-status">{{ t('keyTree.loading') }}</span>
+                <span v-else class="section-status">{{ sess.keys?.length ?? 0 }}</span>
                 <button class="section-close" @click="workspaceStore.removeSession(sess.id)">✕</button>
               </div>
-              <div v-if="sess.loading" class="section-tip">加载中...</div>
-              <div v-else-if="!sess.treeData?.length" class="section-tip">未找到匹配的 key</div>
+              <div v-if="sess.loading" class="section-tip">{{ t('keyTree.loading') }}</div>
+              <div v-else-if="!sess.treeData?.length" class="section-tip">{{ t('keyTree.noKeys') }}</div>
               <div v-else>
                 <KeyTreeNode
                   v-for="node in sess.treeData"
@@ -37,9 +37,9 @@
                   :disabled="sess.loading"
                   @click="workspaceStore.loadMoreKeys(sess.id)"
                 >
-                  {{ sess.loading ? '加载中...' : '加载更多' }}
+                  {{ sess.loading ? t('keyTree.loading') : t('keyTree.loadMore') }}
                 </button>
-                <span v-else-if="sess.keys?.length > 0" class="load-more-hint">已加载全部 {{ sess.keys.length }} 个 key</span>
+                <span v-else-if="sess.keys?.length > 0" class="load-more-hint">{{ t('keyTree.allLoaded', { count: sess.keys.length }) }}</span>
               </div>
             </div>
           </div>
@@ -47,9 +47,9 @@
 
         <!-- 单session模式：keepPrevSearch = false -->
         <template v-else>
-          <div v-if="session?.loading" class="loading">加载中...</div>
-          <div v-else-if="!session" class="empty-state">输入关键词搜索 key</div>
-          <div v-else-if="session.treeData?.length === 0" class="empty-state">未找到匹配的 key</div>
+          <div v-if="session?.loading" class="loading">{{ t('keyTree.loading') }}</div>
+          <div v-else-if="!session" class="empty-state">{{ t('keyTree.searchHint') }}</div>
+          <div v-else-if="session.treeData?.length === 0" class="empty-state">{{ t('keyTree.noKeys') }}</div>
           <div v-else class="tree-scroll">
             <KeyTreeNode
               v-for="node in session.treeData"
@@ -64,9 +64,9 @@
                 :disabled="session.loading"
                 @click="workspaceStore.loadMoreKeys(session.id)"
               >
-                {{ session.loading ? '加载中...' : '加载更多' }}
+                {{ session.loading ? t('keyTree.loading') : t('keyTree.loadMore') }}
               </button>
-              <span v-else class="load-more-hint">已加载全部 {{ session.keys.length }} 个 key</span>
+              <span v-else class="load-more-hint">{{ t('keyTree.allLoaded', { count: session.keys.length }) }}</span>
             </div>
           </div>
         </template>
@@ -75,12 +75,12 @@
       <!-- DB 选择 + Key 统计 -->
       <div class="db-bar">
         <template v-if="!activeConn?.is_cluster">
-          <label class="db-label">DB</label>
+          <label class="db-label">{{ t('keyTree.db') }}</label>
           <select :value="currentDB" @change="switchDB($event.target.value)" class="db-select">
             <option v-for="i in 16" :key="i-1" :value="i-1">{{ i-1 }}</option>
           </select>
         </template>
-        <span class="key-count">共 {{ totalKeys }} 个 Key</span>
+        <span class="key-count">{{ t('keyTree.totalKeys', { count: totalKeys }) }}</span>
       </div>
     </template>
   </div>
@@ -90,10 +90,12 @@
 import { computed } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
+import { useI18n } from '../../i18n/index.js'
 import KeySearchBar from './KeySearchBar.vue'
 import SearchTabs from './SearchTabs.vue'
 import KeyTreeNode from './KeyTreeNode.vue'
 
+const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 const connectionsStore = useConnectionsStore()
 const activeConnID = computed(() => workspaceStore.activeConnID)

@@ -7,6 +7,8 @@ export namespace config {
 	    set_load_count: number;
 	    zset_load_count: number;
 	    stream_load_count: number;
+	    search_history_limit: number;
+	    language: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
@@ -20,6 +22,8 @@ export namespace config {
 	        this.set_load_count = source["set_load_count"];
 	        this.zset_load_count = source["zset_load_count"];
 	        this.stream_load_count = source["stream_load_count"];
+	        this.search_history_limit = source["search_history_limit"];
+	        this.language = source["language"];
 	    }
 	}
 	export class SSHConfig {
