@@ -16,7 +16,7 @@
       </div>
       <span class="count">
         <template v-if="searchResults !== null">{{ t('keyEditor.searchResult', { current: displayItems.length, total: searchResults.length }) }}</template>
-        <template v-else>{{ t('keyEditor.itemsCount', { current: sourceItems.length, total: rawItems.length }) }}</template>
+        <template v-else>{{ t('keyEditor.itemsCount', { current: sourceItems.length, total: totalItems }) }}</template>
       </span>
     </div>
     <div v-if="showAdd" class="add-row">
@@ -78,8 +78,8 @@
       >
         {{ valueLoading ? t('keyEditor.loading') : t('keyTree.loadMore') }}
       </button>
-      <span v-else-if="searchResults === null && !hasMore && rawItems.length > 0" class="load-more-hint">
-        {{ t('keyEditor.allItemsLoaded', { count: rawItems.length }) }}
+      <span v-else-if="searchResults === null && !hasMore && totalItems > 0" class="load-more-hint">
+        {{ t('keyEditor.allItemsLoaded', { count: totalItems }) }}
       </span>
     </div>
 
@@ -136,6 +136,7 @@ const editModalIdx = ref(-1)
 const hasMore = ref(false)
 const nextOffset = ref(0)
 const valueLoading = ref(false)
+const totalItems = computed(() => props.keyValue?.total_count >= 0 ? props.keyValue.total_count : rawItems.value.length)
 
 // 数据源（搜索激活时不保留原始索引）
 const sourceItems = computed(() =>
@@ -181,7 +182,7 @@ async function loadMore() {
   if (!hasMore.value || valueLoading.value || !props.keyValue?.key) return
   valueLoading.value = true
   try {
-    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, 0, nextOffset.value)
+    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, 0, nextOffset.value, '')
     if (result.list_val) {
       rawItems.value.push(...result.list_val)
     }
@@ -193,6 +194,11 @@ async function loadMore() {
   } finally {
     valueLoading.value = false
   }
+}
+
+async function reloadKeyData() {
+  if (!props.keyValue?.key) return
+  await workspaceStore.selectKey(props.keyValue.key)
 }
 
 async function executeSearch() {
@@ -249,7 +255,7 @@ async function saveFromModal(newVal) {
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      rawItems.value[idx] = newVal
+      await reloadKeyData()
       expandShow.value = false
     }
   } catch (e) {
@@ -272,7 +278,7 @@ async function saveEdit(idx) {
   try {
     const result = await lSet(workspaceStore.activeConnID, props.keyValue.key, idx, editValue.value)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) rawItems.value[idx] = editValue.value
+    if (result.success) await reloadKeyData()
   } catch(e) { ok.value = false; msg.value = e.message }
 }
 
@@ -280,19 +286,7 @@ async function removeItem(val, origIdx) {
   try {
     const result = await lRem(workspaceStore.activeConnID, props.keyValue.key, 1, val)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) {
-      if (origIdx !== -1) {
-        rawItems.value.splice(origIdx, 1)
-      } else {
-        // 搜索模式：从搜索结果和 rawItems 各移除一个
-        if (searchResults.value !== null) {
-          const si = searchResults.value.indexOf(val)
-          if (si !== -1) searchResults.value.splice(si, 1)
-        }
-        const ri = rawItems.value.indexOf(val)
-        if (ri !== -1) rawItems.value.splice(ri, 1)
-      }
-    }
+    if (result.success) await reloadKeyData()
   } catch(e) { ok.value = false; msg.value = e.message }
 }
 
@@ -303,8 +297,7 @@ async function addItem() {
     const result = await fn(workspaceStore.activeConnID, props.keyValue.key, newValue.value)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      if (pushDir.value === 'lpush') rawItems.value.unshift(newValue.value)
-      else rawItems.value.push(newValue.value)
+      await reloadKeyData()
       newValue.value = ''; showAdd.value = false
     }
   } catch(e) { ok.value = false; msg.value = e.message }

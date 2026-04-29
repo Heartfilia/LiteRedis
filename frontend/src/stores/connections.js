@@ -5,12 +5,14 @@ export const useConnectionsStore = defineStore('connections', {
   state: () => ({
     connections: [],
     connectedIds: new Set(),
+    connectingIds: new Set(),
     loading: false,
     error: null,
   }),
 
   getters: {
     isConnected: (state) => (id) => state.connectedIds.has(id),
+    isConnecting: (state) => (id) => state.connectingIds.has(id),
     groupedConnections: (state) => {
       const groups = {}
       for (const conn of state.connections) {
@@ -45,6 +47,7 @@ export const useConnectionsStore = defineStore('connections', {
     async remove(id) {
       // 断开连接
       this.connectedIds.delete(id)
+      this.connectingIds.delete(id)
       const result = await deleteConnection(id)
       if (result.success) {
         await this.loadConnections()
@@ -57,16 +60,25 @@ export const useConnectionsStore = defineStore('connections', {
     },
 
     async connect(id) {
-      const result = await connect(id)
-      if (result.success) {
-        this.connectedIds.add(id)
+      if (this.connectingIds.has(id)) {
+        return { success: false, message: 'connecting' }
       }
-      return result
+      this.connectingIds.add(id)
+      try {
+        const result = await connect(id)
+        if (result.success) {
+          this.connectedIds.add(id)
+        }
+        return result
+      } finally {
+        this.connectingIds.delete(id)
+      }
     },
 
     async disconnect(id) {
       await disconnect(id)
       this.connectedIds.delete(id)
+      this.connectingIds.delete(id)
     },
   },
 })

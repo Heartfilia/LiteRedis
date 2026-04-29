@@ -21,10 +21,10 @@
         :title="node.keyType"
       />
       <span class="node-label leaf-label">{{ node.label }}</span>
+      <span v-if="node.ttl > 0" class="ttl-badge" title="TTL">T</span>
       <span class="type-badge" :style="{ background: getTypeColor(node.keyType).bg, color: getTypeColor(node.keyType).text }">
         {{ getTypeColor(node.keyType).label }}
       </span>
-      <span v-if="node.ttl > 0" class="ttl-badge">{{ node.ttl }}s</span>
     </div>
 
     <!-- 子节点递归 -->
@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { getTypeColor } from '../../utils/typeColors.js'
 
@@ -51,15 +51,10 @@ const props = defineProps({
 
 const workspaceStore = useWorkspaceStore()
 const selectedKey = computed(() => workspaceStore.selectedKey)
-
-const isExpanded = ref(props.depth < 1 || workspaceStore.keepPrevSearch) // 第一层默认展开，保留搜索模式全部展开
-
-watch(() => workspaceStore.keepPrevSearch, (val) => {
-  if (val) isExpanded.value = true
-})
+const isExpanded = computed(() => workspaceStore.isNodeExpanded(props.node.fullPath, props.depth))
 
 function toggle() {
-  isExpanded.value = !isExpanded.value
+  workspaceStore.setNodeExpanded(props.node.fullPath, !isExpanded.value)
 }
 
 function selectKey(fullPath) {
@@ -102,7 +97,11 @@ function selectKey(fullPath) {
 }
 .ttl-badge {
   font-size: 10px;
-  color: #f59e0b;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #fef3c7;
+  color: #b45309;
+  font-weight: 600;
   flex-shrink: 0;
 }
 .children { padding-left: 16px; }

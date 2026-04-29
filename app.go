@@ -202,7 +202,7 @@ func (a *App) DBSize(connID string) int64 {
 // ============================================================
 
 // GetValue 读取 Value（支持 cursor/offset 分页）。cursor=0, offset=0 表示第一页。
-func (a *App) GetValue(connID, key string, cursor uint64, offset int) (config.KeyValue, error) {
+func (a *App) GetValue(connID, key string, cursor uint64, offset int, zsetSort string) (config.KeyValue, error) {
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.KeyValue{}, err
@@ -211,7 +211,7 @@ func (a *App) GetValue(connID, key string, cursor uint64, offset int) (config.Ke
 	// 每次读取用独立超时 context，防止大 key 阻塞整个应用
 	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
 	defer cancel()
-	return redisbackend.GetValue(ctx, client, key, settings, cursor, offset)
+	return redisbackend.GetValue(ctx, client, key, settings, cursor, offset, zsetSort)
 }
 
 // SearchValue 按 pattern 搜索 key 内成员（Hash/Set/ZSet 使用 Redis glob，List 使用子串匹配）
@@ -233,6 +233,20 @@ func (a *App) SetString(connID, key, value string, ttlSec int64) config.Operatio
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
 	if err := redisbackend.SetString(a.ctx, client, key, value, ttlSec); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
+// CreateKey 创建一个新 key。
+func (a *App) CreateKey(connID string, req config.CreateKeyRequest) config.OperationResult {
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+	defer cancel()
+	if err := redisbackend.CreateKey(ctx, client, req); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
 	return config.OperationResult{Success: true}

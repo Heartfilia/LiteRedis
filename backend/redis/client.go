@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
+	"time"
 
 	"LiteRedis/backend/config"
 	"LiteRedis/backend/ssh"
@@ -26,6 +28,8 @@ type ClientManager struct {
 	mu      sync.RWMutex
 	clients map[string]*activeConn
 }
+
+const redisConnectTimeout = 8 * time.Second
 
 // NewClientManager 创建连接池管理器
 func NewClientManager() *ClientManager {
@@ -63,36 +67,20 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	var client redis.UniversalClient
 
 	if cfg.IsCluster {
-		addrs := cfg.ClusterAddrs
+		addrs := normalizeAddrs(cfg.ClusterAddrs)
 		if len(addrs) == 0 {
-			addrs = []string{fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)}
+			addrs = []string{joinHostPort(cfg.Host, cfg.Port)}
 		}
-		opts := &redis.ClusterOptions{
-			Addrs:    addrs,
-			Password: cfg.Password,
-		}
-		if dialer != nil {
-			opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return dialer(network, addr)
-			}
-		}
+		opts := buildClusterOptions(addrs, cfg.Password, dialer)
 		client = redis.NewClusterClient(opts)
 	} else {
-		opts := &redis.Options{
-			Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-			Password: cfg.Password,
-			DB:       cfg.DB,
-		}
-		if dialer != nil {
-			opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return dialer(network, addr)
-			}
-		}
+		opts := buildRedisOptions(joinHostPort(cfg.Host, cfg.Port), cfg.Password, cfg.DB, dialer)
 		client = redis.NewClient(opts)
 	}
 
 	// 测试连通性
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), redisConnectTimeout)
+	defer cancel()
 	if err := client.Ping(ctx).Err(); err != nil {
 		client.Close()
 		if sshClient != nil {
@@ -163,19 +151,11 @@ func (m *ClientManager) SelectDB(id string, db int) error {
 		dialer = ssh.MakeDialer(conn.sshClient)
 	}
 
-	opts := &redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", conn.cfg.Host, conn.cfg.Port),
-		Password: conn.cfg.Password,
-		DB:       db,
-	}
-	if dialer != nil {
-		opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return dialer(network, addr)
-		}
-	}
+	opts := buildRedisOptions(joinHostPort(conn.cfg.Host, conn.cfg.Port), conn.cfg.Password, db, dialer)
 
 	newClient := redis.NewClient(opts)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), redisConnectTimeout)
+	defer cancel()
 	if err := newClient.Ping(ctx).Err(); err != nil {
 		newClient.Close()
 		return fmt.Errorf("ping failed after SELECT: %w", err)
@@ -203,39 +183,23 @@ func TestConnection(cfg config.ConnectionConfig) error {
 	}
 
 	var client redis.UniversalClient
-	ctx := context.Background()
 
 	if cfg.IsCluster {
-		addrs := cfg.ClusterAddrs
+		addrs := normalizeAddrs(cfg.ClusterAddrs)
 		if len(addrs) == 0 {
-			addrs = []string{fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)}
+			addrs = []string{joinHostPort(cfg.Host, cfg.Port)}
 		}
-		opts := &redis.ClusterOptions{
-			Addrs:    addrs,
-			Password: cfg.Password,
-		}
-		if dialer != nil {
-			opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return dialer(network, addr)
-			}
-		}
+		opts := buildClusterOptions(addrs, cfg.Password, dialer)
 		client = redis.NewClusterClient(opts)
 	} else {
-		opts := &redis.Options{
-			Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-			Password: cfg.Password,
-			DB:       cfg.DB,
-		}
-		if dialer != nil {
-			opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return dialer(network, addr)
-			}
-		}
+		opts := buildRedisOptions(joinHostPort(cfg.Host, cfg.Port), cfg.Password, cfg.DB, dialer)
 		client = redis.NewClient(opts)
 	}
 	defer client.Close()
 	_ = sshClient
 
+	ctx, cancel := context.WithTimeout(context.Background(), redisConnectTimeout)
+	defer cancel()
 	return client.Ping(ctx).Err()
 }
 
@@ -251,4 +215,70 @@ func (m *ClientManager) DisconnectAll() {
 		}
 		delete(m.clients, id)
 	}
+}
+
+func normalizeHost(host string) string {
+	host = strings.TrimSpace(host)
+	if host == "" || host == "localhost" {
+		return "127.0.0.1"
+	}
+	return host
+}
+
+func joinHostPort(host string, port int) string {
+	return fmt.Sprintf("%s:%d", normalizeHost(host), port)
+}
+
+func normalizeAddrs(addrs []string) []string {
+	result := make([]string, 0, len(addrs))
+	for _, addr := range addrs {
+		addr = strings.TrimSpace(addr)
+		if addr == "" {
+			continue
+		}
+		host, port, err := net.SplitHostPort(addr)
+		if err == nil {
+			result = append(result, net.JoinHostPort(normalizeHost(host), port))
+			continue
+		}
+		result = append(result, addr)
+	}
+	return result
+}
+
+func buildRedisOptions(addr, password string, db int, dialer func(network, addr string) (net.Conn, error)) *redis.Options {
+	opts := &redis.Options{
+		Addr:         addr,
+		Password:     password,
+		DB:           db,
+		DialTimeout:  5 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		PoolTimeout:  10 * time.Second,
+		MaxRetries:   1,
+	}
+	if dialer != nil {
+		opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialer(network, addr)
+		}
+	}
+	return opts
+}
+
+func buildClusterOptions(addrs []string, password string, dialer func(network, addr string) (net.Conn, error)) *redis.ClusterOptions {
+	opts := &redis.ClusterOptions{
+		Addrs:        addrs,
+		Password:     password,
+		DialTimeout:  5 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		PoolTimeout:  10 * time.Second,
+		MaxRetries:   1,
+	}
+	if dialer != nil {
+		opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialer(network, addr)
+		}
+	}
+	return opts
 }

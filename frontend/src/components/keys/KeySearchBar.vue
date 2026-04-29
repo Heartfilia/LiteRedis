@@ -15,6 +15,7 @@
       <button class="btn-search" @click="doSearch" :disabled="loading">
         {{ loading ? '...' : t('keyTree.searchBtn') }}
       </button>
+      <CreateKeyButton v-if="workspaceStore.activeConnID" />
 
       <!-- 历史记录下拉 -->
       <div v-if="showHistory && filteredHistory.length" class="history-dropdown">
@@ -42,6 +43,7 @@
 import { ref, computed, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useI18n } from '../../i18n/index.js'
+import CreateKeyButton from './CreateKeyButton.vue'
 
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
@@ -140,15 +142,15 @@ async function doSearch() {
 }
 .search-input-row {
   display: flex;
-  gap: 0;
+  gap: 6px;
   position: relative;
+  align-items: center;
 }
 .search-input-row input {
   flex: 1;
-  padding: 5px 10px;
+  padding: 5px 66px 5px 10px;
   border: 1px solid #d1d5db;
-  border-right: none;
-  border-radius: 6px 0 0 6px;
+  border-radius: 6px;
   font-size: 12px;
   outline: none;
   color: #1f2937;
@@ -156,20 +158,25 @@ async function doSearch() {
 }
 .search-input-row input:focus { border-color: #3b82f6; }
 .btn-search {
+  position: absolute;
+  right: 38px;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 5px 14px;
-  background: #3b82f6;
-  color: white;
+  height: 24px;
+  padding: 0 10px;
+  background: transparent;
+  color: #3b82f6;
   border: none;
-  border-radius: 0 6px 6px 0;
+  border-left: 1px solid #e5e7eb;
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  transition: background 0.15s;
+  transition: color 0.15s;
 }
-.btn-search:hover:not(:disabled) { background: #2563eb; }
-.btn-search:disabled { background: #93c5fd; cursor: not-allowed; }
+.btn-search:hover:not(:disabled) { color: #2563eb; }
+.btn-search:disabled { color: #93c5fd; cursor: not-allowed; }
 .search-options { margin-top: 5px; }
 .keep-label {
   font-size: 12px;
@@ -184,7 +191,7 @@ async function doSearch() {
   position: absolute;
   top: 100%;
   left: 0;
-  right: 36px;
+  right: 0;
   background: white;
   border: 1px solid #d1d5db;
   border-top: none;

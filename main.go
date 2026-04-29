@@ -12,6 +12,9 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+const minAppWidth = 1220
+const minAppHeight = 720
+
 func main() {
 	// Create an instance of the app structure
 	app := NewApp()
@@ -19,12 +22,20 @@ func main() {
 	// 加载上次保存的窗口状态
 	ws := config.LoadWindowState()
 	app.initWindowState = ws
+	if ws.Width < minAppWidth {
+		ws.Width = minAppWidth
+	}
+	if ws.Height < minAppHeight {
+		ws.Height = minAppHeight
+	}
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "LiteRedis",
-		Width:  ws.Width,
-		Height: ws.Height,
+		Title:     "LiteRedis",
+		Width:     ws.Width,
+		Height:    ws.Height,
+		MinWidth:  minAppWidth,
+		MinHeight: minAppHeight,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

@@ -2,6 +2,8 @@ package redis
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"LiteRedis/backend/config"
@@ -121,6 +123,76 @@ func SetTTL(ctx context.Context, client redis.UniversalClient, key string, ttlSe
 		return client.Persist(ctx, key).Err()
 	}
 	return client.Expire(ctx, key, time.Duration(ttlSec)*time.Second).Err()
+}
+
+// CreateKey 创建指定类型的 key，并按需设置初始值和 TTL。
+func CreateKey(ctx context.Context, client redis.UniversalClient, req config.CreateKeyRequest) error {
+	key := strings.TrimSpace(req.Key)
+	keyType := strings.ToLower(strings.TrimSpace(req.Type))
+	if key == "" {
+		return fmt.Errorf("key is required")
+	}
+	if keyType == "" {
+		return fmt.Errorf("type is required")
+	}
+
+	exists, err := client.Exists(ctx, key).Result()
+	if err != nil {
+		return err
+	}
+	if exists > 0 {
+		return fmt.Errorf("key already exists")
+	}
+
+	switch keyType {
+	case "string":
+		if err := client.Set(ctx, key, req.StringValue, 0).Err(); err != nil {
+			return err
+		}
+	case "hash":
+		field := strings.TrimSpace(req.Field)
+		if field == "" {
+			return fmt.Errorf("field is required for hash")
+		}
+		if err := client.HSet(ctx, key, field, req.Value).Err(); err != nil {
+			return err
+		}
+	case "list":
+		if err := client.RPush(ctx, key, req.ListValue).Err(); err != nil {
+			return err
+		}
+	case "set":
+		member := strings.TrimSpace(req.Member)
+		if member == "" {
+			return fmt.Errorf("member is required for set")
+		}
+		if err := client.SAdd(ctx, key, member).Err(); err != nil {
+			return err
+		}
+	case "zset":
+		member := strings.TrimSpace(req.Member)
+		if member == "" {
+			return fmt.Errorf("member is required for zset")
+		}
+		if err := client.ZAdd(ctx, key, redis.Z{Score: req.Score, Member: member}).Err(); err != nil {
+			return err
+		}
+	case "stream":
+		field := strings.TrimSpace(req.Field)
+		if field == "" {
+			return fmt.Errorf("field is required for stream")
+		}
+		if _, err := client.XAdd(ctx, &redis.XAddArgs{
+			Stream: key,
+			Values: map[string]interface{}{field: req.Value},
+		}).Result(); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported type: %s", keyType)
+	}
+
+	return SetTTL(ctx, client, key, req.TTL)
 }
 
 // DBSize 获取当前 DB key 总数

@@ -1,24 +1,27 @@
 <template>
   <div class="sidebar" :class="{ collapsed: sidebarCollapsed }">
-    <!-- 折叠状态：图标列表 + 底部展开按钮 -->
-    <div v-if="sidebarCollapsed" class="sidebar-collapsed-bar">
-      <div class="collapsed-icons">
-        <div
-          v-for="conn in connectedConnections"
-          :key="conn.id"
-          class="collapsed-conn-icon"
-          :class="{ active: activeConnID === conn.id }"
-          :style="{ background: connColor(conn) }"
-          :title="conn.name || conn.host"
-          @click="handleConnect(conn)"
-        >
-          {{ connInitial(conn) }}
+    <div class="sidebar-layers">
+      <!-- 折叠状态：图标列表 + 底部展开按钮 -->
+      <div class="sidebar-layer sidebar-collapsed-layer" :class="{ visible: sidebarCollapsed }">
+        <div class="sidebar-collapsed-bar">
+          <div class="collapsed-icons">
+            <div
+              v-for="conn in connectedConnections"
+              :key="conn.id"
+              class="collapsed-conn-icon"
+              :class="{ active: activeConnID === conn.id }"
+              :style="{ background: connColor(conn) }"
+              :title="conn.name || conn.host"
+              @click="handleConnect(conn)"
+            >
+              {{ connInitial(conn) }}
+            </div>
+          </div>
+          <button class="btn-expand-bottom" :title="t('sidebar.expand')" @click="sidebarCollapsed = false">▶</button>
         </div>
       </div>
-      <button class="btn-expand-bottom" :title="t('sidebar.expand')" @click="sidebarCollapsed = false">▶</button>
-    </div>
 
-    <template v-else>
+      <div class="sidebar-layer sidebar-expanded-layer" :class="{ visible: !sidebarCollapsed }">
       <!-- 连接列表（按分组） -->
       <div class="conn-list">
         <!-- 未分组连接 -->
@@ -32,7 +35,7 @@
         <div
           v-for="conn in (groupedConnections[''] || [])"
           :key="conn.id"
-          :class="['conn-item', { active: activeConnID === conn.id }]"
+          :class="['conn-item', { active: activeConnID === conn.id, connecting: connectionsStore.isConnecting(conn.id) }]"
           draggable="true"
           @dragstart="onDragStart(conn.id)"
           @dragend="dragOverGroup = null"
@@ -41,16 +44,20 @@
         >
           <div class="conn-main" @click="handleConnect(conn)">
             <span class="conn-avatar" :style="{ background: connColor(conn) }">{{ connInitial(conn) }}</span>
-            <span :class="['conn-dot', connectionsStore.isConnected(conn.id) ? 'connected' : 'disconnected']" />
-            <span class="conn-name">{{ conn.name || t('sidebar.unnamed') }}</span>
+            <span :class="['conn-dot', connectionStateClass(conn.id)]" />
+            <span class="conn-name">
+              {{ conn.name || t('sidebar.unnamed') }}
+              <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-inline">{{ t('sidebar.connecting') }}</span>
+            </span>
           </div>
           <div class="conn-actions">
             <button
-              v-if="connectionsStore.isConnected(conn.id)"
+              v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
               class="btn-tiny btn-disconnect"
               :title="t('sidebar.disconnect')"
               @click.stop="disconnectConn(conn.id)"
             >⊘</button>
+            <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
             <button class="btn-tiny" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
             <div class="delete-wrap">
               <button class="btn-tiny danger" :title="t('sidebar.delete')" @click.stop="requestDelete(conn.id)">✕</button>
@@ -87,7 +94,7 @@
             <div
               v-for="conn in conns"
               :key="conn.id"
-              :class="['conn-item', 'grouped', { active: activeConnID === conn.id }]"
+              :class="['conn-item', 'grouped', { active: activeConnID === conn.id, connecting: connectionsStore.isConnecting(conn.id) }]"
               draggable="true"
               @dragstart="onDragStart(conn.id)"
               @dragend="dragOverGroup = null"
@@ -96,16 +103,20 @@
             >
               <div class="conn-main" @click="handleConnect(conn)">
                 <span class="conn-avatar" :style="{ background: connColor(conn) }">{{ connInitial(conn) }}</span>
-                <span :class="['conn-dot', connectionsStore.isConnected(conn.id) ? 'connected' : 'disconnected']" />
-                <span class="conn-name">{{ conn.name || t('sidebar.unnamed') }}</span>
+                <span :class="['conn-dot', connectionStateClass(conn.id)]" />
+                <span class="conn-name">
+                  {{ conn.name || t('sidebar.unnamed') }}
+                  <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-inline">{{ t('sidebar.connecting') }}</span>
+                </span>
               </div>
               <div class="conn-actions">
                 <button
-                  v-if="connectionsStore.isConnected(conn.id)"
+                  v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
                   class="btn-tiny btn-disconnect"
                   :title="t('sidebar.disconnect')"
                   @click.stop="disconnectConn(conn.id)"
                 >⊘</button>
+                <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
                 <button class="btn-tiny" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
                 <div class="delete-wrap">
                   <button class="btn-tiny danger" :title="t('sidebar.delete')" @click.stop="requestDelete(conn.id)">✕</button>
@@ -143,7 +154,8 @@
           <button class="btn-icon btn-collapse" :title="t('sidebar.collapse')" @click="sidebarCollapsed = true">◀</button>
         </div>
       </div>
-    </template>
+      </div>
+    </div>
 
     <!-- 右键菜单 -->
     <div
@@ -188,6 +200,11 @@ const namedGroups = computed(() => {
 const connectedConnections = computed(() =>
   connectionsStore.connections.filter(c => connectionsStore.isConnected(c.id))
 )
+
+function connectionStateClass(id) {
+  if (connectionsStore.isConnecting(id)) return 'connecting'
+  return connectionsStore.isConnected(id) ? 'connected' : 'disconnected'
+}
 
 // 连接图标颜色（淡雅色板，按 id 哈希取色）
 const AVATAR_COLORS = [
@@ -264,6 +281,7 @@ async function onDropToGroup(targetGroup) {
 }
 
 async function handleConnect(conn) {
+  if (connectionsStore.isConnecting(conn.id)) return
   if (connectionsStore.isConnected(conn.id)) {
     // 已连接：重新激活，恢复该连接的历史状态（如有）
     const restored = workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
@@ -279,6 +297,7 @@ async function handleConnect(conn) {
     return
   }
   const result = await connectionsStore.connect(conn.id)
+  if (result?.message === 'connecting') return
   if (result.success) {
     workspaceStore.setActiveConn(conn.id, conn.name, result.init_db || 0)
     await workspaceStore.fetchTotalKeys()
@@ -333,6 +352,32 @@ async function disconnectConn(id) {
 .sidebar.collapsed {
   width: 44px;
   min-width: 44px;
+}
+.sidebar-layers {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.sidebar-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  will-change: opacity, transform;
+}
+.sidebar-collapsed-layer {
+  transform: translateX(-10px);
+}
+.sidebar-expanded-layer {
+  transform: translateX(10px);
+}
+.sidebar-layer.visible {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 /* ===== 折叠栏 ===== */
@@ -442,10 +487,21 @@ async function disconnectConn(id) {
   cursor: pointer;
   border-radius: 4px;
   margin: 1px 6px;
+  position: relative;
+  overflow: hidden;
 }
 .conn-item.grouped { margin-left: 14px; margin-right: 6px; }
 .conn-item:hover { background: #2d3748; }
 .conn-item.active { background: #2d4a6e; }
+.conn-item.connecting::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 0%, rgba(96, 165, 250, 0.08) 35%, rgba(96, 165, 250, 0.18) 50%, rgba(96, 165, 250, 0.08) 65%, transparent 100%);
+  transform: translateX(-100%);
+  animation: connectingSweep 1.3s linear infinite;
+  pointer-events: none;
+}
 .conn-main { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
 
 /* 连接图标（方形 avatar） */
@@ -463,6 +519,9 @@ async function disconnectConn(id) {
   letter-spacing: 0;
   user-select: none;
 }
+.conn-item.connecting .conn-avatar {
+  animation: avatarFloat 0.9s ease-in-out infinite alternate;
+}
 
 .conn-dot {
   width: 6px; height: 6px;
@@ -470,10 +529,33 @@ async function disconnectConn(id) {
   flex-shrink: 0;
 }
 .conn-dot.connected { background: #4CAF50; }
+.conn-dot.connecting {
+  width: 8px;
+  height: 8px;
+  background: #60a5fa;
+  box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.6);
+  animation: dotPulse 1.2s ease-out infinite;
+}
 .conn-dot.disconnected { background: #9e9e9e; }
 .conn-name { font-size: 13px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.connecting-inline {
+  margin-left: 6px;
+  font-size: 10px;
+  color: #93c5fd;
+  font-weight: 500;
+}
 .conn-actions { display: none; gap: 2px; }
 .conn-item:hover .conn-actions { display: flex; }
+.conn-item.connecting .conn-actions { display: flex; }
+.connecting-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(191, 219, 254, 0.35);
+  border-top-color: #93c5fd;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
 .btn-tiny {
   background: transparent;
   border: 1px solid #4a5568;
@@ -518,6 +600,21 @@ async function disconnectConn(id) {
   transition: background 0.15s;
 }
 .group-header:hover { background: #2d3748; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes connectingSweep {
+  to { transform: translateX(100%); }
+}
+@keyframes dotPulse {
+  0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.6); }
+  100% { box-shadow: 0 0 0 8px rgba(96, 165, 250, 0); }
+}
+@keyframes avatarFloat {
+  from { transform: translateY(0); }
+  to { transform: translateY(-1px); }
+}
 .group-header.drag-over { background: #2d4a6e; border: 1px dashed #4e9af1; }
 .group-arrow { font-size: 9px; flex-shrink: 0; }
 .group-name { flex: 1; }

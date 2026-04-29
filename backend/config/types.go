@@ -95,6 +95,19 @@ type KeyValue struct {
 	TotalCount int64             `json:"total_count"` // 总元素数（-1 表示未知）
 }
 
+// CreateKeyRequest 新建 key 请求
+type CreateKeyRequest struct {
+	Key         string  `json:"key"`
+	Type        string  `json:"type"`
+	TTL         int64   `json:"ttl"`
+	StringValue string  `json:"string_value,omitempty"`
+	Field       string  `json:"field,omitempty"`
+	Value       string  `json:"value,omitempty"`
+	ListValue   string  `json:"list_value,omitempty"`
+	Member      string  `json:"member,omitempty"`
+	Score       float64 `json:"score,omitempty"`
+}
+
 // ScanResult key 扫描结果（支持分页）
 type ScanResult struct {
 	Keys       []RedisKey `json:"keys"`

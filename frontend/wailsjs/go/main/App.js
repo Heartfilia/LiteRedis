@@ -6,6 +6,10 @@ export function Connect(arg1) {
   return window['go']['main']['App']['Connect'](arg1);
 }
 
+export function CreateKey(arg1, arg2) {
+  return window['go']['main']['App']['CreateKey'](arg1, arg2);
+}
+
 export function DBSize(arg1) {
   return window['go']['main']['App']['DBSize'](arg1);
 }
@@ -30,8 +34,8 @@ export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
 
-export function GetValue(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['GetValue'](arg1, arg2, arg3, arg4);
+export function GetValue(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['GetValue'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function HDel(arg1, arg2, arg3) {

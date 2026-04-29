@@ -100,6 +100,34 @@ export namespace config {
 		    return a;
 		}
 	}
+	export class CreateKeyRequest {
+	    key: string;
+	    type: string;
+	    ttl: number;
+	    string_value?: string;
+	    field?: string;
+	    value?: string;
+	    list_value?: string;
+	    member?: string;
+	    score?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateKeyRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.type = source["type"];
+	        this.ttl = source["ttl"];
+	        this.string_value = source["string_value"];
+	        this.field = source["field"];
+	        this.value = source["value"];
+	        this.list_value = source["list_value"];
+	        this.member = source["member"];
+	        this.score = source["score"];
+	    }
+	}
 	export class StreamEntry {
 	    id: string;
 	    fields: Record<string, string>;

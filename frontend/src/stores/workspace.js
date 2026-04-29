@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { scanKeys, getValue, getKeyInfo, deleteKey, renameKey, setTTL, selectDB, dbSize } from '../api/wails.js'
+import { scanKeys, getValue, getKeyInfo, deleteKey, renameKey, setTTL, selectDB, dbSize, createKey } from '../api/wails.js'
 import { buildKeyTree } from '../utils/keyTree.js'
 import { useSettingsStore } from './settings.js'
 
@@ -33,6 +33,9 @@ export const useWorkspaceStore = defineStore('workspace', {
       // 每个连接的状态快照，key 为 connID
       connStates: {},
 
+      // 每个连接展开的目录节点，key 为 connID，value 为 { [fullPath]: boolean }
+      expandedNodes: {},
+
       // 每个连接的搜索历史，key 为 connID，value 为 pattern 数组（最多10条）
       connSearchHistory: persistedHistory,
     }
@@ -65,6 +68,7 @@ export const useWorkspaceStore = defineStore('workspace', {
           keyValue: this.keyValue,
           keyValueError: this.keyValueError,
           keyValueLoading: false,
+          expandedNodes: { ...(this.expandedNodes[this.activeConnID] || {}) },
         }
       }
 
@@ -83,6 +87,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.keyValue = s.keyValue
         this.keyValueError = s.keyValueError
         this.keyValueLoading = false
+        this.expandedNodes[id] = { ...(s.expandedNodes || this.expandedNodes[id] || {}) }
         return true
       }
 
@@ -94,7 +99,28 @@ export const useWorkspaceStore = defineStore('workspace', {
       this.keyValue = null
       this.keyValueError = null
       this.keyValueLoading = false
+      if (id && !this.expandedNodes[id]) {
+        this.expandedNodes[id] = {}
+      }
       return false
+    },
+
+    isNodeExpanded(fullPath, depth = 0) {
+      if (this.keepPrevSearch) return true
+      const connMap = this.expandedNodes[this.activeConnID] || {}
+      if (Object.prototype.hasOwnProperty.call(connMap, fullPath)) {
+        return !!connMap[fullPath]
+      }
+      return depth < 1
+    },
+
+    setNodeExpanded(fullPath, expanded) {
+      if (!this.activeConnID || !fullPath) return
+      const connMap = this.expandedNodes[this.activeConnID] || {}
+      this.expandedNodes[this.activeConnID] = {
+        ...connMap,
+        [fullPath]: expanded,
+      }
     },
 
     async fetchTotalKeys() {
@@ -305,7 +331,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       this._loadingKey = key   // 设置本次令牌
 
       try {
-        const result = await getValue(this.activeConnID, key, 0, 0)
+        const result = await getValue(this.activeConnID, key, 0, 0, '')
 
         // 竞态检查：如果用户在等待过程中又点击了别的 key，丢弃本次结果
         if (this._loadingKey !== key) return
@@ -357,6 +383,16 @@ export const useWorkspaceStore = defineStore('workspace', {
       if (result.success && this.keyValue) {
         this.keyValue.ttl = ttlSec
       }
+      return result
+    },
+
+    async createKey(req) {
+      if (!this.activeConnID) return { success: false, message: 'No active connection' }
+      const result = await createKey(this.activeConnID, req)
+      if (!result.success) return result
+
+      await this.fetchTotalKeys()
+      await this.searchExact(req.key)
       return result
     },
 

@@ -11,6 +11,8 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100vh;
+  min-width: 1220px;
+  min-height: 720px;
   overflow: hidden;
   background: #fff;
   color: #333;
@@ -20,6 +22,8 @@ html, body {
 
 #app {
   height: 100vh;
+  min-width: 1220px;
+  min-height: 720px;
   overflow: hidden;
 }
 

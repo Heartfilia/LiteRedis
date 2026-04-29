@@ -26,9 +26,10 @@ export const setTTL = (connID, key, ttl) => callGo('SetTTL', connID, key, ttl)
 export const dbSize = (connID) => callGo('DBSize', connID)
 
 // ===== Value CRUD =====
-export const getValue = (connID, key, cursor, offset) => callGo('GetValue', connID, key, cursor, offset)
+export const getValue = (connID, key, cursor, offset, zsetSort = '') => callGo('GetValue', connID, key, cursor, offset, zsetSort)
 export const searchValue = (connID, key, keyType, pattern) => callGo('SearchValue', connID, key, keyType, pattern)
 export const setString = (connID, key, value, ttl) => callGo('SetString', connID, key, value, ttl)
+export const createKey = (connID, req) => callGo('CreateKey', connID, req)
 export const hSet = (connID, key, field, value) => callGo('HSet', connID, key, field, value)
 export const hDel = (connID, key, field) => callGo('HDel', connID, key, field)
 export const lPush = (connID, key, value) => callGo('LPush', connID, key, value)

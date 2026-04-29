@@ -16,7 +16,7 @@
       </div>
       <span class="count">
         <template v-if="searchResults !== null">{{ t('keyEditor.searchResult', { current: displayEntries.length, total: searchResults.length }) }}</template>
-        <template v-else>{{ t('keyEditor.fieldsCount', { current: sourceEntries.length, total: fieldCount }) }}</template>
+        <template v-else>{{ t('keyEditor.fieldsCount', { current: sourceEntries.length, total: totalFields }) }}</template>
       </span>
     </div>
 
@@ -84,8 +84,8 @@
       >
         {{ valueLoading ? t('keyEditor.loading') : t('keyTree.loadMore') }}
       </button>
-      <span v-else-if="searchResults === null && !hasMore && fieldCount > 0" class="load-more-hint">
-        {{ t('keyEditor.allFieldsLoaded', { count: fieldCount }) }}
+      <span v-else-if="searchResults === null && !hasMore && totalFields > 0" class="load-more-hint">
+        {{ t('keyEditor.allFieldsLoaded', { count: totalFields }) }}
       </span>
     </div>
 
@@ -116,7 +116,7 @@ const editValue = ref('')
 const msg = ref('')
 const ok = ref(true)
 const copiedField = ref(null)
-const fieldWidth = ref(220)
+const fieldWidth = ref(240)
 
 function startResizeField(e) {
   const startX = e.clientX
@@ -163,6 +163,7 @@ const nextCursor = ref(0)
 const valueLoading = ref(false)
 
 const fieldCount = computed(() => Object.keys(rawHashVal.value).length)
+const totalFields = computed(() => props.keyValue?.total_count >= 0 ? props.keyValue.total_count : fieldCount.value)
 
 // 数据源：搜索激活时用搜索结果，否则用全量
 const sourceEntries = computed(() =>
@@ -197,7 +198,7 @@ async function loadMore() {
   if (!hasMore.value || valueLoading.value || !props.keyValue?.key) return
   valueLoading.value = true
   try {
-    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, nextCursor.value, 0)
+    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, nextCursor.value, 0, '')
     if (result.hash_val) {
       rawHashVal.value = { ...rawHashVal.value, ...result.hash_val }
     }
@@ -209,6 +210,11 @@ async function loadMore() {
   } finally {
     valueLoading.value = false
   }
+}
+
+async function reloadKeyData() {
+  if (!props.keyValue?.key) return
+  await workspaceStore.selectKey(props.keyValue.key)
 }
 
 // 搜索
@@ -266,7 +272,7 @@ async function saveFromModal(newVal) {
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      rawHashVal.value[field] = newVal
+      await reloadKeyData()
       expandShow.value = false
     }
   } catch (e) {
@@ -290,7 +296,7 @@ async function saveEdit(field) {
     const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, field, editValue.value)
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) rawHashVal.value[field] = editValue.value
+    if (result.success) await reloadKeyData()
   } catch(e) {
     ok.value = false; msg.value = e.message
   }
@@ -301,13 +307,7 @@ async function deleteField(field) {
     const result = await hDel(workspaceStore.activeConnID, props.keyValue.key, field)
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) {
-      delete rawHashVal.value[field]
-      // 同步从搜索结果中移除
-      if (searchResults.value !== null) {
-        searchResults.value = searchResults.value.filter(([f]) => f !== field)
-      }
-    }
+    if (result.success) await reloadKeyData()
   } catch(e) {
     ok.value = false; msg.value = e.message
   }
@@ -320,7 +320,7 @@ async function addField() {
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      rawHashVal.value[newField.value] = newValue.value
+      await reloadKeyData()
       newField.value = ''; newValue.value = ''; showAdd.value = false
     }
   } catch(e) {
@@ -369,10 +369,22 @@ async function addField() {
   z-index: 5;
 }
 .col-resizer:hover { background: #3b82f6; border-color: #3b82f6; }
-.field-cell { color: #1d4ed8; font-weight: 500; word-break: break-all; }
-.value-cell { max-width: none; }
+.field-cell { color: #1d4ed8; font-weight: 500; word-break: break-all; min-width: 280px; }
+.value-th,
+.value-cell {
+  width: 55ch;
+  min-width: 55ch;
+  max-width: 55ch;
+}
 .value-text { cursor: pointer; display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; }
-.val-preview { font-family: monospace; font-size: 12px; word-break: break-all; color: #374151; }
+.val-preview {
+  font-family: monospace;
+  font-size: 12px;
+  word-break: break-all;
+  color: #374151;
+  display: inline-block;
+  max-width: 55ch;
+}
 .val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .val-ellipsis:hover { text-decoration: underline; }
 .value-cell input { width: 100%; padding: 3px 6px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 12px; outline: none; }
@@ -423,7 +435,10 @@ async function addField() {
 .msg-bar.ok { background: #f0fdf4; color: #166534; }
 .msg-bar.err { background: #fff1f2; color: #991b1b; }
 
-.value-cell { background: #f8fafc; }
+.value-cell {
+  background: #f8fafc;
+  overflow: hidden;
+}
 
 .btn-confirm-yes { color: #16a34a; border-color: #16a34a; }
 .btn-confirm-yes:hover { background: #16a34a; color: white; }

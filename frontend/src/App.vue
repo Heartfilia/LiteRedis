@@ -37,6 +37,8 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
 .app-layout {
   display: flex;
   height: 100vh;
+  min-width: 1220px;
+  min-height: 720px;
   overflow: hidden;
   background: #fff;
 }

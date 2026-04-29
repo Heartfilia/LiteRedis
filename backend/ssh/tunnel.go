@@ -3,6 +3,7 @@ package ssh
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	gossh "golang.org/x/crypto/ssh"
@@ -10,6 +11,11 @@ import (
 
 // NewSSHTunnel 创建 SSH 客户端，返回可用于 Dial 的客户端
 func NewSSHTunnel(host string, port int, user string, password string) (*gossh.Client, error) {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return nil, fmt.Errorf("SSH host is required")
+	}
+
 	config := &gossh.ClientConfig{
 		User: user,
 		Auth: []gossh.AuthMethod{

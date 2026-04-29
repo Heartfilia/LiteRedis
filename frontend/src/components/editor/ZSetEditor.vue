@@ -16,7 +16,7 @@
       </div>
       <span class="count">
         <template v-if="searchResults !== null">{{ t('keyEditor.searchResult', { current: displayMembers.length, total: searchResults.length }) }}</template>
-        <template v-else>{{ t('keyEditor.membersCount', { current: sourceMembers.length, total: rawMembers.length }) }}</template>
+        <template v-else>{{ t('keyEditor.membersCount', { current: sourceMembers.length, total: totalMembers }) }}</template>
       </span>
     </div>
     <div v-if="showAdd" class="add-row">
@@ -31,12 +31,12 @@
         <thead>
           <tr>
             <th class="num-col">#</th>
-            <th class="score-th" :style="{ width: scoreWidth + 'px' }">
-              <span class="th-content">Score</span>
+            <th class="sortable-col score-th" :style="{ width: scoreWidth + 'px' }" @click="cycleScoreSort">
+              <span class="th-content">Score <span class="sort-icon" :class="scoreSortOrder">{{ scoreSortIcon }}</span></span>
               <span class="col-resizer" @mousedown.stop="startResizeScore" />
             </th>
-            <th class="sortable-col member-th" @click="cycleSortOrder">
-              Member <span class="sort-icon" :class="sortOrder">{{ sortIcon }}</span>
+            <th class="sortable-col member-th" @click="cycleMemberSort">
+              Member <span class="sort-icon" :class="memberSortOrder">{{ memberSortIcon }}</span>
             </th>
             <th class="action-th">{{ t('keyEditor.action') }}</th>
           </tr>
@@ -83,8 +83,8 @@
       >
         {{ valueLoading ? t('keyEditor.loading') : t('keyTree.loadMore') }}
       </button>
-      <span v-else-if="searchResults === null && !hasMore && rawMembers.length > 0" class="load-more-hint">
-        {{ t('keyEditor.allMembersLoaded', { count: rawMembers.length }) }}
+      <span v-else-if="searchResults === null && !hasMore && totalMembers > 0" class="load-more-hint">
+        {{ t('keyEditor.allMembersLoaded', { count: totalMembers }) }}
       </span>
     </div>
 
@@ -115,7 +115,7 @@ const editScore = ref(0)
 const msg = ref('')
 const ok = ref(true)
 const copiedMember = ref(null)
-const scoreWidth = ref(100)
+const scoreWidth = ref(180)
 
 function startResizeScore(e) {
   const startX = e.clientX
@@ -141,11 +141,24 @@ const searchQuery   = ref('')
 const searchResults = ref(null)
 const isSearching   = ref(false)
 
-// 排序状态（按 member 名称）
-const sortOrder = ref('none')
-const sortIcon = computed(() => ({ none: '⇅', asc: '↑', desc: '↓' })[sortOrder.value])
-function cycleSortOrder() {
-  sortOrder.value = { none: 'desc', desc: 'asc', asc: 'none' }[sortOrder.value]
+// 排序状态
+const activeSort = ref('score')
+const memberSortOrder = ref('asc')
+const scoreSortOrder = ref('asc')
+const memberSortIcon = computed(() => ({ none: '⇅', asc: '↑', desc: '↓' })[activeSort.value === 'member' ? memberSortOrder.value : 'none'])
+const scoreSortIcon = computed(() => ({ none: '⇅', asc: '↑', desc: '↓' })[activeSort.value === 'score' ? scoreSortOrder.value : 'none'])
+
+function cycleMemberSort() {
+  activeSort.value = 'member'
+  memberSortOrder.value = memberSortOrder.value === 'asc' ? 'desc' : 'asc'
+}
+
+async function cycleScoreSort() {
+  activeSort.value = 'score'
+  scoreSortOrder.value = scoreSortOrder.value === 'asc' ? 'desc' : 'asc'
+  if (searchResults.value === null) {
+    await reloadByScoreSort()
+  }
 }
 
 // expand modal
@@ -161,16 +174,23 @@ const editModalScore = ref(0)
 const hasMore = ref(false)
 const nextOffset = ref(0)
 const valueLoading = ref(false)
+const totalMembers = computed(() => props.keyValue?.total_count >= 0 ? props.keyValue.total_count : rawMembers.value.length)
 
 const sourceMembers = computed(() =>
   searchResults.value !== null ? searchResults.value : rawMembers.value
 )
 
 const sortedMembers = computed(() => {
-  if (sortOrder.value === 'none') return sourceMembers.value
+  if (activeSort.value === 'score' && searchResults.value !== null) {
+    const copy = [...sourceMembers.value]
+    if (scoreSortOrder.value === 'asc') copy.sort((a, b) => a.score - b.score)
+    if (scoreSortOrder.value === 'desc') copy.sort((a, b) => b.score - a.score)
+    return copy
+  }
+  if (activeSort.value !== 'member') return sourceMembers.value
   const copy = [...sourceMembers.value]
-  if (sortOrder.value === 'asc')  copy.sort((a, b) => a.member.localeCompare(b.member))
-  if (sortOrder.value === 'desc') copy.sort((a, b) => b.member.localeCompare(a.member))
+  if (memberSortOrder.value === 'asc')  copy.sort((a, b) => a.member.localeCompare(b.member))
+  if (memberSortOrder.value === 'desc') copy.sort((a, b) => b.member.localeCompare(a.member))
   return copy
 })
 
@@ -183,7 +203,9 @@ watch(() => props.keyValue, kv => {
   nextOffset.value = kv?.next_offset || 0
   searchQuery.value = ''
   searchResults.value = null
-  sortOrder.value = 'none'
+  activeSort.value = 'score'
+  memberSortOrder.value = 'asc'
+  scoreSortOrder.value = 'asc'
   msg.value = ''
 }, { immediate: true })
 
@@ -191,7 +213,7 @@ async function loadMore() {
   if (!hasMore.value || valueLoading.value || !props.keyValue?.key) return
   valueLoading.value = true
   try {
-    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, 0, nextOffset.value)
+    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, 0, nextOffset.value, scoreRequestOrder.value)
     if (result.zset_val) {
       rawMembers.value.push(...result.zset_val)
     }
@@ -203,6 +225,30 @@ async function loadMore() {
   } finally {
     valueLoading.value = false
   }
+}
+
+const scoreRequestOrder = computed(() => scoreSortOrder.value === 'desc' ? 'desc' : 'asc')
+
+async function reloadByScoreSort() {
+  if (!props.keyValue?.key) return
+  valueLoading.value = true
+  try {
+    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, 0, 0, scoreRequestOrder.value)
+    rawMembers.value = [...(result.zset_val || [])]
+    hasMore.value = result.has_more || false
+    nextOffset.value = result.next_offset || 0
+    msg.value = ''
+  } catch (e) {
+    ok.value = false
+    msg.value = e.message || String(e)
+  } finally {
+    valueLoading.value = false
+  }
+}
+
+async function reloadKeyData() {
+  if (!props.keyValue?.key) return
+  await workspaceStore.selectKey(props.keyValue.key)
 }
 
 async function executeSearch() {
@@ -261,11 +307,11 @@ async function saveFromModal(newMember) {
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      const idx = rawMembers.value.findIndex(m => m.member === oldMember)
-      if (idx !== -1) rawMembers.value[idx] = { member: newMember, score }
       if (searchResults.value !== null) {
         const sidx = searchResults.value.findIndex(m => m.member === oldMember)
         if (sidx !== -1) searchResults.value[sidx] = { member: newMember, score }
+      } else {
+        await reloadKeyData()
       }
       expandShow.value = false
     }
@@ -284,8 +330,12 @@ async function saveEdit(member) {
     const result = await zAdd(workspaceStore.activeConnID, props.keyValue.key, member, editScore.value)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      const idx = rawMembers.value.findIndex(m => m.member === member)
-      if (idx !== -1) rawMembers.value[idx].score = editScore.value
+      if (searchResults.value !== null) {
+        const idx = searchResults.value.findIndex(m => m.member === member)
+        if (idx !== -1) searchResults.value[idx].score = editScore.value
+      } else {
+        await reloadKeyData()
+      }
     }
   } catch(e) { ok.value = false; msg.value = e.message }
 }
@@ -296,7 +346,11 @@ async function addMember() {
     const result = await zAdd(workspaceStore.activeConnID, props.keyValue.key, newMember.value, newScore.value)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      rawMembers.value.push({ member: newMember.value, score: newScore.value })
+      if (searchResults.value === null) {
+        await reloadKeyData()
+      } else {
+        rawMembers.value.push({ member: newMember.value, score: newScore.value })
+      }
       newMember.value = ''; newScore.value = 0; showAdd.value = false
     }
   } catch(e) { ok.value = false; msg.value = e.message }
@@ -307,10 +361,12 @@ async function removeMember(member) {
     const result = await zRem(workspaceStore.activeConnID, props.keyValue.key, member)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      rawMembers.value = rawMembers.value.filter(m => m.member !== member)
       if (searchResults.value !== null) {
         searchResults.value = searchResults.value.filter(m => m.member !== member)
+      } else {
+        await reloadKeyData()
       }
+      rawMembers.value = rawMembers.value.filter(m => m.member !== member)
     }
   } catch(e) { ok.value = false; msg.value = e.message }
 }
@@ -362,11 +418,30 @@ async function copyMember(member) {
   z-index: 5;
 }
 .col-resizer:hover { background: #3b82f6; border-color: #3b82f6; }
-.score-cell { color: #d97706; font-weight: 600; }
+.score-cell {
+  color: #d97706;
+  font-weight: 600;
+  min-width: 160px;
+}
 .score-text { cursor: pointer; }
 .score-cell input { width: 80px; padding: 3px 6px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 12px; outline: none; }
-.member-cell { font-family: monospace; }
-.val-preview { word-break: break-all; color: #374151; font-size: 12px; }
+.member-th,
+.member-cell {
+  width: 55ch;
+  min-width: 55ch;
+  max-width: 55ch;
+}
+.member-cell {
+  font-family: monospace;
+  overflow: hidden;
+}
+.val-preview {
+  word-break: break-all;
+  color: #374151;
+  font-size: 12px;
+  display: inline-block;
+  max-width: 55ch;
+}
 .val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; margin-left: 2px; }
 .val-ellipsis:hover { text-decoration: underline; }
 .action-cell { white-space: nowrap; }

@@ -16,7 +16,7 @@
       </div>
       <span class="count">
         <template v-if="searchResults !== null">{{ t('keyEditor.searchResult', { current: displayMembers.length, total: searchResults.length }) }}</template>
-        <template v-else>{{ t('keyEditor.membersCount', { current: sourceMembers.length, total: rawMembers.length }) }}</template>
+        <template v-else>{{ t('keyEditor.membersCount', { current: sourceMembers.length, total: totalMembers }) }}</template>
       </span>
     </div>
     <div v-if="showAdd" class="add-row">
@@ -58,8 +58,8 @@
       >
         {{ valueLoading ? t('keyEditor.loading') : t('keyTree.loadMore') }}
       </button>
-      <span v-else-if="searchResults === null && !hasMore && rawMembers.length > 0" class="load-more-hint">
-        {{ t('keyEditor.allMembersLoaded', { count: rawMembers.length }) }}
+      <span v-else-if="searchResults === null && !hasMore && totalMembers > 0" class="load-more-hint">
+        {{ t('keyEditor.allMembersLoaded', { count: totalMembers }) }}
       </span>
     </div>
 
@@ -112,6 +112,7 @@ const editModalMember = ref('')
 const hasMore = ref(false)
 const nextCursor = ref(0)
 const valueLoading = ref(false)
+const totalMembers = computed(() => props.keyValue?.total_count >= 0 ? props.keyValue.total_count : rawMembers.value.length)
 
 const sourceMembers = computed(() =>
   searchResults.value !== null ? searchResults.value : rawMembers.value
@@ -142,7 +143,7 @@ async function loadMore() {
   if (!hasMore.value || valueLoading.value || !props.keyValue?.key) return
   valueLoading.value = true
   try {
-    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, nextCursor.value, 0)
+    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, nextCursor.value, 0, '')
     if (result.set_val) {
       rawMembers.value.push(...result.set_val)
     }
@@ -154,6 +155,11 @@ async function loadMore() {
   } finally {
     valueLoading.value = false
   }
+}
+
+async function reloadKeyData() {
+  if (!props.keyValue?.key) return
+  await workspaceStore.selectKey(props.keyValue.key)
 }
 
 async function executeSearch() {
@@ -207,12 +213,7 @@ async function saveFromModal(newVal) {
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      const idx = rawMembers.value.indexOf(oldMember)
-      if (idx !== -1) rawMembers.value[idx] = newVal
-      if (searchResults.value !== null) {
-        const sidx = searchResults.value.indexOf(oldMember)
-        if (sidx !== -1) searchResults.value[sidx] = newVal
-      }
+      await reloadKeyData()
       expandShow.value = false
     }
   } catch (e) {
@@ -234,7 +235,7 @@ async function addMember() {
   try {
     const result = await sAdd(workspaceStore.activeConnID, props.keyValue.key, newMember.value)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) { rawMembers.value.push(newMember.value); newMember.value = ''; showAdd.value = false }
+    if (result.success) { await reloadKeyData(); newMember.value = ''; showAdd.value = false }
   } catch(e) { ok.value = false; msg.value = e.message }
 }
 
@@ -242,12 +243,7 @@ async function removeMember(m) {
   try {
     const result = await sRem(workspaceStore.activeConnID, props.keyValue.key, m)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) {
-      rawMembers.value = rawMembers.value.filter(i => i !== m)
-      if (searchResults.value !== null) {
-        searchResults.value = searchResults.value.filter(i => i !== m)
-      }
-    }
+    if (result.success) await reloadKeyData()
   } catch(e) { ok.value = false; msg.value = e.message }
 }
 </script>

@@ -12,7 +12,7 @@ import (
 
 // GetValue 读取 key 的值（按类型分支），支持 cursor/offset 分页。
 // cursor=0, offset=0 表示第一页。loadCount 控制每次加载条数（≤0 取默认）。
-func GetValue(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings, cursor uint64, offset int) (config.KeyValue, error) {
+func GetValue(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings, cursor uint64, offset int, zsetSort string) (config.KeyValue, error) {
 	keyInfo, err := GetKeyInfo(ctx, client, key)
 	if err != nil {
 		return config.KeyValue{}, err
@@ -77,6 +77,8 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		kv.HashVal = result
 		kv.NextCursor = cursor
 		kv.HasMore = cursor != 0
+		total, _ := client.HLen(ctx, key).Result()
+		kv.TotalCount = total
 
 	case "list":
 		end := int64(offset) + listCount - 1
@@ -106,10 +108,20 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		kv.SetVal = members
 		kv.NextCursor = cursor
 		kv.HasMore = cursor != 0
+		total, _ := client.SCard(ctx, key).Result()
+		kv.TotalCount = total
 
 	case "zset":
 		end := int64(offset) + zsetCount - 1
-		vals, err := client.ZRangeWithScores(ctx, key, int64(offset), end).Result()
+		var (
+			vals []redis.Z
+			err  error
+		)
+		if zsetSort == "desc" {
+			vals, err = client.ZRevRangeWithScores(ctx, key, int64(offset), end).Result()
+		} else {
+			vals, err = client.ZRangeWithScores(ctx, key, int64(offset), end).Result()
+		}
 		if err != nil {
 			return kv, err
 		}

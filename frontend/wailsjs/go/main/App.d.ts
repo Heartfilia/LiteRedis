@@ -5,6 +5,8 @@ import {config} from '../models';
 
 export function Connect(arg1:string):Promise<main.ConnectResult>;
 
+export function CreateKey(arg1:string,arg2:config.CreateKeyRequest):Promise<config.OperationResult>;
+
 export function DBSize(arg1:string):Promise<number>;
 
 export function DeleteConnection(arg1:string):Promise<config.OperationResult>;
@@ -17,7 +19,7 @@ export function GetKeyInfo(arg1:string,arg2:string):Promise<config.RedisKey>;
 
 export function GetSettings():Promise<config.AppSettings>;
 
-export function GetValue(arg1:string,arg2:string,arg3:number,arg4:number):Promise<config.KeyValue>;
+export function GetValue(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string):Promise<config.KeyValue>;
 
 export function HDel(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
