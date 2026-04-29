@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -29,7 +30,7 @@ type ClientManager struct {
 	clients map[string]*activeConn
 }
 
-const redisConnectTimeout = 8 * time.Second
+const redisConnectTimeout = 10 * time.Second
 
 // NewClientManager 创建连接池管理器
 func NewClientManager() *ClientManager {
@@ -42,6 +43,7 @@ func NewClientManager() *ClientManager {
 func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	start := time.Now()
 
 	// 已存在则先关闭
 	if old, ok := m.clients[cfg.ID]; ok {
@@ -56,9 +58,9 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	var dialer func(network, addr string) (net.Conn, error)
 
 	if cfg.SSHEnabled && cfg.SSH != nil {
-		sc, err := ssh.NewSSHTunnel(cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.Password)
+		sc, err := ssh.NewSSHTunnelWithTimeout(cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.Password, remainingConnectTimeout(start))
 		if err != nil {
-			return fmt.Errorf("SSH tunnel error: %w", err)
+			return normalizeConnectError(fmt.Errorf("SSH tunnel error: %w", err))
 		}
 		sshClient = sc
 		dialer = ssh.MakeDialer(sc)
@@ -79,14 +81,14 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	}
 
 	// 测试连通性
-	ctx, cancel := context.WithTimeout(context.Background(), redisConnectTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), remainingConnectTimeout(start))
 	defer cancel()
 	if err := client.Ping(ctx).Err(); err != nil {
 		client.Close()
 		if sshClient != nil {
 			sshClient.Close()
 		}
-		return fmt.Errorf("Redis ping failed: %w", err)
+		return normalizeConnectError(fmt.Errorf("Redis ping failed: %w", err))
 	}
 
 	m.clients[cfg.ID] = &activeConn{
@@ -169,13 +171,14 @@ func (m *ClientManager) SelectDB(id string, db int) error {
 
 // TestConnection 测试连通性（不持久化，不保存连接池）
 func TestConnection(cfg config.ConnectionConfig) error {
+	start := time.Now()
 	var sshClient *gossh.Client
 	var dialer func(network, addr string) (net.Conn, error)
 
 	if cfg.SSHEnabled && cfg.SSH != nil {
-		sc, err := ssh.NewSSHTunnel(cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.Password)
+		sc, err := ssh.NewSSHTunnelWithTimeout(cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.Password, remainingConnectTimeout(start))
 		if err != nil {
-			return fmt.Errorf("SSH tunnel error: %w", err)
+			return normalizeConnectError(fmt.Errorf("SSH tunnel error: %w", err))
 		}
 		sshClient = sc
 		dialer = ssh.MakeDialer(sc)
@@ -198,9 +201,9 @@ func TestConnection(cfg config.ConnectionConfig) error {
 	defer client.Close()
 	_ = sshClient
 
-	ctx, cancel := context.WithTimeout(context.Background(), redisConnectTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), remainingConnectTimeout(start))
 	defer cancel()
-	return client.Ping(ctx).Err()
+	return normalizeConnectError(client.Ping(ctx).Err())
 }
 
 // DisconnectAll 关闭所有连接（应用退出时调用）
@@ -281,4 +284,37 @@ func buildClusterOptions(addrs []string, password string, dialer func(network, a
 		}
 	}
 	return opts
+}
+
+func remainingConnectTimeout(start time.Time) time.Duration {
+	remaining := redisConnectTimeout - time.Since(start)
+	if remaining <= 0 {
+		return time.Second
+	}
+	return remaining
+}
+
+func normalizeConnectError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if isTimeoutError(err) {
+		return fmt.Errorf("connection timed out after 10 seconds")
+	}
+	return err
+}
+
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "i/o timeout") || strings.Contains(msg, "timeout")
 }

@@ -14,6 +14,8 @@ const messages = {
       edit: '编辑',
       delete: '删除',
       confirmDelete: '确认删除？',
+      connectFailed: '连接失败',
+      deleteFailed: '删除失败',
       cancel: '取消',
     },
     keyTree: {
@@ -188,6 +190,8 @@ const messages = {
       edit: 'Edit',
       delete: 'Delete',
       confirmDelete: 'Confirm delete?',
+      connectFailed: 'Connection failed',
+      deleteFailed: 'Delete failed',
       cancel: 'Cancel',
     },
     keyTree: {

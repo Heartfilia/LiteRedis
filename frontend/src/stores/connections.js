@@ -45,11 +45,10 @@ export const useConnectionsStore = defineStore('connections', {
     },
 
     async remove(id) {
-      // 断开连接
-      this.connectedIds.delete(id)
-      this.connectingIds.delete(id)
       const result = await deleteConnection(id)
       if (result.success) {
+        this.connectedIds.delete(id)
+        this.connectingIds.delete(id)
         await this.loadConnections()
       }
       return result

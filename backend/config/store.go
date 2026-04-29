@@ -54,7 +54,7 @@ func saveStore(store *ConfigStore) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(configPath, data, 0644)
+	return atomicWriteFile(configPath, data, 0644)
 }
 
 // ListConnections 返回所有连接配置

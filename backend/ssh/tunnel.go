@@ -9,20 +9,37 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 )
 
+const defaultSSHTimeout = 10 * time.Second
+
 // NewSSHTunnel 创建 SSH 客户端，返回可用于 Dial 的客户端
 func NewSSHTunnel(host string, port int, user string, password string) (*gossh.Client, error) {
+	return NewSSHTunnelWithTimeout(host, port, user, password, defaultSSHTimeout)
+}
+
+// NewSSHTunnelWithTimeout 创建带超时限制的 SSH 客户端。
+func NewSSHTunnelWithTimeout(host string, port int, user string, password string, timeout time.Duration) (*gossh.Client, error) {
 	host = strings.TrimSpace(host)
 	if host == "" {
 		return nil, fmt.Errorf("SSH host is required")
+	}
+	if timeout <= 0 {
+		timeout = defaultSSHTimeout
 	}
 
 	config := &gossh.ClientConfig{
 		User: user,
 		Auth: []gossh.AuthMethod{
 			gossh.Password(password),
+			gossh.KeyboardInteractive(func(_ string, _ string, questions []string, _ []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
 		},
 		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
-		Timeout:         15 * time.Second,
+		Timeout:         timeout,
 	}
 
 	addr := fmt.Sprintf("%s:%d", host, port)

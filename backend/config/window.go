@@ -60,5 +60,5 @@ func SaveWindowState(ws WindowState) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(windowPath, data, 0644)
+	return atomicWriteFile(windowPath, data, 0644)
 }

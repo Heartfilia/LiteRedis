@@ -215,12 +215,14 @@ async function moveToNewGroup(conn) {
 
 async function deleteConn(conn) {
   closeCtxMenu()
-  await connectionsStore.remove(conn.id)
-  if (workspaceStore.activeConnID === conn.id) {
-    workspaceStore.setActiveConn(null, '')
-  }
-  if (selectedConn.value?.id === conn.id) {
-    selectedConn.value = null
+  const result = await connectionsStore.remove(conn.id)
+  if (result?.success) {
+    if (workspaceStore.activeConnID === conn.id) {
+      workspaceStore.setActiveConn(null, '')
+    }
+    if (selectedConn.value?.id === conn.id) {
+      selectedConn.value = null
+    }
   }
 }
 

@@ -168,6 +168,12 @@
       <div class="ctx-divider" />
       <div class="ctx-item ctx-danger" @click="removeConnection(ctxMenu.conn.id); ctxMenu.visible = false">✕ {{ t('sidebar.delete') }}</div>
     </div>
+
+    <Teleport to="body">
+      <Transition name="toast">
+        <div v-if="toastMsg" class="sidebar-toast" :class="toastOk ? 'ok' : 'err'">{{ toastMsg }}</div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -227,6 +233,9 @@ function connInitial(conn) {
 
 // 折叠状态
 const sidebarCollapsed = ref(false)
+const toastMsg = ref('')
+const toastOk = ref(false)
+let toastTimer = null
 
 // 右键菜单
 const ctxMenu = ref({ visible: false, x: 0, y: 0, conn: null })
@@ -235,7 +244,10 @@ function showCtxMenu(e, conn) {
 }
 function closeCtxMenu() { ctxMenu.value.visible = false }
 onMounted(() => document.addEventListener('click', closeCtxMenu))
-onBeforeUnmount(() => document.removeEventListener('click', closeCtxMenu))
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeCtxMenu)
+  if (toastTimer) clearTimeout(toastTimer)
+})
 
 // 编辑连接（打开 ConnectionManager）
 function openEdit(conn) {
@@ -244,6 +256,20 @@ function openEdit(conn) {
 
 function openGitHub() {
   BrowserOpenURL('https://github.com/Heartfilia/LiteRedis')
+}
+
+function showToast(message, ok = false) {
+  toastMsg.value = message
+  toastOk.value = ok
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastMsg.value = ''
+    toastTimer = null
+  }, 3200)
+}
+
+function formatError(prefix, message) {
+  return `${prefix}: ${message || 'Unknown error'}`
 }
 
 // 分组折叠状态
@@ -303,20 +329,21 @@ async function handleConnect(conn) {
     await workspaceStore.fetchTotalKeys()
     await workspaceStore.search('*')
   } else {
-    alert('连接失败: ' + result.message)
+    showToast(formatError(t('sidebar.connectFailed'), result.message))
   }
 }
 
 async function removeConnection(id) {
   ctxMenu.value.visible = false
-  if (activeConnID.value === id) {
-    workspaceStore.setActiveConn(null, '')
-  }
-  delete workspaceStore.connStates[id]
-  workspaceStore.clearSearchHistory(id)
   const result = await connectionsStore.remove(id)
-  if (!result?.success) {
-    alert('删除失败: ' + (result?.message || '未知错误'))
+  if (result?.success) {
+    if (activeConnID.value === id) {
+      workspaceStore.setActiveConn(null, '')
+    }
+    delete workspaceStore.connStates[id]
+    workspaceStore.clearSearchHistory(id)
+  } else {
+    showToast(formatError(t('sidebar.deleteFailed'), result?.message))
   }
 }
 
@@ -650,6 +677,25 @@ async function disconnectConn(id) {
 .ctx-danger { color: #e53e3e; }
 .ctx-danger:hover { background: #fff5f5; color: #e53e3e; }
 .ctx-divider { height: 1px; background: #eee; margin: 3px 0; }
+
+.sidebar-toast {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5000;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  border: 1px solid transparent;
+  max-width: min(520px, calc(100vw - 24px));
+  word-break: break-word;
+}
+.sidebar-toast.ok { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+.sidebar-toast.err { background: #fff1f2; color: #991b1b; border-color: #fecaca; }
+.toast-enter-active, .toast-leave-active { transition: opacity 0.25s, transform 0.25s; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-12px); }
 
 .delete-wrap { position: relative; display: inline-flex; }
 .delete-popover {
