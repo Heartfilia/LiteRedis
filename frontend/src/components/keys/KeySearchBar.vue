@@ -1,20 +1,22 @@
 <template>
   <div class="key-search-bar">
     <div class="search-input-row" ref="inputRowRef">
-      <input
-        v-model="pattern"
-        type="text"
-        :placeholder="t('keyTree.searchPlaceholder')"
-        @keydown.enter="onEnter"
-        @keydown.down.prevent="onArrowDown"
-        @keydown.up.prevent="onArrowUp"
-        @keydown.esc="showHistory = false"
-        @focus="onFocus"
-        @blur="onBlur"
-      />
-      <button class="btn-search" @click="doSearch" :disabled="loading">
-        {{ loading ? '...' : t('keyTree.searchBtn') }}
-      </button>
+      <div class="search-input-shell">
+        <input
+          v-model="pattern"
+          type="text"
+          :placeholder="t('keyTree.searchPlaceholder')"
+          @keydown.enter="onEnter"
+          @keydown.down.prevent="onArrowDown"
+          @keydown.up.prevent="onArrowUp"
+          @keydown.esc="showHistory = false"
+          @focus="onFocus"
+          @blur="onBlur"
+        />
+        <button class="btn-search" @click="doSearch" :disabled="loading">
+          {{ loading ? '...' : t('keyTree.searchBtn') }}
+        </button>
+      </div>
       <CreateKeyButton v-if="workspaceStore.activeConnID" />
 
       <!-- 历史记录下拉 -->
@@ -145,9 +147,15 @@ async function doSearch() {
   gap: 6px;
   position: relative;
   align-items: center;
+  min-width: 0;
 }
-.search-input-row input {
+.search-input-shell {
+  position: relative;
   flex: 1;
+  min-width: 0;
+}
+.search-input-shell input {
+  width: 100%;
   padding: 5px 66px 5px 10px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
@@ -155,11 +163,12 @@ async function doSearch() {
   outline: none;
   color: #1f2937;
   transition: border-color 0.15s;
+  box-sizing: border-box;
 }
-.search-input-row input:focus { border-color: #3b82f6; }
+.search-input-shell input:focus { border-color: #3b82f6; }
 .btn-search {
   position: absolute;
-  right: 38px;
+  right: 6px;
   top: 50%;
   transform: translateY(-50%);
   display: inline-flex; align-items: center; justify-content: center;

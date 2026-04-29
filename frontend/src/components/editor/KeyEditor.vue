@@ -257,12 +257,14 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   padding: 10px 16px;
   border-bottom: 1px solid #e5e7eb;
   background: #f9fafb;
   flex-shrink: 0;
 }
-.key-meta { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.key-meta { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 420px; flex-wrap: wrap; }
 .key-name {
   font-family: monospace;
   font-size: 13px;
@@ -290,7 +292,7 @@ onBeforeUnmount(() => {
 .ttl-info { font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 4px; }
 .ttl-val { color: #d97706; cursor: pointer; text-decoration: underline dotted; font-weight: 500; }
 .ttl-input { width: 70px; padding: 2px 6px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 12px; outline: none; }
-.key-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+.key-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .btn-sm {
   padding: 4px 12px;
   border: 1px solid #d1d5db;

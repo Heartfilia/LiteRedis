@@ -15,11 +15,11 @@ import { ref } from 'vue'
 import KeyTree from '../keys/KeyTree.vue'
 import KeyEditor from '../editor/KeyEditor.vue'
 
-const MIN_WIDTH = 180
+const MIN_WIDTH = 250
 const MAX_WIDTH = 600
 const DEFAULT_WIDTH = 320
 const RESIZER_WIDTH = 7
-const MIN_EDITOR_WIDTH = 820
+const MIN_EDITOR_WIDTH = 760
 
 const panelWidth = ref(DEFAULT_WIDTH)
 const mainContentRef = ref(null)
@@ -69,7 +69,7 @@ function startResize(e) {
   min-width: 0;
 }
 .key-tree-panel {
-  min-width: 180px;
+  min-width: 250px;
   max-width: 600px;
   display: flex;
   flex-direction: column;
@@ -94,7 +94,7 @@ function startResize(e) {
 }
 .key-editor-panel {
   flex: 1;
-  min-width: 820px;
+  min-width: 760px;
   overflow: hidden;
   display: flex;
   flex-direction: column;

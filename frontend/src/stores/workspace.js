@@ -56,6 +56,48 @@ export const useWorkspaceStore = defineStore('workspace', {
   },
 
   actions: {
+    _patternToRegExp(pattern) {
+      const normalized = pattern && pattern.trim() ? pattern.trim() : '*'
+      const escaped = normalized.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      const regexBody = escaped.replace(/\*/g, '.*').replace(/\?/g, '.')
+      return new RegExp(`^${regexBody}$`)
+    },
+
+    _sessionMatchesKey(session, keyName) {
+      if (!session || !keyName) return false
+      const pattern = session.pattern || '*'
+      try {
+        return this._patternToRegExp(pattern).test(keyName)
+      } catch (e) {
+        return pattern === '*' || pattern === keyName
+      }
+    },
+
+    _upsertKeyIntoSessions(keyInfo) {
+      if (!keyInfo?.name) return false
+      let inserted = false
+      this.searchSessions = this.searchSessions.map(session => {
+        if (!this._sessionMatchesKey(session, keyInfo.name)) {
+          return session
+        }
+        const nextKeys = [...session.keys]
+        const existingIdx = nextKeys.findIndex(item => item.name === keyInfo.name)
+        if (existingIdx === -1) {
+          nextKeys.push(keyInfo)
+          inserted = true
+        } else {
+          nextKeys[existingIdx] = { ...nextKeys[existingIdx], ...keyInfo }
+          inserted = true
+        }
+        return {
+          ...session,
+          keys: nextKeys,
+          treeData: buildKeyTree(nextKeys),
+        }
+      })
+      return inserted
+    },
+
     setActiveConn(id, name, initDB = 0) {
       // 保存当前连接的状态快照
       if (this.activeConnID) {
@@ -355,13 +397,24 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     async deleteCurrentKey() {
       if (!this.selectedKey || !this.activeConnID) return
-      await deleteKey(this.activeConnID, this.selectedKey)
-      if (this.activeSession) {
-        await this.search(this.activeSession.pattern)
-      }
+      const deletedKey = this.selectedKey
+      await deleteKey(this.activeConnID, deletedKey)
+      this.searchSessions = this.searchSessions.map(session => {
+        const nextKeys = session.keys.filter(key => key?.name !== deletedKey)
+        return {
+          ...session,
+          keys: nextKeys,
+          treeData: buildKeyTree(nextKeys),
+        }
+      })
+      this.totalKeys = Math.max(0, (this.totalKeys || 0) - 1)
       this.selectedKey = null
       this.keyValue = null
       this.keyValueError = null
+      this.keyValueLoading = false
+      if (this._loadingKey === deletedKey) {
+        this._loadingKey = null
+      }
     },
 
     async renameCurrentKey(newKey) {
@@ -391,8 +444,18 @@ export const useWorkspaceStore = defineStore('workspace', {
       const result = await createKey(this.activeConnID, req)
       if (!result.success) return result
 
-      await this.fetchTotalKeys()
-      await this.searchExact(req.key)
+      this.totalKeys = (this.totalKeys || 0) + 1
+      const keyInfo = {
+        name: req.key,
+        type: req.type,
+        ttl: Number.isFinite(req.ttl) && req.ttl > 0 ? req.ttl : -1,
+      }
+      const inserted = this._upsertKeyIntoSessions(keyInfo)
+      if (!inserted) {
+        await this.searchExact(req.key)
+        return result
+      }
+      await this.selectKey(req.key)
       return result
     },
 

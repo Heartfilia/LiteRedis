@@ -1,5 +1,6 @@
 <template>
   <div class="hash-editor">
+    <FloatingMessage :message="msg" :success="ok" />
     <div class="toolbar">
       <button class="btn-add" @click="showAdd = !showAdd">+ {{ t('keyEditor.addField') }}</button>
       <div class="search-bar">
@@ -28,16 +29,13 @@
       <button @click="showAdd = false">{{ t('keyEditor.cancel') }}</button>
     </div>
 
-    <!-- 操作提示 -->
-    <div v-if="msg" :class="['msg-bar', ok ? 'ok' : 'err']">{{ msg }}</div>
-
     <!-- hash 表格 -->
     <div class="hash-table-wrap">
       <table class="hash-table">
         <thead>
           <tr>
             <th class="num-col">#</th>
-            <th class="sortable-col field-th" @click="cycleSortOrder" :style="{ width: fieldWidth + 'px' }">
+            <th class="sortable-col field-th" @click="cycleSortOrder" :style="fieldColumnStyle">
               <span class="th-content">Field <span class="sort-icon" :class="sortOrder">{{ sortIcon }}</span></span>
               <span class="col-resizer" @mousedown.stop="startResizeField" />
             </th>
@@ -48,7 +46,7 @@
         <tbody>
           <tr v-for="([field, val], idx) in displayEntries" :key="field">
             <td class="num-cell">{{ idx + 1 }}</td>
-            <td class="field-cell" :style="{ width: fieldWidth + 'px' }">{{ field }}</td>
+            <td class="field-cell" :style="fieldColumnStyle">{{ field }}</td>
             <td class="value-cell">
               <span v-if="editingField !== field" class="value-text" @dblclick="startEdit(field, val)">
                 <span class="val-preview">{{ truncate(val) }}</span>
@@ -61,7 +59,12 @@
                 <template v-if="editingField !== field">
                   <button class="btn-tiny" @click="copyVal(val, field)">{{ copiedField === field ? '✓' : t('keyEditor.copy') }}</button>
                   <button class="btn-tiny" @click="openEdit(field, val)">{{ t('keyEditor.edit') }}</button>
-                  <button class="btn-tiny danger" @click="deleteField(field)">{{ t('keyEditor.delete') }}</button>
+                  <InlineDeleteConfirm
+                    :label="t('keyEditor.delete')"
+                    :confirm-text="t('keyEditor.confirmDelete')"
+                    :reset-token="`${props.keyValue?.key || ''}:${field}`"
+                    @confirm="deleteField(field)"
+                  />
                 </template>
                 <template v-else>
                   <button class="btn-tiny btn-confirm-yes" @click="saveEdit(field)">✅</button>
@@ -101,6 +104,8 @@ import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { hSet, hDel, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
+import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
+import FloatingMessage from '../common/FloatingMessage.vue'
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
@@ -117,6 +122,7 @@ const msg = ref('')
 const ok = ref(true)
 const copiedField = ref(null)
 const fieldWidth = ref(240)
+const totalFieldCount = ref(0)
 
 function startResizeField(e) {
   const startX = e.clientX
@@ -163,7 +169,8 @@ const nextCursor = ref(0)
 const valueLoading = ref(false)
 
 const fieldCount = computed(() => Object.keys(rawHashVal.value).length)
-const totalFields = computed(() => props.keyValue?.total_count >= 0 ? props.keyValue.total_count : fieldCount.value)
+const totalFields = computed(() => totalFieldCount.value >= 0 ? totalFieldCount.value : fieldCount.value)
+const fieldColumnStyle = computed(() => ({ width: `min(${fieldWidth.value}px, 42%)` }))
 
 // 数据源：搜索激活时用搜索结果，否则用全量
 const sourceEntries = computed(() =>
@@ -188,6 +195,7 @@ watch(() => props.keyValue, (kv) => {
   rawHashVal.value = { ...(kv?.hash_val || {}) }
   hasMore.value = kv?.has_more || false
   nextCursor.value = kv?.next_cursor || 0
+  totalFieldCount.value = kv?.total_count ?? Object.keys(kv?.hash_val || {}).length
   searchQuery.value = ''
   searchResults.value = null
   sortOrder.value = 'none'
@@ -210,11 +218,6 @@ async function loadMore() {
   } finally {
     valueLoading.value = false
   }
-}
-
-async function reloadKeyData() {
-  if (!props.keyValue?.key) return
-  await workspaceStore.selectKey(props.keyValue.key)
 }
 
 // 搜索
@@ -272,7 +275,10 @@ async function saveFromModal(newVal) {
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      await reloadKeyData()
+      rawHashVal.value = { ...rawHashVal.value, [field]: newVal }
+      if (searchResults.value !== null) {
+        searchResults.value = searchResults.value.map(([f, v]) => f === field ? [field, newVal] : [f, v])
+      }
       expandShow.value = false
     }
   } catch (e) {
@@ -296,7 +302,12 @@ async function saveEdit(field) {
     const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, field, editValue.value)
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) await reloadKeyData()
+    if (result.success) {
+      rawHashVal.value = { ...rawHashVal.value, [field]: editValue.value }
+      if (searchResults.value !== null) {
+        searchResults.value = searchResults.value.map(([f, v]) => f === field ? [field, editValue.value] : [f, v])
+      }
+    }
   } catch(e) {
     ok.value = false; msg.value = e.message
   }
@@ -307,7 +318,15 @@ async function deleteField(field) {
     const result = await hDel(workspaceStore.activeConnID, props.keyValue.key, field)
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) await reloadKeyData()
+    if (result.success) {
+      const next = { ...rawHashVal.value }
+      delete next[field]
+      rawHashVal.value = next
+      totalFieldCount.value = Math.max(0, totalFieldCount.value - 1)
+      if (searchResults.value !== null) {
+        searchResults.value = searchResults.value.filter(([f]) => f !== field)
+      }
+    }
   } catch(e) {
     ok.value = false; msg.value = e.message
   }
@@ -316,11 +335,16 @@ async function deleteField(field) {
 async function addField() {
   if (!newField.value.trim()) return
   try {
-    const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, newField.value, newValue.value)
+    const field = newField.value.trim()
+    const existed = Object.prototype.hasOwnProperty.call(rawHashVal.value, field)
+    const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, field, newValue.value)
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      await reloadKeyData()
+      rawHashVal.value = { ...rawHashVal.value, [field]: newValue.value }
+      if (!existed) {
+        totalFieldCount.value++
+      }
       newField.value = ''; newValue.value = ''; showAdd.value = false
     }
   } catch(e) {
@@ -330,7 +354,7 @@ async function addField() {
 </script>
 
 <style scoped>
-.hash-editor { display: flex; flex-direction: column; height: 100%; gap: 8px; }
+.hash-editor { position: relative; display: flex; flex-direction: column; height: 100%; gap: 8px; }
 .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .search-bar { display: flex; align-items: center; }
 .search-input {
@@ -345,8 +369,8 @@ async function addField() {
 .add-row input:focus { border-color: #3b82f6; }
 .add-row button { padding: 4px 10px; border: 1px solid #d1d5db; border-radius: 5px; cursor: pointer; font-size: 12px; background: #fff; color: #374151; }
 .add-row button:hover { background: #f3f4f6; }
-.hash-table-wrap { flex: 1; overflow-y: auto; }
-.hash-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.hash-table-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; }
+.hash-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
 .hash-table th { background: #f9fafb; padding: 6px 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
 .hash-table td { padding: 5px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
 .num-col { width: 36px; text-align: center; }
@@ -369,13 +393,9 @@ async function addField() {
   z-index: 5;
 }
 .col-resizer:hover { background: #3b82f6; border-color: #3b82f6; }
-.field-cell { color: #1d4ed8; font-weight: 500; word-break: break-all; min-width: 280px; }
+.field-cell { color: #1d4ed8; font-weight: 500; word-break: break-all; min-width: 0; }
 .value-th,
-.value-cell {
-  width: 55ch;
-  min-width: 55ch;
-  max-width: 55ch;
-}
+.value-cell { min-width: 0; }
 .value-text { cursor: pointer; display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; }
 .val-preview {
   font-family: monospace;
@@ -383,13 +403,20 @@ async function addField() {
   word-break: break-all;
   color: #374151;
   display: inline-block;
-  max-width: 55ch;
+  max-width: 100%;
 }
 .val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .val-ellipsis:hover { text-decoration: underline; }
 .value-cell input { width: 100%; padding: 3px 6px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 12px; outline: none; }
-.action-cell { text-align: right; white-space: nowrap; }
-.action-btns { display: inline-flex; gap: 4px; justify-content: flex-end; }
+.action-th,
+.action-cell {
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+  text-align: center;
+  white-space: nowrap;
+}
+.action-btns { display: inline-flex; gap: 4px; justify-content: center; }
 .sortable-col { cursor: pointer; user-select: none; }
 .sortable-col:hover { background: #f3f4f6 !important; }
 .sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; color: #d1d5db; }
@@ -421,27 +448,9 @@ async function addField() {
   font-size: 12px;
   color: #9ca3af;
 }
-.msg { font-size: 12px; padding: 5px 10px; border-radius: 6px; }
-.ok { background: #f0fdf4; color: #166534; }
-.err { background: #fff1f2; color: #991b1b; }
-
-.msg-bar {
-  text-align: center;
-  font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  margin: 0 6px;
-}
-.msg-bar.ok { background: #f0fdf4; color: #166534; }
-.msg-bar.err { background: #fff1f2; color: #991b1b; }
-
 .value-cell {
   background: #f8fafc;
   overflow: hidden;
 }
 
-.btn-confirm-yes { color: #16a34a; border-color: #16a34a; }
-.btn-confirm-yes:hover { background: #16a34a; color: white; }
-.btn-confirm-no { color: #dc2626; border-color: #dc2626; }
-.btn-confirm-no:hover { background: #dc2626; color: white; }
 </style>

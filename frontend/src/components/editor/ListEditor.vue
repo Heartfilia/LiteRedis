@@ -1,5 +1,6 @@
 <template>
   <div class="list-editor">
+    <FloatingMessage :message="msg" :success="ok" />
     <div class="toolbar">
       <button class="btn-add" @click="showAdd = !showAdd">+ {{ t('keyEditor.addElement') }}</button>
       <div class="search-bar">
@@ -26,7 +27,6 @@
       <button @click="showAdd = false">{{ t('keyEditor.cancel') }}</button>
     </div>
 
-    <div v-if="msg" :class="['msg-bar', ok ? 'ok' : 'err']">{{ msg }}</div>
     <!-- sort header -->
     <div class="list-header">
       <span class="sortable-col" @click="cycleSortOrder">
@@ -58,7 +58,12 @@
           <template v-if="editingIdx !== displayOriginalIndices[idx]">
             <button class="btn-tiny" @click="copyItem(item, idx)">{{ copiedItem === item + idx ? '✓' : t('keyEditor.copy') }}</button>
             <button v-if="searchResults === null && sortOrder === 'none'" class="btn-tiny" @click="openEdit(displayOriginalIndices[idx], item)">{{ t('keyEditor.edit') }}</button>
-            <button class="btn-tiny danger" @click="removeItem(item, displayOriginalIndices[idx])">{{ t('keyEditor.delete') }}</button>
+            <InlineDeleteConfirm
+              :label="t('keyEditor.delete')"
+              :confirm-text="t('keyEditor.confirmDelete')"
+              :reset-token="`${props.keyValue?.key || ''}:${idx}:${item}`"
+              @confirm="removeItem(item, displayOriginalIndices[idx])"
+            />
           </template>
           <template v-else>
             <button class="btn-tiny btn-confirm-yes" @click="saveEdit(displayOriginalIndices[idx])">✅</button>
@@ -95,6 +100,8 @@ import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { lPush, rPush, lSet, lRem, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
+import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
+import FloatingMessage from '../common/FloatingMessage.vue'
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
@@ -110,6 +117,7 @@ const editValue = ref('')
 const msg = ref('')
 const ok = ref(true)
 const copiedItem = ref(null)
+const totalItemCount = ref(0)
 
 // 搜索状态（搜索结果是纯字符串数组，不含原始索引）
 const searchQuery   = ref('')
@@ -136,7 +144,7 @@ const editModalIdx = ref(-1)
 const hasMore = ref(false)
 const nextOffset = ref(0)
 const valueLoading = ref(false)
-const totalItems = computed(() => props.keyValue?.total_count >= 0 ? props.keyValue.total_count : rawItems.value.length)
+const totalItems = computed(() => totalItemCount.value >= 0 ? totalItemCount.value : rawItems.value.length)
 
 // 数据源（搜索激活时不保留原始索引）
 const sourceItems = computed(() =>
@@ -171,6 +179,7 @@ watch(() => props.keyValue, kv => {
   rawItems.value = [...(kv?.list_val || [])]
   hasMore.value = kv?.has_more || false
   nextOffset.value = kv?.next_offset || 0
+  totalItemCount.value = kv?.total_count ?? rawItems.value.length
   searchQuery.value = ''
   searchResults.value = null
   sortOrder.value = 'none'
@@ -196,9 +205,40 @@ async function loadMore() {
   }
 }
 
-async function reloadKeyData() {
-  if (!props.keyValue?.key) return
-  await workspaceStore.selectKey(props.keyValue.key)
+function replaceLocalItem(idx, newVal) {
+  if (idx < 0 || idx >= rawItems.value.length) return
+  const nextRaw = [...rawItems.value]
+  nextRaw[idx] = newVal
+  rawItems.value = nextRaw
+}
+
+function removeFirstMatching(list, val) {
+  const idx = list.findIndex(item => item === val)
+  if (idx === -1) return { next: list, removed: false }
+  const next = [...list]
+  next.splice(idx, 1)
+  return { next, removed: true }
+}
+
+function removeLocalItem(val) {
+  const rawResult = removeFirstMatching(rawItems.value, val)
+  if (rawResult.removed) {
+    rawItems.value = rawResult.next
+    totalItemCount.value = Math.max(0, totalItemCount.value - 1)
+  }
+  if (searchResults.value !== null) {
+    const searchResult = removeFirstMatching(searchResults.value, val)
+    if (searchResult.removed) {
+      searchResults.value = searchResult.next
+    }
+  }
+}
+
+function addLocalItem(val) {
+  rawItems.value = pushDir.value === 'lpush'
+    ? [val, ...rawItems.value]
+    : [...rawItems.value, val]
+  totalItemCount.value++
 }
 
 async function executeSearch() {
@@ -255,7 +295,7 @@ async function saveFromModal(newVal) {
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      await reloadKeyData()
+      replaceLocalItem(idx, newVal)
       expandShow.value = false
     }
   } catch (e) {
@@ -278,7 +318,7 @@ async function saveEdit(idx) {
   try {
     const result = await lSet(workspaceStore.activeConnID, props.keyValue.key, idx, editValue.value)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) await reloadKeyData()
+    if (result.success) replaceLocalItem(idx, editValue.value)
   } catch(e) { ok.value = false; msg.value = e.message }
 }
 
@@ -286,7 +326,7 @@ async function removeItem(val, origIdx) {
   try {
     const result = await lRem(workspaceStore.activeConnID, props.keyValue.key, 1, val)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) await reloadKeyData()
+    if (result.success) removeLocalItem(val)
   } catch(e) { ok.value = false; msg.value = e.message }
 }
 
@@ -297,15 +337,16 @@ async function addItem() {
     const result = await fn(workspaceStore.activeConnID, props.keyValue.key, newValue.value)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      await reloadKeyData()
-      newValue.value = ''; showAdd.value = false
+      addLocalItem(newValue.value)
+      newValue.value = ''
+      showAdd.value = false
     }
   } catch(e) { ok.value = false; msg.value = e.message }
 }
 </script>
 
 <style scoped>
-.list-editor { display: flex; flex-direction: column; height: 100%; gap: 8px; }
+.list-editor { position: relative; display: flex; flex-direction: column; height: 100%; gap: 8px; }
 .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .search-bar { display: flex; align-items: center; }
 .search-input {
@@ -367,23 +408,5 @@ async function addItem() {
   font-size: 12px;
   color: #9ca3af;
 }
-.msg { font-size: 12px; padding: 5px 10px; border-radius: 6px; }
-.ok { background: #f0fdf4; color: #166534; }
-.err { background: #fff1f2; color: #991b1b; }
 
-.msg-bar {
-  text-align: center;
-  font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  margin: 0 6px;
-}
-.msg-bar.ok { background: #f0fdf4; color: #166534; }
-.msg-bar.err { background: #fff1f2; color: #991b1b; }
-
-
-.btn-confirm-yes { color: #16a34a; border-color: #16a34a; }
-.btn-confirm-yes:hover { background: #16a34a; color: white; }
-.btn-confirm-no { color: #dc2626; border-color: #dc2626; }
-.btn-confirm-no:hover { background: #dc2626; color: white; }
 </style>

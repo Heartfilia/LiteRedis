@@ -1,13 +1,12 @@
 <template>
   <div class="string-editor">
+    <FloatingMessage :message="msg" :success="ok" />
     <textarea v-model="localVal" rows="10" :disabled="saving" />
     <div class="editor-actions">
       <button class="btn-action" @click="openExpand">⛶ {{ t('keyEditor.expand') }}</button>
       <button class="btn-action" @click="copyValue">{{ copied ? '✓ ' + t('keyEditor.copied') : '📋 ' + t('keyEditor.copy') }}</button>
       <button class="btn-primary" @click="save" :disabled="saving">{{ saving ? t('keyEditor.saving') : t('keyEditor.save') }}</button>
     </div>
-    <div v-if="msg" :class="['msg', ok ? 'ok' : 'err']">{{ msg }}</div>
-
     <ExpandModal
       :show="expandShow"
       :title="props.keyValue?.key || 'string'"
@@ -24,6 +23,7 @@ import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { setString } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
+import FloatingMessage from '../common/FloatingMessage.vue'
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
@@ -70,7 +70,7 @@ async function save() {
 </script>
 
 <style scoped>
-.string-editor { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+.string-editor { position: relative; display: flex; flex-direction: column; gap: 8px; height: 100%; }
 textarea {
   flex: 1; resize: none; padding: 10px 12px;
   border: 1px solid #d1d5db; border-radius: 6px;
@@ -109,7 +109,4 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1
 }
 .btn-primary:hover { background: #2563eb; }
 .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
-.msg { font-size: 12px; padding: 5px 10px; border-radius: 6px; }
-.ok { background: #f0fdf4; color: #166534; }
-.err { background: #fff1f2; color: #991b1b; }
 </style>

@@ -1,5 +1,6 @@
 <template>
   <div class="zset-editor">
+    <FloatingMessage :message="msg" :success="ok" />
     <div class="toolbar">
       <button class="btn-add" @click="showAdd = !showAdd">+ {{ t('keyEditor.addMember') }}</button>
       <div class="search-bar">
@@ -25,7 +26,6 @@
       <button @click="addMember">{{ t('keyEditor.add') }}</button>
       <button @click="showAdd = false">{{ t('keyEditor.cancel') }}</button>
     </div>
-    <div v-if="msg" :class="['msg-bar', ok ? 'ok' : 'err']">{{ msg }}</div>
     <div class="zset-wrap">
       <table class="zset-table">
         <thead>
@@ -60,7 +60,12 @@
                     {{ copiedMember === m.member ? '✓' : t('keyEditor.copy') }}
                   </button>
                   <button class="btn-tiny" @click="openEdit(m)">{{ t('keyEditor.edit') }}</button>
-                  <button class="btn-tiny danger" @click="removeMember(m.member)">{{ t('keyEditor.delete') }}</button>
+                  <InlineDeleteConfirm
+                    :label="t('keyEditor.delete')"
+                    :confirm-text="t('keyEditor.confirmDelete')"
+                    :reset-token="`${props.keyValue?.key || ''}:${m.member}`"
+                    @confirm="removeMember(m.member)"
+                  />
                 </template>
                 <template v-else>
                   <button class="btn-tiny btn-confirm-yes" @click="saveEdit(m.member)">✅</button>
@@ -100,6 +105,8 @@ import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { zAdd, zRem, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
+import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
+import FloatingMessage from '../common/FloatingMessage.vue'
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
@@ -116,6 +123,7 @@ const msg = ref('')
 const ok = ref(true)
 const copiedMember = ref(null)
 const scoreWidth = ref(180)
+const totalMemberCount = ref(0)
 
 function startResizeScore(e) {
   const startX = e.clientX
@@ -174,7 +182,7 @@ const editModalScore = ref(0)
 const hasMore = ref(false)
 const nextOffset = ref(0)
 const valueLoading = ref(false)
-const totalMembers = computed(() => props.keyValue?.total_count >= 0 ? props.keyValue.total_count : rawMembers.value.length)
+const totalMembers = computed(() => totalMemberCount.value >= 0 ? totalMemberCount.value : rawMembers.value.length)
 
 const sourceMembers = computed(() =>
   searchResults.value !== null ? searchResults.value : rawMembers.value
@@ -201,6 +209,7 @@ watch(() => props.keyValue, kv => {
   rawMembers.value = [...(kv?.zset_val || [])]
   hasMore.value = kv?.has_more || false
   nextOffset.value = kv?.next_offset || 0
+  totalMemberCount.value = kv?.total_count ?? rawMembers.value.length
   searchQuery.value = ''
   searchResults.value = null
   activeSort.value = 'score'
@@ -246,9 +255,63 @@ async function reloadByScoreSort() {
   }
 }
 
-async function reloadKeyData() {
-  if (!props.keyValue?.key) return
-  await workspaceStore.selectKey(props.keyValue.key)
+function sortRawMembersByScore() {
+  if (searchResults.value !== null || activeSort.value !== 'score') return
+  rawMembers.value = [...rawMembers.value].sort((a, b) =>
+    scoreSortOrder.value === 'asc' ? a.score - b.score : b.score - a.score
+  )
+}
+
+function upsertLocalMember(member, score) {
+  const nextRaw = [...rawMembers.value]
+  const rawIdx = nextRaw.findIndex(item => item.member === member)
+  if (rawIdx === -1) {
+    nextRaw.push({ member, score })
+    totalMemberCount.value++
+  } else {
+    nextRaw[rawIdx] = { member, score }
+  }
+  rawMembers.value = nextRaw
+  if (searchResults.value !== null) {
+    const nextSearch = [...searchResults.value]
+    const searchIdx = nextSearch.findIndex(item => item.member === member)
+    if (searchIdx !== -1) {
+      nextSearch[searchIdx] = { member, score }
+      searchResults.value = nextSearch
+    }
+  }
+  sortRawMembersByScore()
+}
+
+function renameLocalMember(oldMember, newMember, score) {
+  const hadOld = rawMembers.value.some(item => item.member === oldMember)
+  const hadNew = rawMembers.value.some(item => item.member === newMember)
+  rawMembers.value = [
+    ...rawMembers.value.filter(item => item.member !== oldMember && item.member !== newMember),
+    { member: newMember, score },
+  ]
+  if (hadOld && hadNew && oldMember !== newMember) {
+    totalMemberCount.value = Math.max(0, totalMemberCount.value - 1)
+  }
+  sortRawMembersByScore()
+  if (searchResults.value !== null) {
+    const nextSearch = searchResults.value.filter(item => item.member !== oldMember && item.member !== newMember)
+    nextSearch.push({ member: newMember, score })
+    searchResults.value = nextSearch
+  }
+}
+
+function removeLocalMember(member) {
+  const rawIdx = rawMembers.value.findIndex(item => item.member === member)
+  if (rawIdx !== -1) {
+    const nextRaw = [...rawMembers.value]
+    nextRaw.splice(rawIdx, 1)
+    rawMembers.value = nextRaw
+    totalMemberCount.value = Math.max(0, totalMemberCount.value - 1)
+  }
+  if (searchResults.value !== null) {
+    searchResults.value = searchResults.value.filter(item => item.member !== member)
+  }
 }
 
 async function executeSearch() {
@@ -307,12 +370,7 @@ async function saveFromModal(newMember) {
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      if (searchResults.value !== null) {
-        const sidx = searchResults.value.findIndex(m => m.member === oldMember)
-        if (sidx !== -1) searchResults.value[sidx] = { member: newMember, score }
-      } else {
-        await reloadKeyData()
-      }
+      renameLocalMember(oldMember, newMember, score)
       expandShow.value = false
     }
   } catch (e) {
@@ -329,14 +387,7 @@ async function saveEdit(member) {
   try {
     const result = await zAdd(workspaceStore.activeConnID, props.keyValue.key, member, editScore.value)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) {
-      if (searchResults.value !== null) {
-        const idx = searchResults.value.findIndex(m => m.member === member)
-        if (idx !== -1) searchResults.value[idx].score = editScore.value
-      } else {
-        await reloadKeyData()
-      }
-    }
+    if (result.success) upsertLocalMember(member, editScore.value)
   } catch(e) { ok.value = false; msg.value = e.message }
 }
 
@@ -346,12 +397,10 @@ async function addMember() {
     const result = await zAdd(workspaceStore.activeConnID, props.keyValue.key, newMember.value, newScore.value)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      if (searchResults.value === null) {
-        await reloadKeyData()
-      } else {
-        rawMembers.value.push({ member: newMember.value, score: newScore.value })
-      }
-      newMember.value = ''; newScore.value = 0; showAdd.value = false
+      upsertLocalMember(newMember.value, newScore.value)
+      newMember.value = ''
+      newScore.value = 0
+      showAdd.value = false
     }
   } catch(e) { ok.value = false; msg.value = e.message }
 }
@@ -360,14 +409,7 @@ async function removeMember(member) {
   try {
     const result = await zRem(workspaceStore.activeConnID, props.keyValue.key, member)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) {
-      if (searchResults.value !== null) {
-        searchResults.value = searchResults.value.filter(m => m.member !== member)
-      } else {
-        await reloadKeyData()
-      }
-      rawMembers.value = rawMembers.value.filter(m => m.member !== member)
-    }
+    if (result.success) removeLocalMember(member)
   } catch(e) { ok.value = false; msg.value = e.message }
 }
 
@@ -379,7 +421,7 @@ async function copyMember(member) {
 </script>
 
 <style scoped>
-.zset-editor { display: flex; flex-direction: column; height: 100%; gap: 8px; }
+.zset-editor { position: relative; display: flex; flex-direction: column; height: 100%; gap: 8px; }
 .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .search-bar { display: flex; align-items: center; }
 .search-input {
@@ -395,7 +437,7 @@ async function copyMember(member) {
 .add-row button { padding: 4px 10px; border: 1px solid #d1d5db; border-radius: 5px; cursor: pointer; font-size: 12px; background: #fff; color: #374151; }
 .add-row button:hover { background: #f3f4f6; }
 .zset-wrap { flex: 1; overflow-y: auto; }
-.zset-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.zset-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
 .zset-table th { background: #f9fafb; padding: 6px 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
 .zset-table td { padding: 5px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
 .num-col { width: 36px; text-align: center; }
@@ -444,7 +486,14 @@ async function copyMember(member) {
 }
 .val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; margin-left: 2px; }
 .val-ellipsis:hover { text-decoration: underline; }
-.action-cell { white-space: nowrap; }
+.action-th,
+.action-cell {
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+  text-align: center;
+  white-space: nowrap;
+}
 .sortable-col { cursor: pointer; user-select: none; }
 .sortable-col:hover { background: #f3f4f6 !important; }
 .sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; color: #d1d5db; }
@@ -476,24 +525,5 @@ async function copyMember(member) {
   font-size: 12px;
   color: #9ca3af;
 }
-.msg { font-size: 12px; padding: 5px 10px; border-radius: 6px; }
-.ok { background: #f0fdf4; color: #166534; }
-.err { background: #fff1f2; color: #991b1b; }
-
-.msg-bar {
-  text-align: center;
-  font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  margin: 0 6px;
-}
-.msg-bar.ok { background: #f0fdf4; color: #166534; }
-.msg-bar.err { background: #fff1f2; color: #991b1b; }
-
-.action-btns { display: inline-flex; gap: 4px; justify-content: flex-end; }
-
-.btn-confirm-yes { color: #16a34a; border-color: #16a34a; }
-.btn-confirm-yes:hover { background: #16a34a; color: white; }
-.btn-confirm-no { color: #dc2626; border-color: #dc2626; }
-.btn-confirm-no:hover { background: #dc2626; color: white; }
+.action-btns { display: inline-flex; gap: 4px; justify-content: center; }
 </style>

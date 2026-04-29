@@ -1,5 +1,6 @@
 <template>
   <div class="set-editor">
+    <FloatingMessage :message="msg" :success="ok" />
     <div class="toolbar">
       <button class="btn-add" @click="showAdd = !showAdd">+ {{ t('keyEditor.addMember') }}</button>
       <div class="search-bar">
@@ -25,7 +26,6 @@
       <button @click="showAdd = false">{{ t('keyEditor.cancel') }}</button>
     </div>
 
-    <div v-if="msg" :class="['msg-bar', ok ? 'ok' : 'err']">{{ msg }}</div>
     <!-- sort header -->
     <div class="set-header">
       <span class="sortable-col" @click="cycleSortOrder">
@@ -43,7 +43,12 @@
         <div class="item-actions">
           <button class="btn-tiny" @click="copyMember(m, idx)">{{ copiedMember === m + idx ? '✓' : t('keyEditor.copy') }}</button>
           <button class="btn-tiny" @click="openEdit(idx, m)">{{ t('keyEditor.edit') }}</button>
-          <button class="btn-tiny danger" @click="removeMember(m)">{{ t('keyEditor.delete') }}</button>
+          <InlineDeleteConfirm
+            :label="t('keyEditor.delete')"
+            :confirm-text="t('keyEditor.confirmDelete')"
+            :reset-token="`${props.keyValue?.key || ''}:${m}:${idx}`"
+            @confirm="removeMember(m)"
+          />
         </div>
       </div>
     </div>
@@ -75,6 +80,8 @@ import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { sAdd, sRem, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
+import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
+import FloatingMessage from '../common/FloatingMessage.vue'
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
@@ -87,6 +94,7 @@ const newMember = ref('')
 const msg = ref('')
 const ok = ref(true)
 const copiedMember = ref(null)
+const totalMemberCount = ref(0)
 
 // 搜索状态
 const searchQuery   = ref('')
@@ -112,7 +120,7 @@ const editModalMember = ref('')
 const hasMore = ref(false)
 const nextCursor = ref(0)
 const valueLoading = ref(false)
-const totalMembers = computed(() => props.keyValue?.total_count >= 0 ? props.keyValue.total_count : rawMembers.value.length)
+const totalMembers = computed(() => totalMemberCount.value >= 0 ? totalMemberCount.value : rawMembers.value.length)
 
 const sourceMembers = computed(() =>
   searchResults.value !== null ? searchResults.value : rawMembers.value
@@ -133,6 +141,7 @@ watch(() => props.keyValue, kv => {
   rawMembers.value = [...(kv?.set_val || [])]
   hasMore.value = kv?.has_more || false
   nextCursor.value = kv?.next_cursor || 0
+  totalMemberCount.value = kv?.total_count ?? rawMembers.value.length
   searchQuery.value = ''
   searchResults.value = null
   sortOrder.value = 'none'
@@ -157,9 +166,45 @@ async function loadMore() {
   }
 }
 
-async function reloadKeyData() {
-  if (!props.keyValue?.key) return
-  await workspaceStore.selectKey(props.keyValue.key)
+function replaceLocalMember(oldMember, newMember) {
+  const hadOld = rawMembers.value.includes(oldMember)
+  const hadNew = rawMembers.value.includes(newMember)
+  rawMembers.value = [
+    ...rawMembers.value.filter(item => item !== oldMember && item !== newMember),
+    newMember,
+  ]
+  if (hadOld && hadNew && oldMember !== newMember) {
+    totalMemberCount.value = Math.max(0, totalMemberCount.value - 1)
+  }
+  if (searchResults.value !== null) {
+    const nextSearch = searchResults.value.filter(item => item !== oldMember && item !== newMember)
+    nextSearch.push(newMember)
+    searchResults.value = nextSearch
+  }
+}
+
+function removeLocalMember(member) {
+  const rawIdx = rawMembers.value.findIndex(item => item === member)
+  if (rawIdx !== -1) {
+    const nextRaw = [...rawMembers.value]
+    nextRaw.splice(rawIdx, 1)
+    rawMembers.value = nextRaw
+    totalMemberCount.value = Math.max(0, totalMemberCount.value - 1)
+  }
+  if (searchResults.value !== null) {
+    const searchIdx = searchResults.value.findIndex(item => item === member)
+    if (searchIdx !== -1) {
+      const nextSearch = [...searchResults.value]
+      nextSearch.splice(searchIdx, 1)
+      searchResults.value = nextSearch
+    }
+  }
+}
+
+function addLocalMember(member) {
+  if (rawMembers.value.includes(member)) return
+  rawMembers.value = [...rawMembers.value, member]
+  totalMemberCount.value++
 }
 
 async function executeSearch() {
@@ -213,7 +258,7 @@ async function saveFromModal(newVal) {
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      await reloadKeyData()
+      replaceLocalMember(oldMember, newVal)
       expandShow.value = false
     }
   } catch (e) {
@@ -235,7 +280,11 @@ async function addMember() {
   try {
     const result = await sAdd(workspaceStore.activeConnID, props.keyValue.key, newMember.value)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) { await reloadKeyData(); newMember.value = ''; showAdd.value = false }
+    if (result.success) {
+      addLocalMember(newMember.value)
+      newMember.value = ''
+      showAdd.value = false
+    }
   } catch(e) { ok.value = false; msg.value = e.message }
 }
 
@@ -243,13 +292,13 @@ async function removeMember(m) {
   try {
     const result = await sRem(workspaceStore.activeConnID, props.keyValue.key, m)
     ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) await reloadKeyData()
+    if (result.success) removeLocalMember(m)
   } catch(e) { ok.value = false; msg.value = e.message }
 }
 </script>
 
 <style scoped>
-.set-editor { display: flex; flex-direction: column; height: 100%; gap: 8px; }
+.set-editor { position: relative; display: flex; flex-direction: column; height: 100%; gap: 8px; }
 .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .search-bar { display: flex; align-items: center; }
 .search-input {
@@ -310,23 +359,5 @@ async function removeMember(m) {
   font-size: 12px;
   color: #9ca3af;
 }
-.msg { font-size: 12px; padding: 5px 10px; border-radius: 6px; }
-.ok { background: #f0fdf4; color: #166534; }
-.err { background: #fff1f2; color: #991b1b; }
 
-.msg-bar {
-  text-align: center;
-  font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  margin: 0 6px;
-}
-.msg-bar.ok { background: #f0fdf4; color: #166534; }
-.msg-bar.err { background: #fff1f2; color: #991b1b; }
-
-
-.btn-confirm-yes { color: #16a34a; border-color: #16a34a; }
-.btn-confirm-yes:hover { background: #16a34a; color: white; }
-.btn-confirm-no { color: #dc2626; border-color: #dc2626; }
-.btn-confirm-no:hover { background: #dc2626; color: white; }
 </style>
