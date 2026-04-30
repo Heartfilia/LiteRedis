@@ -94,8 +94,8 @@ export function ScanKeys(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ScanKeys'](arg1, arg2, arg3, arg4);
 }
 
-export function SearchValue(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['SearchValue'](arg1, arg2, arg3, arg4);
+export function SearchValue(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SearchValue'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SelectDB(arg1, arg2) {

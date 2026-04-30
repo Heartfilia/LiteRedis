@@ -246,7 +246,7 @@ async function executeSearch() {
   if (!pattern) { clearSearch(); return }
   isSearching.value = true
   try {
-    const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'list', pattern)
+    const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'list', pattern, false)
     searchResults.value = kv.list_val || []
     editingIdx.value = -1
   } catch(e) { ok.value = false; msg.value = e.message }

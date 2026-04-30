@@ -49,7 +49,7 @@ export function SaveSettings(arg1:config.AppSettings):Promise<config.OperationRe
 
 export function ScanKeys(arg1:string,arg2:string,arg3:number,arg4:number):Promise<config.ScanResult>;
 
-export function SearchValue(arg1:string,arg2:string,arg3:string,arg4:string):Promise<config.KeyValue>;
+export function SearchValue(arg1:string,arg2:string,arg3:string,arg4:string,arg5:boolean):Promise<config.KeyValue>;
 
 export function SelectDB(arg1:string,arg2:number):Promise<config.OperationResult>;
 

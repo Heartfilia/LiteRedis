@@ -319,7 +319,7 @@ async function executeSearch() {
   if (!pattern) { clearSearch(); return }
   isSearching.value = true
   try {
-    const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'zset', pattern)
+    const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'zset', pattern, false)
     searchResults.value = kv.zset_val || []
   } catch(e) { ok.value = false; msg.value = e.message }
   finally { isSearching.value = false }
@@ -438,6 +438,7 @@ async function copyMember(member) {
 .add-row button:hover { background: #f3f4f6; }
 .zset-wrap { flex: 1; overflow-y: auto; }
 .zset-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+.zset-table thead { position: sticky; top: 0; z-index: 10; }
 .zset-table th { background: #f9fafb; padding: 6px 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
 .zset-table td { padding: 5px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
 .num-col { width: 36px; text-align: center; }

@@ -14,6 +14,10 @@
           {{ isSearching ? '…' : t('keyTree.searchBtn') }}
         </button>
         <button v-if="searchResults !== null" class="btn-clear-search" @click="clearSearch">✕</button>
+        <label class="fuzzy-check" title="模糊搜索需要内容自行带*">
+          <input v-model="fuzzySearch" type="checkbox" />
+          {{ t('keyEditor.fuzzy') }}
+        </label>
       </div>
       <span class="count">
         <template v-if="searchResults !== null">{{ t('keyEditor.searchResult', { current: displayEntries.length, total: searchResults.length }) }}</template>
@@ -48,7 +52,7 @@
             <td class="num-cell">{{ idx + 1 }}</td>
             <td class="field-cell" :style="fieldColumnStyle">{{ field }}</td>
             <td class="value-cell">
-              <span v-if="editingField !== field" class="value-text" @dblclick="startEdit(field, val)">
+              <span v-if="editingField !== field" class="value-text">
                 <span class="val-preview">{{ truncate(val) }}</span>
                 <span v-if="val.length > 80" class="val-ellipsis" @click="openExpand(field, val)">…{{ t('keyEditor.expand') }}</span>
               </span>
@@ -147,6 +151,7 @@ function startResizeField(e) {
 const searchQuery   = ref('')
 const searchResults = ref(null)   // null = 无搜索; array of entries = 搜索结果
 const isSearching   = ref(false)
+const fuzzySearch   = ref(false)
 
 // 排序状态
 const sortOrder = ref('none')   // 'none' | 'asc' | 'desc'
@@ -198,6 +203,7 @@ watch(() => props.keyValue, (kv) => {
   totalFieldCount.value = kv?.total_count ?? Object.keys(kv?.hash_val || {}).length
   searchQuery.value = ''
   searchResults.value = null
+  fuzzySearch.value = false
   sortOrder.value = 'none'
   msg.value = ''
 }, { immediate: true })
@@ -224,9 +230,15 @@ async function loadMore() {
 async function executeSearch() {
   const pattern = searchQuery.value.trim()
   if (!pattern) { clearSearch(); return }
+  if (fuzzySearch.value && !pattern.includes('*')) {
+    ok.value = false
+    msg.value = t('keyEditor.fuzzyRequireStar')
+    return
+  }
   isSearching.value = true
   try {
-    const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'hash', pattern)
+    const exact = !fuzzySearch.value
+    const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'hash', pattern, exact)
     searchResults.value = Object.entries(kv.hash_val || {})
   } catch(e) { ok.value = false; msg.value = e.message }
   finally { isSearching.value = false }
@@ -363,6 +375,8 @@ async function addField() {
   border-radius: 5px 0 0 5px; font-size: 12px; outline: none; color: #333;
 }
 .search-input:focus { border-color: #3b82f6; }
+.fuzzy-check { display: flex; align-items: center; gap: 3px; font-size: 12px; color: #6b7280; cursor: pointer; margin-left: 4px; white-space: nowrap; }
+.fuzzy-check input { cursor: pointer; }
 .count { font-size: 12px; color: #9ca3af; margin-left: auto; white-space: nowrap; }
 .add-row { display: flex; gap: 6px; padding: 6px; background: #f9fafb; border-radius: 6px; border: 1px solid #e5e7eb; }
 .add-row input { flex: 1; padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 5px; font-size: 12px; outline: none; }
@@ -371,6 +385,7 @@ async function addField() {
 .add-row button:hover { background: #f3f4f6; }
 .hash-table-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; }
 .hash-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+.hash-table thead { position: sticky; top: 0; z-index: 10; }
 .hash-table th { background: #f9fafb; padding: 6px 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
 .hash-table td { padding: 5px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
 .num-col { width: 36px; text-align: center; }

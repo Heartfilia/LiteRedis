@@ -55,7 +55,7 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	}
 
 	var sshClient *gossh.Client
-	var dialer func(network, addr string) (net.Conn, error)
+	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 	if cfg.SSHEnabled && cfg.SSH != nil {
 		sc, err := ssh.NewSSHTunnelWithTimeout(cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.Password, remainingConnectTimeout(start))
@@ -63,7 +63,7 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 			return normalizeConnectError(fmt.Errorf("SSH tunnel error: %w", err))
 		}
 		sshClient = sc
-		dialer = ssh.MakeDialer(sc)
+		dialer = ssh.MakeContextDialer(sc, redisConnectTimeout)
 	}
 
 	var client redis.UniversalClient
@@ -148,9 +148,9 @@ func (m *ClientManager) SelectDB(id string, db int) error {
 	}
 
 	// 从原始配置重建，只改 DB，避免旧连接池污染
-	var dialer func(network, addr string) (net.Conn, error)
+	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 	if conn.sshClient != nil {
-		dialer = ssh.MakeDialer(conn.sshClient)
+		dialer = ssh.MakeContextDialer(conn.sshClient, redisConnectTimeout)
 	}
 
 	opts := buildRedisOptions(joinHostPort(conn.cfg.Host, conn.cfg.Port), conn.cfg.Password, db, dialer)
@@ -173,7 +173,7 @@ func (m *ClientManager) SelectDB(id string, db int) error {
 func TestConnection(cfg config.ConnectionConfig) error {
 	start := time.Now()
 	var sshClient *gossh.Client
-	var dialer func(network, addr string) (net.Conn, error)
+	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 	if cfg.SSHEnabled && cfg.SSH != nil {
 		sc, err := ssh.NewSSHTunnelWithTimeout(cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.Password, remainingConnectTimeout(start))
@@ -181,7 +181,7 @@ func TestConnection(cfg config.ConnectionConfig) error {
 			return normalizeConnectError(fmt.Errorf("SSH tunnel error: %w", err))
 		}
 		sshClient = sc
-		dialer = ssh.MakeDialer(sc)
+		dialer = ssh.MakeContextDialer(sc, redisConnectTimeout)
 		defer sc.Close()
 	}
 
@@ -249,7 +249,7 @@ func normalizeAddrs(addrs []string) []string {
 	return result
 }
 
-func buildRedisOptions(addr, password string, db int, dialer func(network, addr string) (net.Conn, error)) *redis.Options {
+func buildRedisOptions(addr, password string, db int, dialer func(ctx context.Context, network, addr string) (net.Conn, error)) *redis.Options {
 	opts := &redis.Options{
 		Addr:         addr,
 		Password:     password,
@@ -261,14 +261,12 @@ func buildRedisOptions(addr, password string, db int, dialer func(network, addr 
 		MaxRetries:   1,
 	}
 	if dialer != nil {
-		opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return dialer(network, addr)
-		}
+		opts.Dialer = dialer
 	}
 	return opts
 }
 
-func buildClusterOptions(addrs []string, password string, dialer func(network, addr string) (net.Conn, error)) *redis.ClusterOptions {
+func buildClusterOptions(addrs []string, password string, dialer func(ctx context.Context, network, addr string) (net.Conn, error)) *redis.ClusterOptions {
 	opts := &redis.ClusterOptions{
 		Addrs:        addrs,
 		Password:     password,
@@ -279,9 +277,7 @@ func buildClusterOptions(addrs []string, password string, dialer func(network, a
 		MaxRetries:   1,
 	}
 	if dialer != nil {
-		opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return dialer(network, addr)
-		}
+		opts.Dialer = dialer
 	}
 	return opts
 }

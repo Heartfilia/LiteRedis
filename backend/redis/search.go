@@ -14,11 +14,13 @@ import (
 // Hash/Set/ZSet：pattern 是 Redis glob（如 "user:*"）；
 // List：pattern 是大小写不敏感的子串匹配（Redis 无 LSCAN）。
 // 空 pattern → 等同 "*"，退化为重新加载前 loadCount 条。
+// exact=true 时，Set 使用 SIsMember，Hash 使用 HGet 进行精确匹配。
 func SearchValue(
 	ctx context.Context,
 	client redis.UniversalClient,
 	key, keyType, pattern string,
 	settings config.AppSettings,
+	exact bool,
 ) (config.KeyValue, error) {
 	if strings.TrimSpace(pattern) == "" {
 		pattern = "*"
@@ -29,6 +31,17 @@ func SearchValue(
 
 	switch keyType {
 	case "hash":
+		if exact {
+			kv.HashVal = map[string]string{}
+			val, err := client.HGet(ctx, key, pattern).Result()
+			if err != nil && err != redis.Nil {
+				return kv, err
+			}
+			if err == nil {
+				kv.HashVal = map[string]string{pattern: val}
+			}
+			break
+		}
 		count := settings.HashLoadCount
 		if count <= 0 {
 			count = def.HashLoadCount
@@ -55,6 +68,17 @@ func SearchValue(
 		kv.HashVal = result
 
 	case "set":
+		if exact {
+			kv.SetVal = []string{}
+			isMember, err := client.SIsMember(ctx, key, pattern).Result()
+			if err != nil {
+				return kv, err
+			}
+			if isMember {
+				kv.SetVal = []string{pattern}
+			}
+			break
+		}
 		count := settings.SetLoadCount
 		if count <= 0 {
 			count = def.SetLoadCount

@@ -55,7 +55,13 @@ export const useConnectionsStore = defineStore('connections', {
     },
 
     async test(cfg) {
-      return await testConnection(cfg)
+      // 前端兜底超时：防止 Go 的 TestConnection 在网络异常时永久卡住
+      return await Promise.race([
+        testConnection(cfg),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Connection test timeout after 30 seconds')), 30000)
+        ),
+      ])
     },
 
     async connect(id) {
@@ -64,11 +70,19 @@ export const useConnectionsStore = defineStore('connections', {
       }
       this.connectingIds.add(id)
       try {
-        const result = await connect(id)
+        // 前端兜底超时：防止 Go 的 Connect 在网络异常时永久卡住
+        const result = await Promise.race([
+          connect(id),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Connection timeout after 30 seconds')), 30000)
+          ),
+        ])
         if (result.success) {
           this.connectedIds.add(id)
         }
         return result
+      } catch (e) {
+        return { success: false, message: e.message || String(e) }
       } finally {
         this.connectingIds.delete(id)
       }

@@ -39,7 +39,6 @@
                 >
                   {{ sess.loading ? t('keyTree.loading') : t('keyTree.loadMore') }}
                 </button>
-                <span v-else-if="sess.keys?.length > 0" class="load-more-hint">{{ t('keyTree.allLoaded', { count: sess.keys.length }) }}</span>
               </div>
             </div>
           </div>
@@ -66,7 +65,6 @@
               >
                 {{ session.loading ? t('keyTree.loading') : t('keyTree.loadMore') }}
               </button>
-              <span v-else class="load-more-hint">{{ t('keyTree.allLoaded', { count: session.keys.length }) }}</span>
             </div>
           </div>
         </template>
