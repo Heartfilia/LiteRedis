@@ -30,6 +30,9 @@ export const useWorkspaceStore = defineStore('workspace', {
       // 竞态控制：记录当前"有效"请求的 key，旧请求结果自动丢弃
       _loadingKey: null,
 
+      // 最近一次需要自动展开层级的搜索 session id（有有效数据且 pattern 不是 * 时设置）
+      _autoExpandSessionId: null,
+
       // 每个连接的状态快照，key 为 connID
       connStates: {},
 
@@ -149,6 +152,17 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     isNodeExpanded(fullPath, depth = 0) {
       if (this.keepPrevSearch) return true
+      const session = this.activeSession
+      // 搜索了具体 pattern 且有有效数据时，默认全部展开
+      if (
+        session &&
+        session.id === this._autoExpandSessionId &&
+        session.keys?.length > 0 &&
+        session.pattern &&
+        session.pattern !== '*'
+      ) {
+        return true
+      }
       const connMap = this.expandedNodes[this.activeConnID] || {}
       if (Object.prototype.hasOwnProperty.call(connMap, fullPath)) {
         return !!connMap[fullPath]
@@ -163,6 +177,8 @@ export const useWorkspaceStore = defineStore('workspace', {
         ...connMap,
         [fullPath]: expanded,
       }
+      // 用户手动干预展开状态后，不再自动全部展开
+      this._autoExpandSessionId = null
     },
 
     async fetchTotalKeys() {
@@ -238,15 +254,20 @@ export const useWorkspaceStore = defineStore('workspace', {
         const count = settingsStore.loaded ? settingsStore.keyScanCount : 0
         const result = await scanKeys(this.activeConnID, pattern || '*', count, 0)
         const idx = this.searchSessions.findIndex(s => s.id === sessionId)
+        const keys = result.keys || []
         if (idx !== -1) {
           this.searchSessions[idx] = {
             ...this.searchSessions[idx],
-            keys: result.keys || [],
-            treeData: buildKeyTree(result.keys || []),
+            keys,
+            treeData: buildKeyTree(keys),
             loading: false,
             cursor: result.next_cursor || 0,
             hasMore: result.has_more || false,
           }
+        }
+        // 搜索了具体 pattern 且有有效数据时，标记为自动展开
+        if ((pattern || '*') !== '*' && keys.length > 0) {
+          this._autoExpandSessionId = sessionId
         }
       } catch (e) {
         const idx = this.searchSessions.findIndex(s => s.id === sessionId)
@@ -334,6 +355,7 @@ export const useWorkspaceStore = defineStore('workspace', {
           }
         }
         if (exists) {
+          this._autoExpandSessionId = sessionId
           await this.selectKey(key)
         }
       } catch (e) {
