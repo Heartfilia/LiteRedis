@@ -93,6 +93,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useConnectionsStore } from '../../stores/connections.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { getTypeColor } from '../../utils/typeColors.js'
@@ -106,6 +107,7 @@ import StreamEditor from './StreamEditor.vue'
 const { t } = useI18n()
 
 const workspaceStore = useWorkspaceStore()
+const connectionsStore = useConnectionsStore()
 const selectedKey = computed(() => workspaceStore.selectedKey)
 const keyValue = computed(() => workspaceStore.keyValue)
 const keyValueLoading = computed(() => workspaceStore.keyValueLoading)
@@ -156,11 +158,35 @@ async function doRename() {
   }
 }
 
+// 判断是否为连接类错误
+function isConnectionError(err) {
+  if (!err) return false
+  const msg = String(err).toLowerCase()
+  return msg.includes('connection reset')
+    || msg.includes('broken pipe')
+    || msg.includes('eof')
+    || msg.includes('network')
+    || msg.includes('timeout')
+    || msg.includes('refused')
+    || msg.includes('closed')
+    || msg.includes('dial')
+    || msg.includes('ssh')
+}
+
 // 刷新
 async function refreshKey() {
   confirmingDelete.value = false
-  if (selectedKey.value) {
-    await workspaceStore.selectKey(selectedKey.value)
+  if (!selectedKey.value) return
+  await workspaceStore.selectKey(selectedKey.value)
+  // 若因网络断开导致失败，自动重连后再试一次
+  if (keyValueError.value && isConnectionError(keyValueError.value)) {
+    const connID = workspaceStore.activeConnID
+    if (connID) {
+      const result = await connectionsStore.connect(connID)
+      if (result.success) {
+        await workspaceStore.selectKey(selectedKey.value)
+      }
+    }
   }
 }
 

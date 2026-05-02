@@ -11,7 +11,7 @@
           @keydown.enter="executeSearch"
         />
         <button class="btn-search" :disabled="isSearching" @click="executeSearch">
-          {{ isSearching ? '…' : t('keyTree.searchBtn') }}
+          {{ isSearching ? '…' : (searchResults !== null ? t('keyEditor.refresh') : t('keyTree.searchBtn')) }}
         </button>
         <button v-if="searchResults !== null" class="btn-clear-search" @click="clearSearch">✕</button>
         <label class="fuzzy-check" title="模糊搜索需要内容自行带*">

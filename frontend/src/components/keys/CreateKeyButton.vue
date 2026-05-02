@@ -1,85 +1,87 @@
 <template>
-  <div class="create-key-wrap">
+  <div ref="wrapRef" class="create-key-wrap">
     <button class="create-key-btn" :title="t('keyTree.createKey')" @click="toggleOpen">
       <span>+</span>
     </button>
 
-    <div v-if="open" class="create-key-popover">
-      <div class="popover-header">
-        <span>{{ t('keyTree.createKey') }}</span>
-        <button class="popover-close" @click="close">✕</button>
+    <Teleport to="body">
+      <div v-if="open" class="create-key-popover" :style="popoverStyle">
+        <div class="popover-header">
+          <span>{{ t('keyTree.createKey') }}</span>
+          <button class="popover-close" @click="close">✕</button>
+        </div>
+
+        <div class="form-grid">
+          <label>{{ t('keyTree.keyName') }}</label>
+          <input v-model="form.key" type="text" :placeholder="t('keyTree.keyNamePlaceholder')" />
+
+          <label>{{ t('keyTree.keyType') }}</label>
+          <select v-model="form.type">
+            <option value="string">string</option>
+            <option value="hash">hash</option>
+            <option value="list">list</option>
+            <option value="set">set</option>
+            <option value="zset">zset</option>
+            <option value="stream">stream</option>
+          </select>
+
+          <label>{{ t('keyTree.ttlSeconds') }}</label>
+          <input v-model.number="form.ttl" type="number" :placeholder="t('keyTree.ttlPlaceholder')" />
+        </div>
+
+        <div class="default-value-box">
+          <template v-if="form.type === 'string'">
+            <label>{{ t('keyTree.defaultValue') }}</label>
+            <textarea v-model="form.stringValue" rows="3" />
+          </template>
+
+          <template v-else-if="form.type === 'hash'">
+            <label>{{ t('keyTree.defaultField') }}</label>
+            <input v-model="form.field" type="text" placeholder="field" />
+            <label>{{ t('keyTree.defaultValue') }}</label>
+            <textarea v-model="form.value" rows="3" />
+          </template>
+
+          <template v-else-if="form.type === 'list'">
+            <label>{{ t('keyTree.defaultValue') }}</label>
+            <textarea v-model="form.listValue" rows="3" :placeholder="t('keyTree.listDefaultHint')" />
+          </template>
+
+          <template v-else-if="form.type === 'set'">
+            <label>{{ t('keyTree.defaultMember') }}</label>
+            <input v-model="form.member" type="text" :placeholder="t('keyTree.defaultMember')" />
+          </template>
+
+          <template v-else-if="form.type === 'zset'">
+            <label>{{ t('keyTree.defaultMember') }}</label>
+            <input v-model="form.member" type="text" :placeholder="t('keyTree.defaultMember')" />
+            <label>{{ t('keyTree.defaultScore') }}</label>
+            <input v-model.number="form.score" type="number" step="any" />
+          </template>
+
+          <template v-else-if="form.type === 'stream'">
+            <label>{{ t('keyTree.defaultField') }}</label>
+            <input v-model="form.field" type="text" placeholder="field" />
+            <label>{{ t('keyTree.defaultValue') }}</label>
+            <textarea v-model="form.value" rows="3" />
+          </template>
+        </div>
+
+        <div v-if="msg" :class="['create-msg', ok ? 'ok' : 'err']">{{ msg }}</div>
+
+        <div class="popover-actions">
+          <button class="btn-cancel" @click="close">{{ t('keyEditor.cancel') }}</button>
+          <button class="btn-create" :disabled="saving" @click="submit">
+            {{ saving ? '…' : t('keyTree.create') }}
+          </button>
+        </div>
       </div>
-
-      <div class="form-grid">
-        <label>{{ t('keyTree.keyName') }}</label>
-        <input v-model="form.key" type="text" :placeholder="t('keyTree.keyNamePlaceholder')" />
-
-        <label>{{ t('keyTree.keyType') }}</label>
-        <select v-model="form.type">
-          <option value="string">string</option>
-          <option value="hash">hash</option>
-          <option value="list">list</option>
-          <option value="set">set</option>
-          <option value="zset">zset</option>
-          <option value="stream">stream</option>
-        </select>
-
-        <label>{{ t('keyTree.ttlSeconds') }}</label>
-        <input v-model.number="form.ttl" type="number" :placeholder="t('keyTree.ttlPlaceholder')" />
-      </div>
-
-      <div class="default-value-box">
-        <template v-if="form.type === 'string'">
-          <label>{{ t('keyTree.defaultValue') }}</label>
-          <textarea v-model="form.stringValue" rows="3" />
-        </template>
-
-        <template v-else-if="form.type === 'hash'">
-          <label>{{ t('keyTree.defaultField') }}</label>
-          <input v-model="form.field" type="text" placeholder="field" />
-          <label>{{ t('keyTree.defaultValue') }}</label>
-          <textarea v-model="form.value" rows="3" />
-        </template>
-
-        <template v-else-if="form.type === 'list'">
-          <label>{{ t('keyTree.defaultValue') }}</label>
-          <textarea v-model="form.listValue" rows="3" :placeholder="t('keyTree.listDefaultHint')" />
-        </template>
-
-        <template v-else-if="form.type === 'set'">
-          <label>{{ t('keyTree.defaultMember') }}</label>
-          <input v-model="form.member" type="text" :placeholder="t('keyTree.defaultMember')" />
-        </template>
-
-        <template v-else-if="form.type === 'zset'">
-          <label>{{ t('keyTree.defaultMember') }}</label>
-          <input v-model="form.member" type="text" :placeholder="t('keyTree.defaultMember')" />
-          <label>{{ t('keyTree.defaultScore') }}</label>
-          <input v-model.number="form.score" type="number" step="any" />
-        </template>
-
-        <template v-else-if="form.type === 'stream'">
-          <label>{{ t('keyTree.defaultField') }}</label>
-          <input v-model="form.field" type="text" placeholder="field" />
-          <label>{{ t('keyTree.defaultValue') }}</label>
-          <textarea v-model="form.value" rows="3" />
-        </template>
-      </div>
-
-      <div v-if="msg" :class="['create-msg', ok ? 'ok' : 'err']">{{ msg }}</div>
-
-      <div class="popover-actions">
-        <button class="btn-cancel" @click="close">{{ t('keyEditor.cancel') }}</button>
-        <button class="btn-create" :disabled="saving" @click="submit">
-          {{ saving ? '…' : t('keyTree.create') }}
-        </button>
-      </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, nextTick } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useI18n } from '../../i18n/index.js'
 
@@ -90,6 +92,8 @@ const open = ref(false)
 const saving = ref(false)
 const msg = ref('')
 const ok = ref(true)
+const wrapRef = ref(null)
+const popoverStyle = ref({})
 
 const form = reactive(defaultForm())
 
@@ -117,6 +121,15 @@ function toggleOpen() {
   open.value = !open.value
   if (open.value) {
     resetForm()
+    nextTick(() => {
+      const rect = wrapRef.value?.getBoundingClientRect()
+      if (rect) {
+        popoverStyle.value = {
+          top: `${rect.bottom + 6}px`,
+          left: `${Math.max(8, rect.right - 300)}px`,
+        }
+      }
+    })
   }
 }
 
@@ -190,10 +203,8 @@ async function submit() {
   background: #f8fbff;
 }
 .create-key-popover {
-  position: absolute;
-  top: 36px;
-  right: 0;
-  z-index: 30;
+  position: fixed;
+  z-index: 10000;
   width: 300px;
   padding: 12px;
   border: 1px solid #e5e7eb;
