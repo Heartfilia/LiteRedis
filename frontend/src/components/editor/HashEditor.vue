@@ -101,7 +101,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
@@ -196,14 +196,49 @@ const sortedEntries = computed(() => {
 // 直接显示所有已加载的数据（不再客户端分页）
 const displayEntries = computed(() => sortedEntries.value)
 
+const lastKey = ref('')
+function persistSearchState(key = props.keyValue?.key || lastKey.value) {
+  if (!key) return
+  workspaceStore.setEditorSearchState(key, 'hash', {
+    query: searchQuery.value,
+    fuzzy: fuzzySearch.value,
+  })
+}
+
+watch([searchQuery, fuzzySearch], () => {
+  persistSearchState()
+})
+
+onBeforeUnmount(() => {
+  persistSearchState()
+})
+
 watch(() => props.keyValue, (kv) => {
+  persistSearchState(lastKey.value)
+
   rawHashVal.value = { ...(kv?.hash_val || {}) }
   hasMore.value = kv?.has_more || false
   nextCursor.value = kv?.next_cursor || 0
   totalFieldCount.value = kv?.total_count ?? Object.keys(kv?.hash_val || {}).length
-  searchQuery.value = ''
+
+  // 恢复或重置搜索状态
+  if (kv?.key) {
+    const cached = workspaceStore.getEditorSearchState(kv.key, 'hash')
+    if (cached) {
+      searchQuery.value = cached.query
+      fuzzySearch.value = cached.fuzzy
+    } else {
+      searchQuery.value = ''
+      fuzzySearch.value = false
+    }
+    lastKey.value = kv.key
+  } else {
+    searchQuery.value = ''
+    fuzzySearch.value = false
+    lastKey.value = ''
+  }
   searchResults.value = null
-  fuzzySearch.value = false
+
   sortOrder.value = 'none'
   msg.value = ''
 }, { immediate: true })
@@ -247,6 +282,10 @@ async function executeSearch() {
 function clearSearch() {
   searchQuery.value = ''
   searchResults.value = null
+  fuzzySearch.value = false
+  if (props.keyValue?.key) {
+  workspaceStore.setEditorSearchState(props.keyValue.key, 'hash', null)
+  }
 }
 
 function truncate(val, max = 80) {

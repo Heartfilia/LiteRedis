@@ -93,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
@@ -175,13 +175,44 @@ const displayOriginalIndices = computed(() =>
   sortedIndexed.value.map(({ origIdx }) => origIdx)
 )
 
-watch(() => props.keyValue, kv => {
+const lastKey = ref('')
+function persistSearchState(key = props.keyValue?.key || lastKey.value) {
+  if (!key) return
+  workspaceStore.setEditorSearchState(key, 'list', {
+    query: searchQuery.value,
+  })
+}
+
+watch(searchQuery, () => {
+  persistSearchState()
+})
+
+onBeforeUnmount(() => {
+  persistSearchState()
+})
+
+watch(() => props.keyValue, (kv) => {
+  persistSearchState(lastKey.value)
+
   rawItems.value = [...(kv?.list_val || [])]
   hasMore.value = kv?.has_more || false
   nextOffset.value = kv?.next_offset || 0
   totalItemCount.value = kv?.total_count ?? rawItems.value.length
-  searchQuery.value = ''
+
+  if (kv?.key) {
+    const cached = workspaceStore.getEditorSearchState(kv.key, 'list')
+    if (cached) {
+      searchQuery.value = cached.query
+    } else {
+      searchQuery.value = ''
+    }
+    lastKey.value = kv.key
+  } else {
+    searchQuery.value = ''
+    lastKey.value = ''
+  }
   searchResults.value = null
+
   sortOrder.value = 'none'
   msg.value = ''
   editingIdx.value = -1
@@ -256,6 +287,9 @@ async function executeSearch() {
 function clearSearch() {
   searchQuery.value = ''
   searchResults.value = null
+  if (props.keyValue?.key) {
+  workspaceStore.setEditorSearchState(props.keyValue.key, 'list', null)
+  }
 }
 
 function truncate(val, max = 80) {

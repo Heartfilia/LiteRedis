@@ -98,7 +98,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
@@ -205,13 +205,44 @@ const sortedMembers = computed(() => {
 // 直接显示所有已加载的数据
 const displayMembers = computed(() => sortedMembers.value)
 
-watch(() => props.keyValue, kv => {
+const lastKey = ref('')
+function persistSearchState(key = props.keyValue?.key || lastKey.value) {
+  if (!key) return
+  workspaceStore.setEditorSearchState(key, 'zset', {
+    query: searchQuery.value,
+  })
+}
+
+watch(searchQuery, () => {
+  persistSearchState()
+})
+
+onBeforeUnmount(() => {
+  persistSearchState()
+})
+
+watch(() => props.keyValue, (kv) => {
+  persistSearchState(lastKey.value)
+
   rawMembers.value = [...(kv?.zset_val || [])]
   hasMore.value = kv?.has_more || false
   nextOffset.value = kv?.next_offset || 0
   totalMemberCount.value = kv?.total_count ?? rawMembers.value.length
-  searchQuery.value = ''
+
+  if (kv?.key) {
+    const cached = workspaceStore.getEditorSearchState(kv.key, 'zset')
+    if (cached) {
+      searchQuery.value = cached.query
+    } else {
+      searchQuery.value = ''
+    }
+    lastKey.value = kv.key
+  } else {
+    searchQuery.value = ''
+    lastKey.value = ''
+  }
   searchResults.value = null
+
   activeSort.value = 'score'
   memberSortOrder.value = 'asc'
   scoreSortOrder.value = 'asc'
@@ -328,6 +359,9 @@ async function executeSearch() {
 function clearSearch() {
   searchQuery.value = ''
   searchResults.value = null
+  if (props.keyValue?.key) {
+  workspaceStore.setEditorSearchState(props.keyValue.key, 'zset', null)
+  }
 }
 
 function startEdit(m) { editingMember.value = m.member; editScore.value = m.score }

@@ -1,7 +1,7 @@
 <template>
   <div class="key-search-bar">
     <div class="search-input-row" ref="inputRowRef">
-      <div class="search-input-shell">
+      <div class="search-input-shell" ref="shellRef">
         <input
           v-model="pattern"
           type="text"
@@ -18,19 +18,6 @@
         </button>
       </div>
       <CreateKeyButton v-if="workspaceStore.activeConnID" />
-
-      <!-- 历史记录下拉 -->
-      <div v-if="showHistory && filteredHistory.length" class="history-dropdown">
-        <div
-          v-for="(item, idx) in filteredHistory"
-          :key="item"
-          :class="['history-item', { active: idx === activeIndex }]"
-          @mousedown.prevent="selectHistory(item)"
-          @mouseenter="activeIndex = idx"
-        >
-          {{ item }}
-        </div>
-      </div>
     </div>
     <div class="search-options">
       <label class="keep-label">
@@ -38,11 +25,28 @@
         {{ t('keyTree.keepPrev') }}
       </label>
     </div>
+
+    <!-- 历史记录下拉（fixed 定位，避免被父容器 overflow:hidden 裁切） -->
+    <div
+      v-if="showHistory && filteredHistory.length"
+      class="history-dropdown"
+      :style="dropdownStyle"
+    >
+      <div
+        v-for="(item, idx) in filteredHistory"
+        :key="item"
+        :class="['history-item', { active: idx === activeIndex }]"
+        @mousedown.prevent="selectHistory(item)"
+        @mouseenter="activeIndex = idx"
+      >
+        {{ item }}
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useI18n } from '../../i18n/index.js'
 import CreateKeyButton from './CreateKeyButton.vue'
@@ -56,6 +60,8 @@ const loading = ref(false)
 const showHistory = ref(false)
 const activeIndex = ref(-1)
 const inputRowRef = ref(null)
+const shellRef = ref(null)
+const dropdownStyle = ref({})
 
 const filteredHistory = computed(() => {
   const id = workspaceStore.activeConnID
@@ -65,6 +71,16 @@ const filteredHistory = computed(() => {
   if (!term || term === '*') return list.slice(0, 10)
   return list.filter(h => h.toLowerCase().includes(term.toLowerCase())).slice(0, 10)
 })
+
+function updateDropdownPosition() {
+  const rect = shellRef.value?.getBoundingClientRect()
+  if (!rect) return
+  dropdownStyle.value = {
+    top: `${rect.bottom}px`,
+    left: `${rect.left}px`,
+    minWidth: `${rect.width}px`,
+  }
+}
 
 watch(keep, val => {
   workspaceStore.keepPrevSearch = val
@@ -87,6 +103,7 @@ function onFocus() {
   if (id && (workspaceStore.connSearchHistory[id] || []).length > 0) {
     showHistory.value = true
     activeIndex.value = -1
+    nextTick(updateDropdownPosition)
   }
 }
 
@@ -197,18 +214,16 @@ async function doSearch() {
 }
 
 .history-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
+  position: fixed;
   background: white;
   border: 1px solid #d1d5db;
   border-top: none;
   border-radius: 0 0 6px 6px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  z-index: 100;
+  z-index: 10000;
   max-height: 240px;
   overflow-y: auto;
+  width: max-content;
 }
 .history-item {
   padding: 6px 10px;
@@ -216,8 +231,6 @@ async function doSearch() {
   color: #374151;
   cursor: pointer;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .history-item:hover,
 .history-item.active {

@@ -41,6 +41,9 @@ export const useWorkspaceStore = defineStore('workspace', {
 
       // 每个连接的搜索历史，key 为 connID，value 为 pattern 数组（最多10条）
       connSearchHistory: persistedHistory,
+
+      // 编辑器内搜索状态缓存，key 为 'connID:keyType:key'，value 为 { query, fuzzy }
+      editorSearchStates: {},
     }
   },
 
@@ -479,6 +482,18 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
       await this.selectKey(req.key)
       return result
+    },
+
+    getEditorSearchState(key, keyType) {
+      if (!this.activeConnID || !key) return null
+      const cacheKey = `${this.activeConnID}:${keyType}:${key}`
+      return this.editorSearchStates[cacheKey] || null
+    },
+
+    setEditorSearchState(key, keyType, state) {
+      if (!this.activeConnID || !key) return
+      const cacheKey = `${this.activeConnID}:${keyType}:${key}`
+      this.editorSearchStates[cacheKey] = state
     },
 
     async switchDB(db) {
