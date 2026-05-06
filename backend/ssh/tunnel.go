@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"LiteRedis/backend/config"
@@ -174,11 +175,66 @@ func candidatePrivateKeyPaths(explicitPath string) []string {
 // 而 SSH channel 不实现这些接口，会返回 "deadline not supported" 错误。
 type deadlineConn struct {
 	net.Conn
+	mu         sync.Mutex
+	readTimer  *time.Timer
+	writeTimer *time.Timer
+	bothTimer  *time.Timer
 }
 
-func (c *deadlineConn) SetDeadline(_ time.Time) error      { return nil }
-func (c *deadlineConn) SetReadDeadline(_ time.Time) error  { return nil }
-func (c *deadlineConn) SetWriteDeadline(_ time.Time) error { return nil }
+func (c *deadlineConn) stopTimer(timer **time.Timer) {
+	if *timer == nil {
+		return
+	}
+	(*timer).Stop()
+	*timer = nil
+}
+
+func (c *deadlineConn) resetTimer(timer **time.Timer, deadline time.Time, label string) {
+	c.stopTimer(timer)
+	if deadline.IsZero() {
+		return
+	}
+	d := time.Until(deadline)
+	if d <= 0 {
+		config.AppendDebugLog("[ssh] %s deadline reached immediately, closing conn", label)
+		_ = c.Conn.Close()
+		return
+	}
+	*timer = time.AfterFunc(d, func() {
+		config.AppendDebugLog("[ssh] %s deadline reached after %s, closing conn", label, d)
+		_ = c.Conn.Close()
+	})
+}
+
+func (c *deadlineConn) SetDeadline(deadline time.Time) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.resetTimer(&c.bothTimer, deadline, "read/write")
+	return nil
+}
+
+func (c *deadlineConn) SetReadDeadline(deadline time.Time) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.resetTimer(&c.readTimer, deadline, "read")
+	return nil
+}
+
+func (c *deadlineConn) SetWriteDeadline(deadline time.Time) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.resetTimer(&c.writeTimer, deadline, "write")
+	return nil
+}
+
+func (c *deadlineConn) Close() error {
+	c.mu.Lock()
+	c.stopTimer(&c.readTimer)
+	c.stopTimer(&c.writeTimer)
+	c.stopTimer(&c.bothTimer)
+	c.mu.Unlock()
+	return c.Conn.Close()
+}
 
 // MakeDialer 返回一个使用 SSH 客户端拨号的 Dialer 函数
 // 如果 sshClient 为 nil，则走正常 TCP
@@ -205,14 +261,10 @@ func MakeDialer(sshClient *gossh.Client, timeout time.Duration) func(network, ad
 				return
 			}
 			config.AppendDebugLog("[ssh] tunnel dial ok addr=%s", addr)
-			_ = conn.SetDeadline(time.Now().Add(timeout))
-			done <- result{&deadlineConn{conn}, nil}
+			done <- result{&deadlineConn{Conn: conn}, nil}
 		}()
 		select {
 		case r := <-done:
-			if r.conn != nil {
-				_ = r.conn.SetDeadline(time.Time{})
-			}
 			return r.conn, r.err
 		case <-time.After(timeout):
 			config.AppendDebugLog("[ssh] tunnel dial timeout addr=%s timeout=%s", addr, timeout)

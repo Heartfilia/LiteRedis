@@ -289,8 +289,8 @@ func buildRedisOptions(addr, password string, db int, dialer func(ctx context.Co
 		Password:     password,
 		DB:           db,
 		DialTimeout:  5 * time.Second,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  8 * time.Second,
+		WriteTimeout: 8 * time.Second,
 		PoolTimeout:  10 * time.Second,
 		MaxRetries:   1,
 	}
@@ -305,8 +305,8 @@ func buildClusterOptions(addrs []string, password string, dialer func(ctx contex
 		Addrs:        addrs,
 		Password:     password,
 		DialTimeout:  5 * time.Second,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  8 * time.Second,
+		WriteTimeout: 8 * time.Second,
 		PoolTimeout:  10 * time.Second,
 		MaxRetries:   1,
 	}
