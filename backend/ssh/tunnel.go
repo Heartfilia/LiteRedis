@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"LiteRedis/backend/config"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -34,15 +35,18 @@ func NewSSHTunnelWithConfig(host string, port int, user string, password string,
 	if timeout <= 0 {
 		timeout = defaultSSHTimeout
 	}
+	config.AppendDebugLog("[ssh] begin host=%s port=%d user=%s timeout=%s keyPath=%q", host, port, user, timeout, privateKeyPath)
 	authMethods, err := buildAuthMethods(password, privateKeyPath, passphrase)
 	if err != nil {
+		config.AppendDebugLog("[ssh] build auth failed: %v", err)
 		return nil, err
 	}
 	if len(authMethods) == 0 {
+		config.AppendDebugLog("[ssh] no auth methods available")
 		return nil, fmt.Errorf("no SSH auth methods available; provide password or private key")
 	}
 
-	config := &gossh.ClientConfig{
+	clientConfig := &gossh.ClientConfig{
 		User:            user,
 		Auth:            authMethods,
 		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
@@ -54,15 +58,25 @@ func NewSSHTunnelWithConfig(host string, port int, user string, password string,
 	// 自己控制 TCP 连接超时，避免某些 Windows 环境下 net.DialTimeout 不生效的问题
 	tcpConn, err := net.DialTimeout("tcp", addr, timeout)
 	if err != nil {
+		config.AppendDebugLog("[ssh] tcp dial failed addr=%s err=%v", addr, err)
 		return nil, fmt.Errorf("SSH tcp dial failed: %w", err)
+	}
+	config.AppendDebugLog("[ssh] tcp dial ok addr=%s", addr)
+	if err := tcpConn.SetDeadline(time.Now().Add(timeout)); err != nil {
+		tcpConn.Close()
+		config.AppendDebugLog("[ssh] set deadline failed addr=%s err=%v", addr, err)
+		return nil, fmt.Errorf("SSH set deadline failed: %w", err)
 	}
 
 	// SSH 握手
-	conn, chans, reqs, err := gossh.NewClientConn(tcpConn, addr, config)
+	conn, chans, reqs, err := gossh.NewClientConn(tcpConn, addr, clientConfig)
 	if err != nil {
 		tcpConn.Close()
+		config.AppendDebugLog("[ssh] handshake failed addr=%s err=%v", addr, err)
 		return nil, fmt.Errorf("SSH handshake failed: %w", err)
 	}
+	_ = tcpConn.SetDeadline(time.Time{})
+	config.AppendDebugLog("[ssh] handshake ok addr=%s", addr)
 
 	client := gossh.NewClient(conn, chans, reqs)
 	return client, nil
@@ -75,6 +89,7 @@ func buildAuthMethods(password string, privateKeyPath string, passphrase string)
 	passphrase = strings.TrimSpace(passphrase)
 
 	if password != "" {
+		config.AppendDebugLog("[ssh] add password auth")
 		authMethods = append(authMethods,
 			gossh.Password(password),
 			gossh.KeyboardInteractive(func(_ string, _ string, questions []string, _ []bool) ([]string, error) {
@@ -92,11 +107,13 @@ func buildAuthMethods(password string, privateKeyPath string, passphrase string)
 	for _, path := range keyPaths {
 		signer, err := loadPrivateKeySigner(path, passphrase)
 		if err != nil {
+			config.AppendDebugLog("[ssh] load private key failed path=%s err=%v", path, err)
 			if firstKeyErr == nil {
 				firstKeyErr = fmt.Errorf("%s: %w", path, err)
 			}
 			continue
 		}
+		config.AppendDebugLog("[ssh] add public key auth path=%s", path)
 		authMethods = append(authMethods, gossh.PublicKeys(signer))
 	}
 
@@ -180,17 +197,25 @@ func MakeDialer(sshClient *gossh.Client, timeout time.Duration) func(network, ad
 		}
 		done := make(chan result, 1)
 		go func() {
+			config.AppendDebugLog("[ssh] tunnel dial begin network=%s addr=%s timeout=%s", network, addr, timeout)
 			conn, err := sshClient.Dial(network, addr)
 			if err != nil {
+				config.AppendDebugLog("[ssh] tunnel dial failed addr=%s err=%v", addr, err)
 				done <- result{nil, err}
 				return
 			}
+			config.AppendDebugLog("[ssh] tunnel dial ok addr=%s", addr)
+			_ = conn.SetDeadline(time.Now().Add(timeout))
 			done <- result{&deadlineConn{conn}, nil}
 		}()
 		select {
 		case r := <-done:
+			if r.conn != nil {
+				_ = r.conn.SetDeadline(time.Time{})
+			}
 			return r.conn, r.err
 		case <-time.After(timeout):
+			config.AppendDebugLog("[ssh] tunnel dial timeout addr=%s timeout=%s", addr, timeout)
 			return nil, fmt.Errorf("ssh dial %s timeout after %v", addr, timeout)
 		}
 	}

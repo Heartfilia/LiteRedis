@@ -77,6 +77,10 @@ wails build -platform darwin/universal
 
 产物路径：`build/bin/LiteRedis.app`
 
+如果需要给用户提供更接近安装包体验的产物，可以再封装成 `.dmg`，打开后让用户把 `LiteRedis.app` 拖到 `Applications`。
+
+本仓库的 GitHub Action 发布流程现在已经改成自动产出 `dmg`。
+
 ---
 
 ### Windows 打包

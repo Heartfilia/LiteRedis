@@ -79,9 +79,9 @@ func (a *App) DeleteConnection(id string) config.OperationResult {
 // TestConnection 测试连通性（不持久化）
 func (a *App) TestConnection(cfg config.ConnectionConfig) config.OperationResult {
 	if err := redisbackend.TestConnection(cfg); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
+		return config.OperationResult{Success: false, Message: err.Error() + "\nDebug log: " + config.DebugLogPath()}
 	}
-	return config.OperationResult{Success: true, Message: "连接成功"}
+	return config.OperationResult{Success: true, Message: "连接成功\nDebug log: " + config.DebugLogPath()}
 }
 
 // ConnectResult 连接结果，包含初始 DB
@@ -98,7 +98,7 @@ func (a *App) Connect(id string) ConnectResult {
 		return ConnectResult{Success: false, Message: "连接配置不存在"}
 	}
 	if err := a.manager.Connect(*cfg); err != nil {
-		return ConnectResult{Success: false, Message: err.Error()}
+		return ConnectResult{Success: false, Message: err.Error() + "\nDebug log: " + config.DebugLogPath()}
 	}
 	return ConnectResult{Success: true, InitDB: cfg.DB}
 }

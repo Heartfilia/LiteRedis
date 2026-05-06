@@ -44,6 +44,7 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	start := time.Now()
+	config.AppendDebugLog("[connect] begin id=%s name=%s redis=%s:%d cluster=%v ssh=%v", cfg.ID, cfg.Name, cfg.Host, cfg.Port, cfg.IsCluster, cfg.SSHEnabled)
 
 	// 已存在则先关闭
 	if old, ok := m.clients[cfg.ID]; ok {
@@ -58,6 +59,7 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 	if cfg.SSHEnabled && cfg.SSH != nil {
+		config.AppendDebugLog("[connect] ssh enabled host=%s port=%d user=%s keyPath=%q", cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.PrivateKeyPath)
 		sc, err := ssh.NewSSHTunnelWithConfig(
 			cfg.SSH.Host,
 			cfg.SSH.Port,
@@ -68,10 +70,12 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 			remainingConnectTimeout(start),
 		)
 		if err != nil {
+			config.AppendDebugLog("[connect] ssh setup failed: %v", err)
 			return normalizeConnectError(fmt.Errorf("SSH tunnel error: %w", err))
 		}
 		sshClient = sc
 		dialer = ssh.MakeContextDialer(sc, redisConnectTimeout)
+		config.AppendDebugLog("[connect] ssh ready")
 	}
 
 	var client redis.UniversalClient
@@ -91,13 +95,16 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	// 测试连通性
 	ctx, cancel := context.WithTimeout(context.Background(), remainingConnectTimeout(start))
 	defer cancel()
+	config.AppendDebugLog("[connect] redis ping begin")
 	if err := client.Ping(ctx).Err(); err != nil {
 		client.Close()
 		if sshClient != nil {
 			sshClient.Close()
 		}
+		config.AppendDebugLog("[connect] redis ping failed: %v", err)
 		return normalizeConnectError(fmt.Errorf("Redis ping failed: %w", err))
 	}
+	config.AppendDebugLog("[connect] success elapsed=%s", time.Since(start))
 
 	m.clients[cfg.ID] = &activeConn{
 		client:    client,
@@ -180,10 +187,12 @@ func (m *ClientManager) SelectDB(id string, db int) error {
 // TestConnection 测试连通性（不持久化，不保存连接池）
 func TestConnection(cfg config.ConnectionConfig) error {
 	start := time.Now()
+	config.AppendDebugLog("[test] begin name=%s redis=%s:%d cluster=%v ssh=%v", cfg.Name, cfg.Host, cfg.Port, cfg.IsCluster, cfg.SSHEnabled)
 	var sshClient *gossh.Client
 	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 	if cfg.SSHEnabled && cfg.SSH != nil {
+		config.AppendDebugLog("[test] ssh enabled host=%s port=%d user=%s keyPath=%q", cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.PrivateKeyPath)
 		sc, err := ssh.NewSSHTunnelWithConfig(
 			cfg.SSH.Host,
 			cfg.SSH.Port,
@@ -194,11 +203,13 @@ func TestConnection(cfg config.ConnectionConfig) error {
 			remainingConnectTimeout(start),
 		)
 		if err != nil {
+			config.AppendDebugLog("[test] ssh setup failed: %v", err)
 			return normalizeConnectError(fmt.Errorf("SSH tunnel error: %w", err))
 		}
 		sshClient = sc
 		dialer = ssh.MakeContextDialer(sc, redisConnectTimeout)
 		defer sc.Close()
+		config.AppendDebugLog("[test] ssh ready")
 	}
 
 	var client redis.UniversalClient
@@ -219,7 +230,14 @@ func TestConnection(cfg config.ConnectionConfig) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), remainingConnectTimeout(start))
 	defer cancel()
-	return normalizeConnectError(client.Ping(ctx).Err())
+	config.AppendDebugLog("[test] redis ping begin")
+	err := client.Ping(ctx).Err()
+	if err != nil {
+		config.AppendDebugLog("[test] redis ping failed: %v", err)
+		return normalizeConnectError(fmt.Errorf("Redis ping failed: %w", err))
+	}
+	config.AppendDebugLog("[test] success elapsed=%s", time.Since(start))
+	return nil
 }
 
 // DisconnectAll 关闭所有连接（应用退出时调用）

@@ -59,7 +59,7 @@ export const useConnectionsStore = defineStore('connections', {
       return await Promise.race([
         testConnection(cfg),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Connection test timeout after 30 seconds')), 30000)
+          setTimeout(() => reject(new Error('Connection test timeout after 15 seconds')), 15000)
         ),
       ])
     },
@@ -74,7 +74,7 @@ export const useConnectionsStore = defineStore('connections', {
         const result = await Promise.race([
           connect(id),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Connection timeout after 30 seconds')), 30000)
+            setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000)
           ),
         ])
         if (result.success) {

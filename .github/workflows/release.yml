@@ -35,15 +35,24 @@ jobs:
       - name: Build
         run: wails build -platform darwin/arm64 -clean
 
-      - name: Package .app → zip
+      - name: Package .app → dmg
         run: |
           cd build/bin
-          zip -r LiteRedis-macos-arm64.zip LiteRedis.app
+          rm -rf dmg-root
+          mkdir -p dmg-root
+          cp -R LiteRedis.app dmg-root/
+          ln -s /Applications dmg-root/Applications
+          hdiutil create \
+            -volname "LiteRedis" \
+            -srcfolder dmg-root \
+            -ov \
+            -format UDZO \
+            LiteRedis-macos-arm64.dmg
 
       - uses: actions/upload-artifact@v4
         with:
           name: macos-arm64
-          path: build/bin/LiteRedis-macos-arm64.zip
+          path: build/bin/LiteRedis-macos-arm64.dmg
 
   # ─────────────────────────────────────────
   # Linux x64
@@ -145,7 +154,7 @@ jobs:
           name: "LiteRedis ${{ github.ref_name }}"
           generate_release_notes: true
           files: |
-            artifacts/macos-arm64/LiteRedis-macos-arm64.zip
+            artifacts/macos-arm64/LiteRedis-macos-arm64.dmg
             artifacts/linux-amd64/LiteRedis-linux-amd64.tar.gz
             artifacts/windows-amd64/LiteRedis.exe
             artifacts/windows-amd64/LiteRedis-amd64-installer.exe
