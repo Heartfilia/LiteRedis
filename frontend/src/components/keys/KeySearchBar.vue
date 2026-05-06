@@ -48,11 +48,13 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import CreateKeyButton from './CreateKeyButton.vue'
 
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
+const settingsStore = useSettingsStore()
 
 const pattern = ref('*')
 const keep = ref(workspaceStore.keepPrevSearch)
@@ -67,9 +69,10 @@ const filteredHistory = computed(() => {
   const id = workspaceStore.activeConnID
   if (!id) return []
   const list = workspaceStore.connSearchHistory[id] || []
+  const maxCount = settingsStore.loaded ? settingsStore.searchHistoryLimit : 10
   const term = pattern.value.trim()
-  if (!term || term === '*') return list.slice(0, 10)
-  return list.filter(h => h.toLowerCase().includes(term.toLowerCase())).slice(0, 10)
+  if (!term || term === '*') return list.slice(0, maxCount)
+  return list.filter(h => h.toLowerCase().includes(term.toLowerCase())).slice(0, maxCount)
 })
 
 function updateDropdownPosition() {

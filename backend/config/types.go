@@ -21,10 +21,12 @@ type ConnectionConfig struct {
 
 // SSHConfig SSH 配置
 type SSHConfig struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	User     string `json:"user"`
-	Password string `json:"password"`
+	Host           string `json:"host"`
+	Port           int    `json:"port"`
+	User           string `json:"user"`
+	Password       string `json:"password"`
+	PrivateKeyPath string `json:"private_key_path,omitempty"`
+	Passphrase     string `json:"passphrase,omitempty"`
 }
 
 // AppSettings 全局应用设置

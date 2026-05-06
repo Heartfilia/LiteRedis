@@ -195,7 +195,9 @@ async function doSave() {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   background: white;
+  overflow: hidden;
 }
 .settings-header {
   display: flex;
@@ -223,6 +225,7 @@ async function doSave() {
 
 .settings-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
 }
@@ -296,6 +299,7 @@ async function doSave() {
 .lang-select:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
 
 .settings-footer {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;

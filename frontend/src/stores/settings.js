@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { getSettings, saveSettings } from '../api/wails.js'
 import { setLanguage } from '../i18n/index.js'
+import { useWorkspaceStore } from './workspace.js'
 
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
@@ -48,6 +49,7 @@ export const useSettingsStore = defineStore('settings', {
       const result = await saveSettings(payload)
       if (result.success) {
         Object.assign(this, values)
+        useWorkspaceStore().trimAllSearchHistory(this.searchHistoryLimit)
       }
       return result
     },

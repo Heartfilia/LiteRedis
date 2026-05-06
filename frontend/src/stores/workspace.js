@@ -224,6 +224,17 @@ export const useWorkspaceStore = defineStore('workspace', {
       this._saveSearchHistory()
     },
 
+    trimAllSearchHistory(limit) {
+      const normalizedLimit = Number(limit)
+      if (!Number.isFinite(normalizedLimit) || normalizedLimit < 1) return
+      const next = {}
+      for (const [connId, history] of Object.entries(this.connSearchHistory || {})) {
+        next[connId] = Array.isArray(history) ? history.slice(0, normalizedLimit) : []
+      }
+      this.connSearchHistory = next
+      this._saveSearchHistory()
+    },
+
     async search(pattern) {
       if (!this.activeConnID) return
       this._recordSearchHistory(pattern)

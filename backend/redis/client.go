@@ -58,7 +58,15 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 	if cfg.SSHEnabled && cfg.SSH != nil {
-		sc, err := ssh.NewSSHTunnelWithTimeout(cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.Password, remainingConnectTimeout(start))
+		sc, err := ssh.NewSSHTunnelWithConfig(
+			cfg.SSH.Host,
+			cfg.SSH.Port,
+			cfg.SSH.User,
+			cfg.SSH.Password,
+			cfg.SSH.PrivateKeyPath,
+			cfg.SSH.Passphrase,
+			remainingConnectTimeout(start),
+		)
 		if err != nil {
 			return normalizeConnectError(fmt.Errorf("SSH tunnel error: %w", err))
 		}
@@ -176,7 +184,15 @@ func TestConnection(cfg config.ConnectionConfig) error {
 	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 	if cfg.SSHEnabled && cfg.SSH != nil {
-		sc, err := ssh.NewSSHTunnelWithTimeout(cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.Password, remainingConnectTimeout(start))
+		sc, err := ssh.NewSSHTunnelWithConfig(
+			cfg.SSH.Host,
+			cfg.SSH.Port,
+			cfg.SSH.User,
+			cfg.SSH.Password,
+			cfg.SSH.PrivateKeyPath,
+			cfg.SSH.Passphrase,
+			remainingConnectTimeout(start),
+		)
 		if err != nil {
 			return normalizeConnectError(fmt.Errorf("SSH tunnel error: %w", err))
 		}

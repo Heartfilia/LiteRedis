@@ -90,6 +90,18 @@
               <input v-model="form.ssh.password" type="password" :placeholder="t('connManager.sshPasswordPlaceholder')" />
             </div>
           </div>
+          <div class="form-row">
+            <div class="form-group flex1">
+              <label>{{ t('connManager.sshPrivateKey') }}</label>
+              <input v-model="form.ssh.private_key_path" type="text" :placeholder="t('connManager.sshPrivateKeyPlaceholder')" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex1">
+              <label>{{ t('connManager.sshPassphrase') }}</label>
+              <input v-model="form.ssh.passphrase" type="password" :placeholder="t('connManager.sshPassphrasePlaceholder')" />
+            </div>
+          </div>
         </div>
       </template>
     </div>
@@ -136,7 +148,7 @@ const defaultForm = () => ({
   isCluster: false,
   clusterAddrs: [],
   sshEnabled: false,
-  ssh: { host: '', port: 22, user: '', password: '' },
+  ssh: { host: '', port: 22, user: '', password: '', private_key_path: '', passphrase: '' },
 })
 
 const form = reactive(defaultForm())
@@ -148,7 +160,7 @@ watch(() => props.connection, (conn) => {
       ...defaultForm(),
       ...conn,
       group: conn.group || '',
-      ssh: conn.ssh ? { ...conn.ssh } : { host: '', port: 22, user: '', password: '' },
+      ssh: conn.ssh ? { ...conn.ssh } : { host: '', port: 22, user: '', password: '', private_key_path: '', passphrase: '' },
     })
     clusterAddrsText.value = (conn.clusterAddrs || []).join('\n')
   } else {
@@ -182,6 +194,8 @@ function buildCfg() {
       port: form.ssh.port || 22,
       user: form.ssh.user,
       password: form.ssh.password,
+      private_key_path: form.ssh.private_key_path,
+      passphrase: form.ssh.passphrase,
     } : null,
   }
   return cfg

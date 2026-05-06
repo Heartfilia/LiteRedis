@@ -31,6 +31,8 @@ export namespace config {
 	    port: number;
 	    user: string;
 	    password: string;
+	    private_key_path?: string;
+	    passphrase?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SSHConfig(source);
@@ -42,6 +44,8 @@ export namespace config {
 	        this.port = source["port"];
 	        this.user = source["user"];
 	        this.password = source["password"];
+	        this.private_key_path = source["private_key_path"];
+	        this.passphrase = source["passphrase"];
 	    }
 	}
 	export class ConnectionConfig {
