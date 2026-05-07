@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"LiteRedis/backend/config"
@@ -131,6 +132,13 @@ func (a *App) ScanKeys(connID string, pattern string, count int64, cursor uint64
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.ScanResult{}, err
+	}
+	cfg, cfgErr := config.GetConnection(connID)
+	if cfgErr == nil && cfg != nil && cfg.IsCluster {
+		normalized := strings.TrimSpace(pattern)
+		if normalized == "" || normalized == "*" || strings.ContainsAny(normalized, "*?[") {
+			return config.ScanResult{}, nil
+		}
 	}
 	if count <= 0 {
 		settings, _ := config.GetSettings()

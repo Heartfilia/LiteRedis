@@ -59,19 +59,13 @@
             >⊘</button>
             <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
             <button class="btn-tiny" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
-            <div class="delete-wrap">
-              <button class="btn-tiny danger" :title="t('sidebar.delete')" @click.stop="requestDelete(conn.id)">✕</button>
-              <div v-if="confirmDeleteId === conn.id" class="delete-popover">
-                <div class="delete-popover-arrow"></div>
-                <div class="delete-popover-content">
-                  <span class="delete-popover-text">{{ t('sidebar.confirmDelete') }}</span>
-                  <div class="delete-popover-btns">
-                    <button class="btn-tiny btn-confirm-yes" @click.stop="confirmDelete(conn.id)">✓</button>
-                    <button class="btn-tiny btn-confirm-no" @click.stop="cancelDelete()">✗</button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <InlineDeleteConfirm
+              class="sidebar-delete-confirm"
+              label="✕"
+              :confirm-text="t('sidebar.confirmDelete')"
+              :reset-token="`${conn.id}:${activeConnID || ''}`"
+              @confirm="removeConnection(conn.id)"
+            />
           </div>
         </div>
         </div>
@@ -118,19 +112,13 @@
                 >⊘</button>
                 <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
                 <button class="btn-tiny" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
-                <div class="delete-wrap">
-                  <button class="btn-tiny danger" :title="t('sidebar.delete')" @click.stop="requestDelete(conn.id)">✕</button>
-                  <div v-if="confirmDeleteId === conn.id" class="delete-popover">
-                    <div class="delete-popover-arrow"></div>
-                    <div class="delete-popover-content">
-                      <span class="delete-popover-text">{{ t('sidebar.confirmDelete') }}</span>
-                      <div class="delete-popover-btns">
-                        <button class="btn-tiny btn-confirm-yes" @click.stop="confirmDelete(conn.id)">✓</button>
-                        <button class="btn-tiny btn-confirm-no" @click.stop="cancelDelete()">✗</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <InlineDeleteConfirm
+                  class="sidebar-delete-confirm"
+                  label="✕"
+                  :confirm-text="t('sidebar.confirmDelete')"
+                  :reset-token="`${conn.id}:${activeConnID || ''}`"
+                  @confirm="removeConnection(conn.id)"
+                />
               </div>
             </div>
           </div>
@@ -183,6 +171,7 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useI18n } from '../../i18n/index.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
+import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 
 const { t } = useI18n()
 
@@ -220,6 +209,8 @@ const AVATAR_COLORS = [
 ]
 
 function connColor(conn) {
+  const customColor = (conn.iconColor || conn.icon_color || '').trim()
+  if (/^#[0-9a-fA-F]{6}$/.test(customColor)) return customColor
   let hash = 0
   const s = conn.id || conn.name || conn.host || ''
   for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0
@@ -299,6 +290,9 @@ async function onDropToGroup(targetGroup) {
       db: conn.db,
       is_cluster: conn.is_cluster,
       cluster_addrs: conn.cluster_addrs || [],
+      proxy_enabled: conn.proxy_enabled,
+      proxy_url: conn.proxy_url || '',
+      icon_color: conn.icon_color || '',
       ssh_enabled: conn.ssh_enabled,
       ssh: conn.ssh || null,
     })
@@ -312,13 +306,15 @@ async function handleConnect(conn) {
     // 已连接：重新激活，恢复该连接的历史状态（如有）
     const restored = workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
     if (restored) {
-      // 恢复了历史状态，只需刷新 key 数量
-      await workspaceStore.fetchTotalKeys()
+      // 恢复历史状态时不阻塞界面，总数后台刷新
+      workspaceStore.fetchTotalKeys()
     } else {
-      // 首次激活：按连接配置的 DB 初始化
+      // Cluster 模式不默认扫 key，避免模糊查询
       await workspaceStore.switchDB(conn.db || 0)
-      await workspaceStore.fetchTotalKeys()
-      await workspaceStore.search('*')
+      if (!conn.is_cluster) {
+        await workspaceStore.search('*')
+      }
+      workspaceStore.fetchTotalKeys()
     }
     return
   }
@@ -326,8 +322,10 @@ async function handleConnect(conn) {
   if (result?.message === 'connecting') return
   if (result.success) {
     workspaceStore.setActiveConn(conn.id, conn.name, result.init_db || 0)
-    await workspaceStore.fetchTotalKeys()
-    await workspaceStore.search('*')
+    if (!conn.is_cluster) {
+      await workspaceStore.search('*')
+    }
+    workspaceStore.fetchTotalKeys()
   } else {
     showToast(formatError(t('sidebar.connectFailed'), result.message))
   }
@@ -346,12 +344,6 @@ async function removeConnection(id) {
     showToast(formatError(t('sidebar.deleteFailed'), result?.message))
   }
 }
-
-// 内联删除确认
-const confirmDeleteId = ref(null)
-function requestDelete(id) { confirmDeleteId.value = id }
-function confirmDelete(id) { confirmDeleteId.value = null; removeConnection(id) }
-function cancelDelete() { confirmDeleteId.value = null }
 
 // 断开连接
 async function disconnectConn(id) {
@@ -515,7 +507,7 @@ async function disconnectConn(id) {
   border-radius: 4px;
   margin: 1px 6px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 .conn-item.grouped { margin-left: 14px; margin-right: 6px; }
 .conn-item:hover { background: #2d3748; }
@@ -594,6 +586,50 @@ async function disconnectConn(id) {
 }
 .btn-tiny:hover { background: #4a5568; }
 .btn-tiny.danger:hover { background: #e53e3e; border-color: #e53e3e; color: white; }
+:deep(.sidebar-delete-confirm .btn-tiny.danger) {
+  border-color: #475569;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.18);
+}
+:deep(.sidebar-delete-confirm .btn-tiny.danger:hover) {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #f87171;
+  color: #fecaca;
+}
+:deep(.sidebar-delete-confirm .btn-tiny.danger-confirm) {
+  background: #b91c1c;
+  border-color: #ef4444;
+  color: #fff;
+}
+:deep(.sidebar-delete-confirm .delete-popover) {
+  border-color: #334155;
+  background: #0f172a;
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.42);
+}
+:deep(.sidebar-delete-confirm .delete-popover-arrow) {
+  background: #0f172a;
+  border-left-color: #334155;
+  border-top-color: #334155;
+}
+:deep(.sidebar-delete-confirm .delete-popover-text) {
+  color: #fecaca;
+}
+:deep(.sidebar-delete-confirm .btn-confirm-yes) {
+  color: #86efac;
+  border-color: #22c55e;
+}
+:deep(.sidebar-delete-confirm .btn-confirm-yes:hover) {
+  background: #16a34a;
+  color: #fff;
+}
+:deep(.sidebar-delete-confirm .btn-confirm-no) {
+  color: #fda4af;
+  border-color: #fb7185;
+}
+:deep(.sidebar-delete-confirm .btn-confirm-no:hover) {
+  background: #e11d48;
+  color: #fff;
+}
 .btn-disconnect { color: #f59e0b; border-color: #f59e0b; }
 .btn-disconnect:hover { background: rgba(245,158,11,0.2); color: #d97706; }
 .btn-confirm-yes { color: #16a34a; border-color: #16a34a; }
@@ -697,45 +733,4 @@ async function disconnectConn(id) {
 .toast-enter-active, .toast-leave-active { transition: opacity 0.25s, transform 0.25s; }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-12px); }
 
-.delete-wrap { position: relative; display: inline-flex; }
-.delete-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 100;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  padding: 8px 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-}
-.delete-popover-arrow {
-  position: absolute;
-  top: -5px;
-  right: 10px;
-  width: 10px;
-  height: 10px;
-  background: white;
-  border-left: 1px solid #e5e7eb;
-  border-top: 1px solid #e5e7eb;
-  transform: rotate(45deg);
-}
-.delete-popover-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.delete-popover-text {
-  font-size: 12px;
-  color: #dc2626;
-  font-weight: 500;
-}
-.delete-popover-btns {
-  display: flex;
-  gap: 4px;
-}
 </style>

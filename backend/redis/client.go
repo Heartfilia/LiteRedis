@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	gossh "golang.org/x/crypto/ssh"
+	"golang.org/x/net/proxy"
 )
 
 // activeConn 活跃连接
@@ -76,6 +78,15 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 		sshClient = sc
 		dialer = ssh.MakeContextDialer(sc, redisConnectTimeout)
 		config.AppendDebugLog("[connect] ssh ready")
+	}
+	if dialer == nil && cfg.ProxyEnabled && strings.TrimSpace(cfg.ProxyURL) != "" {
+		pd, err := makeProxyDialer(cfg.ProxyURL, redisConnectTimeout)
+		if err != nil {
+			config.AppendDebugLog("[connect] proxy setup failed: %v", err)
+			return normalizeConnectError(fmt.Errorf("Proxy error: %w", err))
+		}
+		dialer = pd
+		config.AppendDebugLog("[connect] proxy ready url=%s", cfg.ProxyURL)
 	}
 
 	var client redis.UniversalClient
@@ -211,6 +222,15 @@ func TestConnection(cfg config.ConnectionConfig) error {
 		defer sc.Close()
 		config.AppendDebugLog("[test] ssh ready")
 	}
+	if dialer == nil && cfg.ProxyEnabled && strings.TrimSpace(cfg.ProxyURL) != "" {
+		pd, err := makeProxyDialer(cfg.ProxyURL, redisConnectTimeout)
+		if err != nil {
+			config.AppendDebugLog("[test] proxy setup failed: %v", err)
+			return normalizeConnectError(fmt.Errorf("Proxy error: %w", err))
+		}
+		dialer = pd
+		config.AppendDebugLog("[test] proxy ready url=%s", cfg.ProxyURL)
+	}
 
 	var client redis.UniversalClient
 
@@ -281,6 +301,113 @@ func normalizeAddrs(addrs []string) []string {
 		result = append(result, addr)
 	}
 	return result
+}
+
+func makeProxyDialer(rawURL string, timeout time.Duration) (func(ctx context.Context, network, addr string) (net.Conn, error), error) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return nil, nil
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid proxy url: %w", err)
+	}
+	baseDialer := &net.Dialer{Timeout: timeout}
+
+	switch strings.ToLower(parsed.Scheme) {
+	case "http", "https":
+		return func(ctx context.Context, network, addr string) (net.Conn, error) {
+			conn, err := baseDialer.DialContext(ctx, network, parsed.Host)
+			if err != nil {
+				return nil, err
+			}
+			targetConn := conn
+			connectHost := addr
+			authHeader := ""
+			if parsed.User != nil {
+				username := parsed.User.Username()
+				password, _ := parsed.User.Password()
+				authHeader = "Proxy-Authorization: Basic " + basicProxyAuth(username, password) + "\r\n"
+			}
+			req := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\n%s\r\n", connectHost, connectHost, authHeader)
+			if _, err := targetConn.Write([]byte(req)); err != nil {
+				targetConn.Close()
+				return nil, err
+			}
+			buf := make([]byte, 4096)
+			n, err := targetConn.Read(buf)
+			if err != nil {
+				targetConn.Close()
+				return nil, err
+			}
+			if !strings.Contains(string(buf[:n]), " 200 ") {
+				targetConn.Close()
+				return nil, fmt.Errorf("http proxy connect failed: %s", strings.TrimSpace(string(buf[:n])))
+			}
+			return targetConn, nil
+		}, nil
+	case "socks5", "socks5h":
+		var auth *proxy.Auth
+		if parsed.User != nil {
+			password, _ := parsed.User.Password()
+			auth = &proxy.Auth{
+				User:     parsed.User.Username(),
+				Password: password,
+			}
+		}
+		d, err := proxy.SOCKS5("tcp", parsed.Host, auth, baseDialer)
+		if err != nil {
+			return nil, err
+		}
+		return func(ctx context.Context, network, addr string) (net.Conn, error) {
+			type result struct {
+				conn net.Conn
+				err  error
+			}
+			done := make(chan result, 1)
+			go func() {
+				conn, err := d.Dial(network, addr)
+				done <- result{conn: conn, err: err}
+			}()
+			select {
+			case r := <-done:
+				return r.conn, r.err
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported proxy scheme: %s", parsed.Scheme)
+	}
+}
+
+func basicProxyAuth(username string, password string) string {
+	plain := username + ":" + password
+	const enc = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	var out strings.Builder
+	for i := 0; i < len(plain); i += 3 {
+		var b0, b1, b2 byte
+		b0 = plain[i]
+		if i+1 < len(plain) {
+			b1 = plain[i+1]
+		}
+		if i+2 < len(plain) {
+			b2 = plain[i+2]
+		}
+		out.WriteByte(enc[b0>>2])
+		out.WriteByte(enc[((b0&0x03)<<4)|(b1>>4)])
+		if i+1 < len(plain) {
+			out.WriteByte(enc[((b1&0x0f)<<2)|(b2>>6)])
+		} else {
+			out.WriteByte('=')
+		}
+		if i+2 < len(plain) {
+			out.WriteByte(enc[b2&0x3f])
+		} else {
+			out.WriteByte('=')
+		}
+	}
+	return out.String()
 }
 
 func buildRedisOptions(addr, password string, db int, dialer func(ctx context.Context, network, addr string) (net.Conn, error)) *redis.Options {

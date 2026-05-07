@@ -3,8 +3,8 @@
     <button class="btn-tiny danger" :class="{ 'danger-confirm': open }" @click.stop="toggleOpen">
       {{ label }}
     </button>
-    <div v-if="open" class="delete-popover">
-      <div class="delete-popover-arrow"></div>
+    <div v-if="open" ref="popoverEl" class="delete-popover" :class="popoverPlacementClass">
+      <div class="delete-popover-arrow" :class="popoverPlacementClass"></div>
       <div class="delete-popover-content">
         <span class="delete-popover-text">{{ confirmText }}</span>
         <div class="delete-popover-btns">
@@ -17,7 +17,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   label: { type: String, default: 'Delete' },
@@ -27,35 +27,93 @@ const props = defineProps({
 
 const emit = defineEmits(['confirm'])
 
+let activeCloser = null
+
 const open = ref(false)
 const rootEl = ref(null)
+const popoverEl = ref(null)
+const popoverPlacement = ref('bottom')
+
+const popoverPlacementClass = computed(() => ({
+  top: popoverPlacement.value === 'top',
+  bottom: popoverPlacement.value !== 'top',
+}))
 
 function toggleOpen() {
-  open.value = !open.value
+  if (open.value) {
+    close()
+    return
+  }
+  if (activeCloser && activeCloser !== close) {
+    activeCloser()
+  }
+  open.value = true
+  activeCloser = close
+  nextTick(() => {
+    updatePlacement()
+    ensureVisible()
+  })
 }
 
 function confirmDelete() {
-  open.value = false
+  close()
   emit('confirm')
 }
 
-function handleDocumentClick(event) {
-  if (!open.value || !rootEl.value) return
-  if (!rootEl.value.contains(event.target)) {
-    open.value = false
+function close() {
+  open.value = false
+  if (activeCloser === close) {
+    activeCloser = null
   }
 }
 
+function handleDocumentPointerDown(event) {
+  if (!open.value || !rootEl.value) return
+  if (!rootEl.value.contains(event.target)) {
+    close()
+  }
+}
+
+function handleWindowChange() {
+  if (!open.value) return
+  updatePlacement()
+}
+
+function updatePlacement() {
+  if (!rootEl.value || !popoverEl.value) return
+  popoverPlacement.value = 'bottom'
+  const rootRect = rootEl.value.getBoundingClientRect()
+  const popoverRect = popoverEl.value.getBoundingClientRect()
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
+  const spaceBelow = viewportHeight - rootRect.bottom
+  const spaceAbove = rootRect.top
+  if (spaceBelow < popoverRect.height + 8 && spaceAbove > spaceBelow) {
+    popoverPlacement.value = 'top'
+  } else {
+    popoverPlacement.value = 'bottom'
+  }
+}
+
+function ensureVisible() {
+  if (!rootEl.value) return
+  rootEl.value.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
+
 watch(() => props.resetToken, () => {
-  open.value = false
+  close()
 })
 
 onMounted(() => {
-  document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('pointerdown', handleDocumentPointerDown, true)
+  window.addEventListener('resize', handleWindowChange)
+  window.addEventListener('scroll', handleWindowChange, true)
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('click', handleDocumentClick)
+  close()
+  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
+  window.removeEventListener('resize', handleWindowChange)
+  window.removeEventListener('scroll', handleWindowChange, true)
 })
 </script>
 
@@ -88,6 +146,14 @@ onBeforeUnmount(() => {
   padding: 8px 10px;
   white-space: nowrap;
 }
+.delete-popover.top {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.delete-popover.bottom {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
 
 .delete-popover-arrow {
   position: absolute;
@@ -98,6 +164,16 @@ onBeforeUnmount(() => {
   background: #fff;
   border-left: 1px solid #e5e7eb;
   border-top: 1px solid #e5e7eb;
+  transform: rotate(45deg);
+}
+.delete-popover-arrow.top {
+  top: auto;
+  bottom: -5px;
+  transform: rotate(225deg);
+}
+.delete-popover-arrow.bottom {
+  top: -5px;
+  bottom: auto;
   transform: rotate(45deg);
 }
 

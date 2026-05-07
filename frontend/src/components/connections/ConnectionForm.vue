@@ -13,12 +13,20 @@
         v-model="form.group"
         type="text"
         :placeholder="t('connManager.groupPlaceholder')"
-        list="group-datalist"
+        @focus="showGroupSuggestions = true"
+        @blur="hideGroupSuggestions"
       />
-      <datalist id="group-datalist">
-        <option value="" :label="t('connManager.groupPlaceholder')" />
-        <option v-for="g in existingGroups" :key="g" :value="g" />
-      </datalist>
+      <div v-if="showGroupSuggestions && filteredGroups.length" class="group-suggestions">
+        <button
+          v-for="g in filteredGroups"
+          :key="g"
+          type="button"
+          class="group-suggestion-item"
+          @mousedown.prevent="selectGroup(g)"
+        >
+          {{ g }}
+        </button>
+      </div>
     </div>
 
     <!-- 集群模式切换 -->
@@ -60,6 +68,26 @@
         <input v-model="form.password" type="password" :placeholder="t('connManager.passwordPlaceholder')" />
       </div>
     </template>
+
+    <div class="proxy-section">
+      <div class="form-group toggle-row">
+        <label>{{ t('connManager.proxyEnabled') }}</label>
+        <input type="checkbox" v-model="form.proxyEnabled" />
+      </div>
+
+      <template v-if="form.proxyEnabled">
+        <div class="proxy-panel">
+          <div class="form-group">
+            <label>{{ t('connManager.proxyUrl') }}</label>
+            <input
+              v-model="form.proxyUrl"
+              type="text"
+              :placeholder="t('connManager.proxyUrlPlaceholder')"
+            />
+          </div>
+        </div>
+      </template>
+    </div>
 
     <!-- SSH 配置 -->
     <div class="ssh-section">
@@ -106,18 +134,62 @@
       </template>
     </div>
 
+    <div class="icon-color-section">
+      <div class="form-group">
+        <label>Icon Color</label>
+        <div class="icon-color-card">
+          <div class="icon-color-preview">
+            <span class="icon-preview-badge" :style="{ background: previewIconColor }">
+              {{ previewInitial }}
+            </span>
+            <div class="icon-preview-text">
+              <div class="icon-preview-title">Connection Icon</div>
+              <div class="icon-preview-subtitle">
+                {{ normalizedIconColor ? normalizedIconColor.toUpperCase() : 'Default palette' }}
+              </div>
+            </div>
+          </div>
+          <div class="icon-color-row">
+            <input v-model="form.iconColor" class="icon-color-picker" type="color" />
+            <input
+              v-model="form.iconColor"
+              class="icon-color-text"
+              type="text"
+              placeholder="#5C7F9E"
+            />
+            <button type="button" class="btn-secondary btn-color-reset" @click="form.iconColor = ''">
+              Default
+            </button>
+          </div>
+          <div class="icon-color-swatches">
+            <button
+              v-for="color in ICON_COLOR_PRESETS"
+              :key="color"
+              type="button"
+              class="icon-swatch"
+              :class="{ active: normalizedIconColor === color }"
+              :style="{ background: color }"
+              @click="form.iconColor = color"
+            />
+          </div>
+        </div>
+        <div class="field-hint">Leave empty to use the default connection color.</div>
+      </div>
+    </div>
+
     <!-- 操作按钮 -->
     <div class="form-actions">
       <button class="btn-secondary" @click="$emit('cancel')">{{ t('connManager.cancel') }}</button>
       <button class="btn-secondary" :disabled="testing" @click="handleTest">
         {{ testing ? t('connManager.testing') : t('connManager.testConn') }}
       </button>
-      <button class="btn-primary" :disabled="saving" @click="handleSave">
+      <button class="btn-primary" :disabled="saving || !isDirty" :class="{ disabled: saving || !isDirty }" @click="handleSave">
         {{ saving ? t('connManager.saving') : t('connManager.save') }}
       </button>
     </div>
 
     <div v-if="testMsg" :class="['test-msg', testOk ? 'ok' : 'err']">{{ testMsg }}</div>
+    <div v-if="saveOkMsg" class="test-msg ok">{{ saveOkMsg }}</div>
     <div v-if="saveMsg" class="test-msg err">{{ saveMsg }}</div>
   </div>
 </template>
@@ -136,6 +208,15 @@ const { t } = useI18n()
 
 const isEdit = computed(() => !!props.connection?.id)
 const existingGroups = computed(() => Object.keys(connectionsStore.groupedConnections).filter(g => g))
+const filteredGroups = computed(() => {
+  const keyword = form.group.trim().toLowerCase()
+  if (!keyword) return existingGroups.value
+  return existingGroups.value.filter(g => g.toLowerCase().includes(keyword))
+})
+const ICON_COLOR_PRESETS = [
+  '#5c7f9e', '#6e8c6a', '#8a6a7a', '#7a6e8a',
+  '#8a7a5a', '#5a7a7a', '#d97706', '#2563eb',
+]
 
 const defaultForm = () => ({
   id: '',
@@ -147,12 +228,76 @@ const defaultForm = () => ({
   db: 0,
   isCluster: false,
   clusterAddrs: [],
+  proxyEnabled: false,
+  proxyUrl: '',
+  iconColor: '',
   sshEnabled: false,
   ssh: { host: '', port: 22, user: '', password: '', private_key_path: '', passphrase: '' },
 })
 
 const form = reactive(defaultForm())
 const clusterAddrsText = ref('')
+const initialSnapshot = ref('')
+const showGroupSuggestions = ref(false)
+let hideGroupTimer = null
+
+const normalizedIconColor = computed(() => normalizeIconColor(form.iconColor))
+const previewIconColor = computed(() => normalizedIconColor.value || '#5c7f9e')
+const previewInitial = computed(() => {
+  const value = (form.name || form.host || '?').trim()
+  return value ? value[0].toUpperCase() : '?'
+})
+
+function clearHideGroupTimer() {
+  if (hideGroupTimer) {
+    clearTimeout(hideGroupTimer)
+    hideGroupTimer = null
+  }
+}
+
+function hideGroupSuggestions() {
+  clearHideGroupTimer()
+  hideGroupTimer = setTimeout(() => {
+    showGroupSuggestions.value = false
+    hideGroupTimer = null
+  }, 120)
+}
+
+function selectGroup(group) {
+  clearHideGroupTimer()
+  form.group = group
+  showGroupSuggestions.value = false
+}
+
+function snapshotValue() {
+  return JSON.stringify({
+    id: form.id || '',
+    name: form.name || '',
+    group: form.group || '',
+    host: form.host || '',
+    port: form.port || 6379,
+    password: form.password || '',
+    db: form.db || 0,
+    isCluster: !!form.isCluster,
+    cluster_addrs: form.isCluster
+      ? clusterAddrsText.value.split('\n').map(s => s.trim()).filter(Boolean)
+      : [],
+    proxyEnabled: !!form.proxyEnabled,
+    proxyUrl: form.proxyUrl || '',
+    iconColor: form.iconColor || '',
+    sshEnabled: !!form.sshEnabled,
+    ssh: form.sshEnabled ? {
+      host: form.ssh.host || '',
+      port: form.ssh.port || 22,
+      user: form.ssh.user || '',
+      password: form.ssh.password || '',
+      private_key_path: form.ssh.private_key_path || '',
+      passphrase: form.ssh.passphrase || '',
+    } : null,
+  })
+}
+
+const isDirty = computed(() => snapshotValue() !== initialSnapshot.value)
 
 watch(() => props.connection, (conn) => {
   if (conn) {
@@ -160,19 +305,29 @@ watch(() => props.connection, (conn) => {
       ...defaultForm(),
       ...conn,
       group: conn.group || '',
+      isCluster: conn.isCluster ?? conn.is_cluster,
+      proxyEnabled: conn.proxyEnabled ?? conn.proxy_enabled,
+      proxyUrl: conn.proxyUrl ?? conn.proxy_url ?? '',
+      iconColor: conn.iconColor ?? conn.icon_color ?? '',
       ssh: conn.ssh ? { ...conn.ssh } : { host: '', port: 22, user: '', password: '', private_key_path: '', passphrase: '' },
     })
-    clusterAddrsText.value = (conn.clusterAddrs || []).join('\n')
+    clusterAddrsText.value = (conn.clusterAddrs || conn.cluster_addrs || []).join('\n')
   } else {
     Object.assign(form, defaultForm())
     clusterAddrsText.value = ''
   }
+  showGroupSuggestions.value = false
+  clearHideGroupTimer()
+  saveOkMsg.value = ''
+  saveMsg.value = ''
+  initialSnapshot.value = snapshotValue()
 }, { immediate: true })
 
 const testing = ref(false)
 const saving = ref(false)
 const testMsg = ref('')
 const testOk = ref(false)
+const saveOkMsg = ref('')
 const saveMsg = ref('')
 
 function buildCfg() {
@@ -188,6 +343,9 @@ function buildCfg() {
     cluster_addrs: form.isCluster
       ? clusterAddrsText.value.split('\n').map(s => s.trim()).filter(Boolean)
       : [],
+    proxy_enabled: form.proxyEnabled,
+    proxy_url: form.proxyEnabled ? form.proxyUrl.trim() : '',
+    icon_color: normalizeIconColor(form.iconColor),
     ssh_enabled: form.sshEnabled,
     ssh: form.sshEnabled ? {
       host: form.ssh.host,
@@ -199,6 +357,12 @@ function buildCfg() {
     } : null,
   }
   return cfg
+}
+
+function normalizeIconColor(value) {
+  const color = (value || '').trim()
+  if (!color) return ''
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : ''
 }
 
 async function handleTest() {
@@ -217,7 +381,9 @@ async function handleTest() {
 }
 
 async function handleSave() {
+  if (!isDirty.value) return
   saveMsg.value = ''
+  saveOkMsg.value = ''
   if (!form.name.trim()) { saveMsg.value = t('connManager.nameRequiredErr'); return }
   if (!form.isCluster && !form.host.trim()) { saveMsg.value = t('connManager.hostRequiredErr'); return }
 
@@ -225,6 +391,8 @@ async function handleSave() {
   try {
     const result = await connectionsStore.save(buildCfg())
     if (result.success) {
+      saveOkMsg.value = t('connManager.saveOk')
+      initialSnapshot.value = snapshotValue()
       emit('saved')
     } else {
       saveMsg.value = result.message || t('connManager.saveFailed')
@@ -243,7 +411,7 @@ async function handleSave() {
   max-width: 480px;
 }
 h3 { margin: 0 0 16px; font-size: 15px; color: #111827; font-weight: 600; }
-.form-group { margin-bottom: 12px; }
+.form-group { margin-bottom: 12px; position: relative; }
 .form-group label { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; font-weight: 500; }
 input[type=text], input[type=password], input[type=number], textarea {
   width: 100%; padding: 6px 9px; border: 1px solid #d1d5db; border-radius: 6px;
@@ -252,14 +420,107 @@ input[type=text], input[type=password], input[type=number], textarea {
 }
 input:focus, textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.12); }
 textarea { resize: vertical; font-family: monospace; }
+.group-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  max-height: 180px;
+  overflow-y: auto;
+}
+.group-suggestion-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+}
+.group-suggestion-item:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
 .toggle-row { display: flex; align-items: center; justify-content: space-between; }
 .toggle-row input[type=checkbox] { width: auto; }
 .form-row { display: flex; gap: 8px; }
 .flex1 { flex: 1; }
 .w100 { width: 100px; }
 .w80 { width: 80px; }
+.proxy-section { border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 4px; }
+.proxy-panel { background: #f9fafb; padding: 12px; border-radius: 6px; margin-top: 8px; border: 1px solid #e5e7eb; }
 .ssh-section { border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 4px; }
 .ssh-panel { background: #f9fafb; padding: 12px; border-radius: 6px; margin-top: 8px; border: 1px solid #e5e7eb; }
+.icon-color-section { border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 4px; }
+.icon-color-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f8fafc 100%);
+}
+.icon-color-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.icon-preview-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.icon-preview-text { min-width: 0; }
+.icon-preview-title { font-size: 13px; font-weight: 600; color: #1f2937; }
+.icon-preview-subtitle { font-size: 12px; color: #6b7280; }
+.icon-color-row { display: flex; gap: 8px; align-items: center; }
+.icon-color-picker {
+  width: 42px;
+  min-width: 42px;
+  height: 34px;
+  padding: 3px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.icon-color-text { flex: 1; min-width: 0; text-transform: uppercase; }
+.btn-color-reset { flex-shrink: 0; }
+.icon-color-swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.icon-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.28);
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+.icon-swatch:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.14);
+}
+.icon-swatch.active {
+  border-color: #1f2937;
+  box-shadow: 0 0 0 1px #1f2937;
+}
+.field-hint { margin-top: 4px; font-size: 12px; color: #9ca3af; }
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
@@ -275,6 +536,7 @@ textarea { resize: vertical; font-family: monospace; }
 }
 .btn-primary:hover { background: #2563eb; }
 .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+.btn-primary.disabled:hover { background: #93c5fd; }
 .btn-secondary {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 6px 14px;

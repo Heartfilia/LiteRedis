@@ -13,6 +13,7 @@ export const useSettingsStore = defineStore('settings', {
     zsetLoadCount: 20,
     streamLoadCount: 20,
     searchHistoryLimit: 10,
+    keyDisplayMode: 'tree',
     language: 'zh',
   }),
 
@@ -27,6 +28,7 @@ export const useSettingsStore = defineStore('settings', {
         this.zsetLoadCount = s.zset_load_count || 20
         this.streamLoadCount = s.stream_load_count || 20
         this.searchHistoryLimit = s.search_history_limit || 10
+        this.keyDisplayMode = s.key_display_mode || 'tree'
         this.language = s.language || 'zh'
         setLanguage(this.language)
         this.loaded = true
@@ -44,6 +46,7 @@ export const useSettingsStore = defineStore('settings', {
         zset_load_count: values.zsetLoadCount,
         stream_load_count: values.streamLoadCount,
         search_history_limit: values.searchHistoryLimit,
+        key_display_mode: values.keyDisplayMode,
         language: values.language,
       }
       const result = await saveSettings(payload)

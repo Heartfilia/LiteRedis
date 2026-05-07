@@ -13,6 +13,9 @@ type ConnectionConfig struct {
 	DB           int        `json:"db"`
 	IsCluster    bool       `json:"is_cluster"`
 	ClusterAddrs []string   `json:"cluster_addrs,omitempty"`
+	ProxyEnabled bool       `json:"proxy_enabled"`
+	ProxyURL     string     `json:"proxy_url,omitempty"`
+	IconColor    string     `json:"icon_color,omitempty"`
 	SSHEnabled   bool       `json:"ssh_enabled"`
 	SSH          *SSHConfig `json:"ssh,omitempty"`
 	CreatedAt    time.Time  `json:"created_at"`
@@ -38,6 +41,7 @@ type AppSettings struct {
 	ZSetLoadCount      int64  `json:"zset_load_count"`      // ZSet 每次加载条数，默认 20
 	StreamLoadCount    int64  `json:"stream_load_count"`    // Stream 每次加载条数，默认 20
 	SearchHistoryLimit int    `json:"search_history_limit"` // 保留最近查询历史条数，默认 10
+	KeyDisplayMode     string `json:"key_display_mode"`     // key 展示模式: tree | flat
 	Language           string `json:"language"`             // 界面语言，默认 zh
 }
 
@@ -51,6 +55,7 @@ func DefaultSettings() AppSettings {
 		ZSetLoadCount:      20,
 		StreamLoadCount:    20,
 		SearchHistoryLimit: 10,
+		KeyDisplayMode:     "tree",
 		Language:           "zh",
 	}
 }

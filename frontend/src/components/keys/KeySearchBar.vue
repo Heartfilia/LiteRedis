@@ -5,7 +5,7 @@
         <input
           v-model="pattern"
           type="text"
-          :placeholder="t('keyTree.searchPlaceholder')"
+          :placeholder="isCluster ? t('keyTree.clusterSearchPlaceholder') : t('keyTree.searchPlaceholder')"
           @keydown.enter="onEnter"
           @keydown.down.prevent="onArrowDown"
           @keydown.up.prevent="onArrowUp"
@@ -13,17 +13,26 @@
           @focus="onFocus"
           @blur="onBlur"
         />
-        <button class="btn-search" @click="doSearch" :disabled="loading">
-          {{ loading ? '...' : t('keyTree.searchBtn') }}
+        <button class="btn-search" @click="doSearch" :disabled="loading" :title="t('keyTree.searchBtn')">
+          <span v-if="loading" class="search-loading">...</span>
+          <svg v-else viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+            <path
+              d="M8.5 3a5.5 5.5 0 104.03 9.24l3.11 3.11a1 1 0 001.41-1.41l-3.1-3.11A5.5 5.5 0 008.5 3zm0 2a3.5 3.5 0 110 7 3.5 3.5 0 010-7z"
+              fill="currentColor"
+            />
+          </svg>
         </button>
       </div>
       <CreateKeyButton v-if="workspaceStore.activeConnID" />
     </div>
     <div class="search-options">
-      <label class="keep-label">
+      <label v-if="!isCluster" class="keep-label">
         <input type="checkbox" v-model="keep" />
         {{ t('keyTree.keepPrev') }}
       </label>
+      <div v-else class="cluster-hint">
+        {{ t('keyTree.clusterSearchHint') }}
+      </div>
     </div>
 
     <!-- 历史记录下拉（fixed 定位，避免被父容器 overflow:hidden 裁切） -->
@@ -49,14 +58,16 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
+import { useConnectionsStore } from '../../stores/connections.js'
 import { useI18n } from '../../i18n/index.js'
 import CreateKeyButton from './CreateKeyButton.vue'
 
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 const settingsStore = useSettingsStore()
+const connectionsStore = useConnectionsStore()
 
-const pattern = ref('*')
+const pattern = ref('')
 const keep = ref(workspaceStore.keepPrevSearch)
 const loading = ref(false)
 const showHistory = ref(false)
@@ -64,6 +75,8 @@ const activeIndex = ref(-1)
 const inputRowRef = ref(null)
 const shellRef = ref(null)
 const dropdownStyle = ref({})
+const activeConn = computed(() => connectionsStore.connections.find(c => c.id === workspaceStore.activeConnID))
+const isCluster = computed(() => !!activeConn.value?.is_cluster)
 
 const filteredHistory = computed(() => {
   const id = workspaceStore.activeConnID
@@ -86,12 +99,23 @@ function updateDropdownPosition() {
 }
 
 watch(keep, val => {
+  if (isCluster.value) {
+    workspaceStore.keepPrevSearch = true
+    return
+  }
   workspaceStore.keepPrevSearch = val
 })
 
+watch(isCluster, (val) => {
+  if (val) {
+    keep.value = true
+    workspaceStore.keepPrevSearch = true
+  }
+}, { immediate: true })
+
 watch(() => workspaceStore.activeConnID, () => {
-  pattern.value = '*'
-  keep.value = workspaceStore.keepPrevSearch
+  pattern.value = ''
+  keep.value = isCluster.value ? true : workspaceStore.keepPrevSearch
   loading.value = false
   showHistory.value = false
   activeIndex.value = -1
@@ -144,11 +168,17 @@ async function doSearch() {
   if (loading.value) return
   loading.value = true
   try {
-    const p = pattern.value.trim() || '*'
-    if (p !== '*' && !p.includes('*') && !p.includes('?') && !p.includes('[')) {
+    const p = pattern.value.trim()
+    if (isCluster.value) {
+      if (!p) return
       await workspaceStore.searchExact(p)
+      return
+    }
+    const normalized = p || '*'
+    if (normalized !== '*' && !normalized.includes('*') && !normalized.includes('?') && !normalized.includes('[')) {
+      await workspaceStore.searchExact(normalized)
     } else {
-      await workspaceStore.search(p)
+      await workspaceStore.search(normalized)
     }
   } finally {
     loading.value = false
@@ -170,31 +200,37 @@ async function doSearch() {
   min-width: 0;
 }
 .search-input-shell {
-  position: relative;
+  display: flex;
+  align-items: stretch;
   flex: 1;
   min-width: 0;
-}
-.search-input-shell input {
-  width: 100%;
-  padding: 5px 66px 5px 10px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.search-input-shell input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 10px;
+  border: none;
   font-size: 12px;
   outline: none;
   color: #1f2937;
-  transition: border-color 0.15s;
   box-sizing: border-box;
-}
-.search-input-shell input:focus { border-color: #3b82f6; }
-.btn-search {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: inline-flex; align-items: center; justify-content: center;
-  height: 24px;
-  padding: 0 10px;
   background: transparent;
+}
+.search-input-shell:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59,130,246,.12);
+}
+.btn-search {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+  background: #f8fafc;
   color: #3b82f6;
   border: none;
   border-left: 1px solid #e5e7eb;
@@ -202,10 +238,14 @@ async function doSearch() {
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  transition: color 0.15s;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
-.btn-search:hover:not(:disabled) { color: #2563eb; }
+.btn-search:hover:not(:disabled) { color: #2563eb; background: #eff6ff; border-color: #bfdbfe; }
 .btn-search:disabled { color: #93c5fd; cursor: not-allowed; }
+.search-loading {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
 .search-options { margin-top: 5px; }
 .keep-label {
   font-size: 12px;
@@ -214,6 +254,11 @@ async function doSearch() {
   align-items: center;
   gap: 4px;
   cursor: pointer;
+}
+.cluster-hint {
+  font-size: 12px;
+  color: #b45309;
+  line-height: 1.4;
 }
 
 .history-dropdown {

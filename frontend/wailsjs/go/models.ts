@@ -8,6 +8,7 @@ export namespace config {
 	    zset_load_count: number;
 	    stream_load_count: number;
 	    search_history_limit: number;
+	    key_display_mode: string;
 	    language: string;
 	
 	    static createFrom(source: any = {}) {
@@ -23,6 +24,7 @@ export namespace config {
 	        this.zset_load_count = source["zset_load_count"];
 	        this.stream_load_count = source["stream_load_count"];
 	        this.search_history_limit = source["search_history_limit"];
+	        this.key_display_mode = source["key_display_mode"];
 	        this.language = source["language"];
 	    }
 	}
@@ -58,6 +60,9 @@ export namespace config {
 	    db: number;
 	    is_cluster: boolean;
 	    cluster_addrs?: string[];
+	    proxy_enabled: boolean;
+	    proxy_url?: string;
+	    icon_color?: string;
 	    ssh_enabled: boolean;
 	    ssh?: SSHConfig;
 	    // Go type: time
@@ -80,6 +85,9 @@ export namespace config {
 	        this.db = source["db"];
 	        this.is_cluster = source["is_cluster"];
 	        this.cluster_addrs = source["cluster_addrs"];
+	        this.proxy_enabled = source["proxy_enabled"];
+	        this.proxy_url = source["proxy_url"];
+	        this.icon_color = source["icon_color"];
 	        this.ssh_enabled = source["ssh_enabled"];
 	        this.ssh = this.convertValues(source["ssh"], SSHConfig);
 	        this.created_at = this.convertValues(source["created_at"], null);

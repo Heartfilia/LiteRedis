@@ -6,11 +6,15 @@
     <template v-else>
       <KeySearchBar />
       <!-- SearchTabs 只在单session模式显示 -->
-      <SearchTabs v-if="!workspaceStore.keepPrevSearch" />
+      <SearchTabs v-if="!workspaceStore.keepPrevSearch && !showClusterEmptyHint" />
 
       <div class="tree-content">
+        <div v-if="showClusterEmptyHint" class="empty-state cluster-empty-state">
+          <div class="cluster-empty-title">{{ t('keyTree.clusterEmptyTitle') }}</div>
+          <div class="cluster-empty-text">{{ t('keyTree.clusterEmptyHint') }}</div>
+        </div>
         <!-- 合并模式：keepPrevSearch = true -->
-        <template v-if="workspaceStore.keepPrevSearch">
+        <template v-else-if="workspaceStore.keepPrevSearch">
           <div v-if="displaySessions.length === 0" class="empty-state">{{ t('keyTree.searchHint') }}</div>
           <div v-else class="merged-scroll">
             <div v-for="sess in displaySessions" :key="sess.id" class="search-section">
@@ -88,24 +92,54 @@
 import { computed } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
+import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import KeySearchBar from './KeySearchBar.vue'
 import SearchTabs from './SearchTabs.vue'
 import KeyTreeNode from './KeyTreeNode.vue'
+import { buildKeyTree } from '../../utils/keyTree.js'
 
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
 const connectionsStore = useConnectionsStore()
+const settingsStore = useSettingsStore()
 const activeConnID = computed(() => workspaceStore.activeConnID)
 const currentDB = computed(() => workspaceStore.currentDB)
 const totalKeys = computed(() => workspaceStore.totalKeys)
-const session = computed(() => workspaceStore.activeSession)
-const displaySessions = computed(() => workspaceStore.displaySessions)
+const keyDisplayMode = computed(() => settingsStore.keyDisplayMode || 'tree')
+const session = computed(() => mapSessionForDisplay(workspaceStore.activeSession))
+const displaySessions = computed(() => workspaceStore.displaySessions.map(mapSessionForDisplay))
 const activeConn = computed(() => connectionsStore.connections.find(c => c.id === activeConnID.value))
+const showClusterEmptyHint = computed(() =>
+  !!activeConn.value?.is_cluster &&
+  !session.value &&
+  displaySessions.value.length === 0
+)
 
 async function switchDB(db) {
   await workspaceStore.switchDB(parseInt(db))
   await workspaceStore.search('*')
+}
+
+function buildFlatTree(keys = []) {
+  return keys.map(key => ({
+    label: key.name,
+    fullPath: key.name,
+    isLeaf: true,
+    keyType: key.type,
+    ttl: key.ttl,
+    children: [],
+    count: 1,
+  }))
+}
+
+function mapSessionForDisplay(source) {
+  if (!source) return source
+  const keys = source.keys || []
+  return {
+    ...source,
+    treeData: keyDisplayMode.value === 'flat' ? buildFlatTree(keys) : buildKeyTree(keys),
+  }
 }
 </script>
 
@@ -122,12 +156,16 @@ async function switchDB(db) {
 .loading, .empty-state {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   color: #999;
   font-size: 13px;
   padding: 40px;
 }
+.cluster-empty-state { gap: 8px; text-align: center; }
+.cluster-empty-title { font-size: 14px; font-weight: 600; color: #1f2937; }
+.cluster-empty-text { font-size: 12px; color: #6b7280; max-width: 320px; line-height: 1.6; }
 
 /* 合并模式 */
 .merged-scroll { flex: 1; overflow-y: auto; }

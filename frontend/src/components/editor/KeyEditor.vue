@@ -48,19 +48,12 @@
         <div class="key-actions">
           <button class="btn-sm" @click="startRename">{{ t('keyEditor.rename') }}</button>
           <button class="btn-sm" @click="refreshKey">{{ t('keyEditor.refresh') }}</button>
-          <div class="delete-wrap">
-            <button class="btn-sm danger" @click="confirmingDelete = true">{{ t('keyEditor.delete') }}</button>
-            <div v-if="confirmingDelete" class="delete-popover">
-              <div class="delete-popover-arrow"></div>
-              <div class="delete-popover-content">
-                <span class="delete-popover-text">{{ t('keyEditor.confirmDelete') }}</span>
-                <div class="delete-popover-btns">
-                  <button class="btn-xs btn-confirm-yes" @click="doDelete">✓</button>
-                  <button class="btn-xs btn-confirm-no" @click="confirmingDelete = false">✕</button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <InlineDeleteConfirm
+            :label="t('keyEditor.delete')"
+            :confirm-text="t('keyEditor.confirmDelete')"
+            :reset-token="selectedKey || ''"
+            @confirm="doDelete"
+          />
         </div>
       </div>
 
@@ -103,6 +96,7 @@ import ListEditor from './ListEditor.vue'
 import SetEditor from './SetEditor.vue'
 import ZSetEditor from './ZSetEditor.vue'
 import StreamEditor from './StreamEditor.vue'
+import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 
 const { t } = useI18n()
 
@@ -113,9 +107,6 @@ const keyValue = computed(() => workspaceStore.keyValue)
 const keyValueLoading = computed(() => workspaceStore.keyValueLoading)
 const keyValueError = computed(() => workspaceStore.keyValueError)
 const typeColor = computed(() => getTypeColor(keyValue.value?.type))
-
-// 切换 key 时重置删除确认状态
-watch(selectedKey, () => { confirmingDelete.value = false })
 
 // 复制 key 名（点击 key-name 触发）
 const keyCopied = ref(false)
@@ -175,7 +166,6 @@ function isConnectionError(err) {
 
 // 刷新
 async function refreshKey() {
-  confirmingDelete.value = false
   if (!selectedKey.value) return
   await workspaceStore.selectKey(selectedKey.value)
   // 若因网络断开导致失败，自动重连后再试一次
@@ -190,10 +180,7 @@ async function refreshKey() {
   }
 }
 
-// 删除（二次确认）
-const confirmingDelete = ref(false)
 async function doDelete() {
-  confirmingDelete.value = false
   await workspaceStore.deleteCurrentKey()
 }
 
@@ -296,10 +283,11 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 600;
   color: #1d4ed8;
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: min(100%, 720px);
+  white-space: normal;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
   cursor: pointer;
   border-radius: 4px;
   padding: 2px 6px;
@@ -333,49 +321,6 @@ onBeforeUnmount(() => {
 .btn-sm:hover { background: #f3f4f6; border-color: #9ca3af; }
 .btn-sm.danger { color: #dc2626; border-color: #fca5a5; }
 .btn-sm.danger:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
-.btn-sm.danger-confirm { background: #dc2626; color: white; border-color: #dc2626; }
-.btn-sm.danger-confirm:hover { background: #b91c1c; border-color: #b91c1c; }
-.delete-wrap { position: relative; display: inline-flex; }
-.delete-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 100;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  padding: 8px 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-}
-.delete-popover-arrow {
-  position: absolute;
-  top: -5px;
-  right: 10px;
-  width: 10px;
-  height: 10px;
-  background: white;
-  border-left: 1px solid #e5e7eb;
-  border-top: 1px solid #e5e7eb;
-  transform: rotate(45deg);
-}
-.delete-popover-content {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.delete-popover-text {
-  font-size: 12px;
-  color: #dc2626;
-  font-weight: 500;
-}
-.delete-popover-btns {
-  display: flex;
-  gap: 4px;
-}
 .btn-confirm-yes {
   color: #16a34a;
   border-color: #16a34a;

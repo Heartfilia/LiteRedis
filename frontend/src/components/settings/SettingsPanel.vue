@@ -91,6 +91,19 @@
 
       <div class="setting-item">
         <label>
+          <span class="label-text">{{ t('settings.keyDisplayMode') }}</span>
+          <span class="label-hint">{{ t('settings.keyDisplayModeHint') }}</span>
+        </label>
+        <div class="input-unit">
+          <select v-model="form.keyDisplayMode" class="lang-select">
+            <option value="tree">{{ t('settings.keyDisplayTree') }}</option>
+            <option value="flat">{{ t('settings.keyDisplayFlat') }}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <label>
           <span class="label-text">{{ t('settings.language') }}</span>
           <span class="label-hint">{{ t('settings.languageHint') }}</span>
         </label>
@@ -136,6 +149,7 @@ const form = reactive({
   zsetLoadCount: 20,
   streamLoadCount: 20,
   searchHistoryLimit: 10,
+  keyDisplayMode: 'tree',
   language: 'zh',
 })
 
@@ -156,6 +170,7 @@ function syncFromStore() {
   form.zsetLoadCount = settingsStore.zsetLoadCount
   form.streamLoadCount = settingsStore.streamLoadCount
   form.searchHistoryLimit = settingsStore.searchHistoryLimit
+  form.keyDisplayMode = settingsStore.keyDisplayMode
   form.language = settingsStore.language
 }
 
@@ -167,6 +182,7 @@ function reset() {
   form.zsetLoadCount = 20
   form.streamLoadCount = 20
   form.searchHistoryLimit = 10
+  form.keyDisplayMode = 'tree'
   form.language = 'zh'
 }
 

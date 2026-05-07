@@ -149,6 +149,10 @@ function selectConn(conn) {
   selectedConn.value = {
     ...conn,
     isCluster: conn.is_cluster,
+    clusterAddrs: conn.clusterAddrs || conn.cluster_addrs || [],
+    proxyEnabled: conn.proxyEnabled ?? conn.proxy_enabled,
+    proxyUrl: conn.proxyUrl ?? conn.proxy_url ?? '',
+    iconColor: conn.iconColor ?? conn.icon_color ?? '',
     sshEnabled: conn.ssh_enabled,
   }
 }
@@ -182,6 +186,9 @@ function buildCfg(conn, group) {
     db: conn.db,
     is_cluster: conn.is_cluster,
     cluster_addrs: conn.cluster_addrs || [],
+    proxy_enabled: conn.proxy_enabled,
+    proxy_url: conn.proxy_url || '',
+    icon_color: conn.icon_color || '',
     ssh_enabled: conn.ssh_enabled,
     ssh: conn.ssh || null,
   }

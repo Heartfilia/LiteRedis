@@ -3,7 +3,10 @@ package redis
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"LiteRedis/backend/config"
@@ -19,6 +22,9 @@ func ScanKeys(ctx context.Context, client redis.UniversalClient, pattern string,
 	}
 	if count <= 0 {
 		count = 100
+	}
+	if clusterClient, ok := client.(*redis.ClusterClient); ok {
+		return scanClusterKeys(ctx, clusterClient, pattern, count, cursor)
 	}
 
 	var keyNames []string
@@ -79,6 +85,95 @@ func ScanKeys(ctx context.Context, client redis.UniversalClient, pattern string,
 	result.Keys = keys
 	result.NextCursor = nextCursor
 	result.HasMore = nextCursor != 0
+	return result, nil
+}
+
+func scanClusterKeys(ctx context.Context, client *redis.ClusterClient, pattern string, count int64, cursor uint64) (config.ScanResult, error) {
+	result := config.ScanResult{Keys: []config.RedisKey{}}
+	keyMap := make(map[string]struct{})
+	var mu sync.Mutex
+
+	err := client.ForEachMaster(ctx, func(ctx context.Context, master *redis.Client) error {
+		var cursor uint64
+		for {
+			keys, nextCursor, err := master.Scan(ctx, cursor, pattern, count).Result()
+			if err != nil {
+				return err
+			}
+			shouldStop := false
+			mu.Lock()
+			for _, key := range keys {
+				keyMap[key] = struct{}{}
+				if int64(len(keyMap)) >= count {
+					shouldStop = true
+					break
+				}
+			}
+			reachedCount := int64(len(keyMap)) >= count
+			mu.Unlock()
+
+			if shouldStop || nextCursor == 0 || reachedCount {
+				return nil
+			}
+			cursor = nextCursor
+		}
+	})
+	if err != nil {
+		return result, err
+	}
+
+	if len(keyMap) == 0 {
+		return result, nil
+	}
+
+	keyNames := make([]string, 0, len(keyMap))
+	for key := range keyMap {
+		keyNames = append(keyNames, key)
+	}
+	sort.Strings(keyNames)
+
+	start := int(cursor)
+	if start >= len(keyNames) {
+		return result, nil
+	}
+
+	end := start + int(count)
+	if end > len(keyNames) {
+		end = len(keyNames)
+	}
+	pageKeys := keyNames[start:end]
+
+	pipe := client.Pipeline()
+	typeCmds := make([]*redis.StatusCmd, len(pageKeys))
+	ttlCmds := make([]*redis.DurationCmd, len(pageKeys))
+	for i, key := range pageKeys {
+		typeCmds[i] = pipe.Type(ctx, key)
+		ttlCmds[i] = pipe.TTL(ctx, key)
+	}
+	_, err = pipe.Exec(ctx)
+	if err != nil && err != redis.Nil {
+		return result, err
+	}
+
+	keys := make([]config.RedisKey, len(pageKeys))
+	for i, name := range pageKeys {
+		ttlDur := ttlCmds[i].Val()
+		var ttlSec int64
+		if ttlDur < 0 {
+			ttlSec = int64(ttlDur)
+		} else {
+			ttlSec = int64(ttlDur / time.Second)
+		}
+		keys[i] = config.RedisKey{
+			Name: name,
+			Type: typeCmds[i].Val(),
+			TTL:  ttlSec,
+		}
+	}
+
+	result.Keys = keys
+	result.NextCursor = uint64(end)
+	result.HasMore = end < len(keyNames)
 	return result, nil
 }
 
@@ -197,5 +292,20 @@ func CreateKey(ctx context.Context, client redis.UniversalClient, req config.Cre
 
 // DBSize 获取当前 DB key 总数
 func DBSize(ctx context.Context, client redis.UniversalClient) (int64, error) {
+	if clusterClient, ok := client.(*redis.ClusterClient); ok {
+		var total atomic.Int64
+		err := clusterClient.ForEachMaster(ctx, func(ctx context.Context, master *redis.Client) error {
+			size, err := master.DBSize(ctx).Result()
+			if err != nil {
+				return err
+			}
+			total.Add(size)
+			return nil
+		})
+		if err != nil {
+			return 0, err
+		}
+		return total.Load(), nil
+	}
 	return client.DBSize(ctx).Result()
 }

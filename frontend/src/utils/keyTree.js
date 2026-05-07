@@ -3,12 +3,30 @@
  */
 export function buildKeyTree(keys, sep = ':') {
   const root = {}
+  const LEAF_MARK = '__leaf__'
 
   for (const key of keys) {
     const parts = key.name.split(sep)
     let cur = root
     for (let i = 0; i < parts.length; i++) {
-      const part = parts[i]
+      const rawPart = parts[i]
+      const part = rawPart === '' ? '[empty]' : rawPart
+      const isLast = i === parts.length - 1
+
+      if (isLast) {
+        const leafKey = rawPart === '' ? `${LEAF_MARK}:${i}` : `${LEAF_MARK}:${rawPart}`
+        cur[leafKey] = {
+          label: part,
+          fullPath: key.name,
+          isLeaf: true,
+          keyType: key.type,
+          ttl: key.ttl,
+          children: {},
+          count: 1,
+        }
+        continue
+      }
+
       if (!cur[part]) {
         cur[part] = {
           label: part,
@@ -21,11 +39,6 @@ export function buildKeyTree(keys, sep = ':') {
         }
       }
       cur[part].count++
-      if (i === parts.length - 1) {
-        cur[part].isLeaf = true
-        cur[part].keyType = key.type
-        cur[part].ttl = key.ttl
-      }
       cur = cur[part].children
     }
   }
