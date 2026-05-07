@@ -16,6 +16,7 @@ import (
 
 const defaultSSHTimeout = 10 * time.Second
 const defaultSSHDialTimeout = 10 * time.Second
+const minSupportedDeadline = 100 * time.Millisecond
 
 // NewSSHTunnel 创建 SSH 客户端，返回可用于 Dial 的客户端
 func NewSSHTunnel(host string, port int, user string, password string) (*gossh.Client, error) {
@@ -199,6 +200,10 @@ func (c *deadlineConn) resetTimer(timer **time.Timer, deadline time.Time, label 
 		config.AppendDebugLog("[ssh] %s deadline reached immediately, closing conn", label)
 		_ = c.Conn.Close()
 		return
+	}
+	if d < minSupportedDeadline {
+		config.AppendDebugLog("[ssh] %s deadline too small (%s), clamp to %s", label, d, minSupportedDeadline)
+		d = minSupportedDeadline
 	}
 	*timer = time.AfterFunc(d, func() {
 		config.AppendDebugLog("[ssh] %s deadline reached after %s, closing conn", label, d)
