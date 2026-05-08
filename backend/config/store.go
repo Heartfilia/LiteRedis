@@ -195,6 +195,36 @@ func SaveSettings(s AppSettings) error {
 	if s.SearchHistoryLimit > 100 {
 		s.SearchHistoryLimit = 100
 	}
+	if s.KeyDisplayMode == "" {
+		s.KeyDisplayMode = "tree"
+	}
+	if s.FontSizeLevel != "small" && s.FontSizeLevel != "medium" && s.FontSizeLevel != "large" {
+		s.FontSizeLevel = "small"
+	}
+	if s.WatermarkSize < 10 {
+		s.WatermarkSize = 10
+	}
+	if s.WatermarkSize > 48 {
+		s.WatermarkSize = 48
+	}
+	if s.WatermarkAngle < -90 {
+		s.WatermarkAngle = -90
+	}
+	if s.WatermarkAngle > 90 {
+		s.WatermarkAngle = 90
+	}
+	if s.WatermarkOpacity < 1 {
+		s.WatermarkOpacity = 1
+	}
+	if s.WatermarkOpacity > 100 {
+		s.WatermarkOpacity = 100
+	}
+	if s.WatermarkDensity < 1 {
+		s.WatermarkDensity = 1
+	}
+	if s.WatermarkDensity > 5 {
+		s.WatermarkDensity = 5
+	}
 	if s.Language == "" {
 		s.Language = "zh"
 	}

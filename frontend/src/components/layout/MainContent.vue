@@ -5,15 +5,26 @@
     </div>
     <div class="resizer" @mousedown="startResize" />
     <div class="key-editor-panel">
+      <div v-if="watermarkEnabled && watermarkText" class="editor-watermark-layer" :style="watermarkLayerStyle">
+        <div
+          v-for="n in watermarkItems"
+          :key="n"
+          class="editor-watermark-item"
+          :style="watermarkItemStyle"
+        >
+          {{ watermarkText }}
+        </div>
+      </div>
       <KeyEditor />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import KeyTree from '../keys/KeyTree.vue'
 import KeyEditor from '../editor/KeyEditor.vue'
+import { useSettingsStore } from '../../stores/settings.js'
 
 const MIN_WIDTH = 250
 const MAX_WIDTH = 600
@@ -23,6 +34,28 @@ const MIN_EDITOR_WIDTH = 760
 
 const panelWidth = ref(DEFAULT_WIDTH)
 const mainContentRef = ref(null)
+const settingsStore = useSettingsStore()
+const watermarkItems = computed(() => {
+  const density = Math.min(5, Math.max(1, Number(settingsStore.watermarkDensity) || 3))
+  return Array.from({ length: density * density * 2 }, (_, index) => index + 1)
+})
+
+const watermarkEnabled = computed(() => !!settingsStore.watermarkEnabled)
+const watermarkText = computed(() => settingsStore.watermarkText || '')
+const watermarkLayerStyle = computed(() => {
+  const density = Math.min(5, Math.max(1, Number(settingsStore.watermarkDensity) || 3))
+  const columns = density + 1
+  const gap = 220 - (density - 1) * 38
+  return {
+    '--wm-columns': `${columns}`,
+    '--wm-gap': `${Math.max(90, gap)}px`,
+  }
+})
+const watermarkItemStyle = computed(() => ({
+  '--wm-size': `${Math.min(48, Math.max(10, Number(settingsStore.watermarkSize) || 16))}px`,
+  '--wm-angle': `${Math.min(90, Math.max(-90, Number(settingsStore.watermarkAngle) || -22))}deg`,
+  '--wm-opacity': `${Math.min(100, Math.max(1, Number(settingsStore.watermarkOpacity) || 12)) / 100}`,
+}))
 
 function getPanelBounds() {
   const containerWidth = mainContentRef.value?.clientWidth || 0
@@ -98,5 +131,33 @@ function startResize(e) {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+.editor-watermark-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  pointer-events: none;
+  display: grid;
+  grid-template-columns: repeat(var(--wm-columns), minmax(0, 1fr));
+  grid-auto-rows: minmax(96px, 1fr);
+  gap: var(--wm-gap);
+  padding: 18px;
+  overflow: hidden;
+}
+.editor-watermark-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: var(--wm-size);
+  color: rgba(71, 85, 105, var(--wm-opacity));
+  transform: rotate(var(--wm-angle));
+  user-select: none;
+  white-space: nowrap;
+}
+.key-editor-panel > :not(.editor-watermark-layer) {
+  position: relative;
+  z-index: 1;
 }
 </style>

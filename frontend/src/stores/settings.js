@@ -14,6 +14,13 @@ export const useSettingsStore = defineStore('settings', {
     streamLoadCount: 20,
     searchHistoryLimit: 10,
     keyDisplayMode: 'tree',
+    fontSizeLevel: 'small',
+    watermarkEnabled: false,
+    watermarkText: '',
+    watermarkSize: 16,
+    watermarkAngle: -22,
+    watermarkOpacity: 12,
+    watermarkDensity: 3,
     language: 'zh',
   }),
 
@@ -29,6 +36,13 @@ export const useSettingsStore = defineStore('settings', {
         this.streamLoadCount = s.stream_load_count || 20
         this.searchHistoryLimit = s.search_history_limit || 10
         this.keyDisplayMode = s.key_display_mode || 'tree'
+        this.fontSizeLevel = s.font_size_level || 'small'
+        this.watermarkEnabled = !!s.watermark_enabled
+        this.watermarkText = s.watermark_text || ''
+        this.watermarkSize = s.watermark_size || 16
+        this.watermarkAngle = Number.isFinite(s.watermark_angle) ? s.watermark_angle : -22
+        this.watermarkOpacity = s.watermark_opacity || 12
+        this.watermarkDensity = s.watermark_density || 3
         this.language = s.language || 'zh'
         setLanguage(this.language)
         this.loaded = true
@@ -47,6 +61,13 @@ export const useSettingsStore = defineStore('settings', {
         stream_load_count: values.streamLoadCount,
         search_history_limit: values.searchHistoryLimit,
         key_display_mode: values.keyDisplayMode,
+        font_size_level: values.fontSizeLevel,
+        watermark_enabled: values.watermarkEnabled,
+        watermark_text: values.watermarkText,
+        watermark_size: values.watermarkSize,
+        watermark_angle: values.watermarkAngle,
+        watermark_opacity: values.watermarkOpacity,
+        watermark_density: values.watermarkDensity,
         language: values.language,
       }
       const result = await saveSettings(payload)

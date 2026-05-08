@@ -27,7 +27,9 @@ defineEmits(['close'])
   width: 520px;
   max-width: 95vw;
   max-height: 86vh;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border-radius: 12px;
   background: white;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);

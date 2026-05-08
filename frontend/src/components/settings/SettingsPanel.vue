@@ -104,6 +104,88 @@
 
       <div class="setting-item">
         <label>
+          <span class="label-text">{{ t('settings.fontSizeLevel') }}</span>
+          <span class="label-hint">{{ t('settings.fontSizeLevelHint') }}</span>
+        </label>
+        <div class="input-unit">
+          <select v-model="form.fontSizeLevel" class="lang-select">
+            <option value="small">{{ t('settings.fontSizeSmall') }}</option>
+            <option value="medium">{{ t('settings.fontSizeMedium') }}</option>
+            <option value="large">{{ t('settings.fontSizeLarge') }}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-title mt">{{ t('settings.watermark') }}</div>
+
+      <div class="setting-item">
+        <label>
+          <span class="label-text">{{ t('settings.watermarkEnabled') }}</span>
+          <span class="label-hint">{{ t('settings.watermarkEnabledHint') }}</span>
+        </label>
+        <div class="input-unit">
+          <input v-model="form.watermarkEnabled" type="checkbox" class="check-input" />
+        </div>
+      </div>
+
+      <template v-if="form.watermarkEnabled">
+        <div class="setting-item">
+          <label>
+            <span class="label-text">{{ t('settings.watermarkText') }}</span>
+            <span class="label-hint">{{ t('settings.watermarkTextHint') }}</span>
+          </label>
+          <div class="input-unit input-unit-wide">
+            <input v-model="form.watermarkText" type="text" class="text-input" />
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <label>
+            <span class="label-text">{{ t('settings.watermarkSize') }}</span>
+            <span class="label-hint">{{ t('settings.watermarkSizeHint') }}</span>
+          </label>
+          <div class="input-unit">
+            <input v-model.number="form.watermarkSize" type="number" min="10" max="48" step="1" />
+            <span class="unit">px</span>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <label>
+            <span class="label-text">{{ t('settings.watermarkAngle') }}</span>
+            <span class="label-hint">{{ t('settings.watermarkAngleHint') }}</span>
+          </label>
+          <div class="input-unit">
+            <input v-model.number="form.watermarkAngle" type="number" min="-90" max="90" step="1" />
+            <span class="unit">deg</span>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <label>
+            <span class="label-text">{{ t('settings.watermarkOpacity') }}</span>
+            <span class="label-hint">{{ t('settings.watermarkOpacityHint') }}</span>
+          </label>
+          <div class="input-unit">
+            <input v-model.number="form.watermarkOpacity" type="number" min="1" max="100" step="1" />
+            <span class="unit">%</span>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <label>
+            <span class="label-text">{{ t('settings.watermarkDensity') }}</span>
+            <span class="label-hint">{{ t('settings.watermarkDensityHint') }}</span>
+          </label>
+          <div class="input-unit">
+            <input v-model.number="form.watermarkDensity" type="number" min="1" max="5" step="1" />
+            <span class="unit">{{ t('settings.unitLevel') }}</span>
+          </div>
+        </div>
+      </template>
+
+      <div class="setting-item">
+        <label>
           <span class="label-text">{{ t('settings.language') }}</span>
           <span class="label-hint">{{ t('settings.languageHint') }}</span>
         </label>
@@ -126,7 +208,7 @@
     <div class="settings-footer">
       <button class="btn-cancel" @click="reset">{{ t('settings.reset') }}</button>
       <button class="btn-close-modal" @click="$emit('close')">{{ t('settings.close') }}</button>
-      <button class="btn-save" :disabled="saving" @click="doSave">{{ saving ? t('settings.saving') : t('settings.save') }}</button>
+      <button class="btn-save" :disabled="saving" @click="doSave">{{ saving ? t('settings.applying') : t('settings.apply') }}</button>
     </div>
   </div>
 </template>
@@ -150,6 +232,13 @@ const form = reactive({
   streamLoadCount: 20,
   searchHistoryLimit: 10,
   keyDisplayMode: 'tree',
+  fontSizeLevel: 'small',
+  watermarkEnabled: false,
+  watermarkText: '',
+  watermarkSize: 16,
+  watermarkAngle: -22,
+  watermarkOpacity: 12,
+  watermarkDensity: 3,
   language: 'zh',
 })
 
@@ -171,6 +260,13 @@ function syncFromStore() {
   form.streamLoadCount = settingsStore.streamLoadCount
   form.searchHistoryLimit = settingsStore.searchHistoryLimit
   form.keyDisplayMode = settingsStore.keyDisplayMode
+  form.fontSizeLevel = settingsStore.fontSizeLevel
+  form.watermarkEnabled = settingsStore.watermarkEnabled
+  form.watermarkText = settingsStore.watermarkText
+  form.watermarkSize = settingsStore.watermarkSize
+  form.watermarkAngle = settingsStore.watermarkAngle
+  form.watermarkOpacity = settingsStore.watermarkOpacity
+  form.watermarkDensity = settingsStore.watermarkDensity
   form.language = settingsStore.language
 }
 
@@ -183,6 +279,13 @@ function reset() {
   form.streamLoadCount = 20
   form.searchHistoryLimit = 10
   form.keyDisplayMode = 'tree'
+  form.fontSizeLevel = 'small'
+  form.watermarkEnabled = false
+  form.watermarkText = ''
+  form.watermarkSize = 16
+  form.watermarkAngle = -22
+  form.watermarkOpacity = 12
+  form.watermarkDensity = 3
   form.language = 'zh'
 }
 
@@ -295,6 +398,19 @@ async function doSave() {
   text-align: right;
   outline: none;
   transition: border-color 0.15s;
+}
+.text-input {
+  width: 220px !important;
+  text-align: left !important;
+}
+.input-unit-wide {
+  width: 220px;
+  justify-content: flex-end;
+}
+.check-input {
+  width: 16px !important;
+  height: 16px;
+  accent-color: #3b82f6;
 }
 .input-unit input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
 .unit {

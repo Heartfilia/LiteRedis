@@ -9,6 +9,13 @@ export namespace config {
 	    stream_load_count: number;
 	    search_history_limit: number;
 	    key_display_mode: string;
+	    font_size_level: string;
+	    watermark_enabled: boolean;
+	    watermark_text: string;
+	    watermark_size: number;
+	    watermark_angle: number;
+	    watermark_opacity: number;
+	    watermark_density: number;
 	    language: string;
 	
 	    static createFrom(source: any = {}) {
@@ -25,6 +32,13 @@ export namespace config {
 	        this.stream_load_count = source["stream_load_count"];
 	        this.search_history_limit = source["search_history_limit"];
 	        this.key_display_mode = source["key_display_mode"];
+	        this.font_size_level = source["font_size_level"];
+	        this.watermark_enabled = source["watermark_enabled"];
+	        this.watermark_text = source["watermark_text"];
+	        this.watermark_size = source["watermark_size"];
+	        this.watermark_angle = source["watermark_angle"];
+	        this.watermark_opacity = source["watermark_opacity"];
+	        this.watermark_density = source["watermark_density"];
 	        this.language = source["language"];
 	    }
 	}
