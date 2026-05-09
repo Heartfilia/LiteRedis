@@ -20,10 +20,12 @@ import (
 
 // activeConn 活跃连接
 type activeConn struct {
-	client    redis.UniversalClient
-	sshClient *gossh.Client
-	cfg       config.ConnectionConfig
-	currentDB int
+	client        redis.UniversalClient
+	sshClient     *gossh.Client
+	sshForward    *ssh.LocalForward
+	forwardedAddr string
+	cfg           config.ConnectionConfig
+	currentDB     int
 }
 
 // ClientManager 连接池管理器
@@ -51,6 +53,9 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	// 已存在则先关闭
 	if old, ok := m.clients[cfg.ID]; ok {
 		old.client.Close()
+		if old.sshForward != nil {
+			old.sshForward.Close()
+		}
 		if old.sshClient != nil {
 			old.sshClient.Close()
 		}
@@ -58,7 +63,9 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	}
 
 	var sshClient *gossh.Client
+	var sshForward *ssh.LocalForward
 	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
+	redisAddr := joinHostPort(cfg.Host, cfg.Port)
 
 	if cfg.SSHEnabled && cfg.SSH != nil {
 		config.AppendDebugLog("[connect] ssh enabled host=%s port=%d user=%s keyPath=%q", cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.PrivateKeyPath)
@@ -76,7 +83,19 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 			return normalizeConnectError(fmt.Errorf("SSH tunnel error: %w", err))
 		}
 		sshClient = sc
-		dialer = ssh.MakeContextDialer(sc, redisConnectTimeout)
+		if cfg.IsCluster {
+			dialer = ssh.MakeContextDialer(sc, redisConnectTimeout)
+		} else {
+			forward, err := ssh.StartLocalForward(sc, redisAddr)
+			if err != nil {
+				sc.Close()
+				config.AppendDebugLog("[connect] ssh local forward failed: %v", err)
+				return normalizeConnectError(fmt.Errorf("SSH local forward error: %w", err))
+			}
+			sshForward = forward
+			redisAddr = forward.Addr()
+			config.AppendDebugLog("[connect] ssh local forward ready addr=%s", redisAddr)
+		}
 		config.AppendDebugLog("[connect] ssh ready")
 	}
 	if dialer == nil && cfg.ProxyEnabled && strings.TrimSpace(cfg.ProxyURL) != "" {
@@ -94,12 +113,12 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	if cfg.IsCluster {
 		addrs := normalizeAddrs(cfg.ClusterAddrs)
 		if len(addrs) == 0 {
-			addrs = []string{joinHostPort(cfg.Host, cfg.Port)}
+			addrs = []string{redisAddr}
 		}
 		opts := buildClusterOptions(addrs, cfg.Password, dialer)
 		client = redis.NewClusterClient(opts)
 	} else {
-		opts := buildRedisOptions(joinHostPort(cfg.Host, cfg.Port), cfg.Password, cfg.DB, dialer)
+		opts := buildRedisOptions(redisAddr, cfg.Password, cfg.DB, dialer)
 		client = redis.NewClient(opts)
 	}
 
@@ -109,6 +128,9 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	config.AppendDebugLog("[connect] redis ping begin")
 	if err := client.Ping(ctx).Err(); err != nil {
 		client.Close()
+		if sshForward != nil {
+			sshForward.Close()
+		}
 		if sshClient != nil {
 			sshClient.Close()
 		}
@@ -118,10 +140,12 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	config.AppendDebugLog("[connect] success elapsed=%s", time.Since(start))
 
 	m.clients[cfg.ID] = &activeConn{
-		client:    client,
-		sshClient: sshClient,
-		cfg:       cfg,
-		currentDB: cfg.DB,
+		client:        client,
+		sshClient:     sshClient,
+		sshForward:    sshForward,
+		forwardedAddr: redisAddr,
+		cfg:           cfg,
+		currentDB:     cfg.DB,
 	}
 	return nil
 }
@@ -133,6 +157,9 @@ func (m *ClientManager) Disconnect(id string) {
 
 	if conn, ok := m.clients[id]; ok {
 		conn.client.Close()
+		if conn.sshForward != nil {
+			conn.sshForward.Close()
+		}
 		if conn.sshClient != nil {
 			conn.sshClient.Close()
 		}
@@ -175,11 +202,14 @@ func (m *ClientManager) SelectDB(id string, db int) error {
 
 	// 从原始配置重建，只改 DB，避免旧连接池污染
 	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
-	if conn.sshClient != nil {
+	redisAddr := joinHostPort(conn.cfg.Host, conn.cfg.Port)
+	if conn.sshForward != nil {
+		redisAddr = conn.forwardedAddr
+	} else if conn.sshClient != nil {
 		dialer = ssh.MakeContextDialer(conn.sshClient, redisConnectTimeout)
 	}
 
-	opts := buildRedisOptions(joinHostPort(conn.cfg.Host, conn.cfg.Port), conn.cfg.Password, db, dialer)
+	opts := buildRedisOptions(redisAddr, conn.cfg.Password, db, dialer)
 
 	newClient := redis.NewClient(opts)
 	ctx, cancel := context.WithTimeout(context.Background(), redisConnectTimeout)
@@ -200,7 +230,9 @@ func TestConnection(cfg config.ConnectionConfig) error {
 	start := time.Now()
 	config.AppendDebugLog("[test] begin name=%s redis=%s:%d cluster=%v ssh=%v", cfg.Name, cfg.Host, cfg.Port, cfg.IsCluster, cfg.SSHEnabled)
 	var sshClient *gossh.Client
+	var sshForward *ssh.LocalForward
 	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
+	redisAddr := joinHostPort(cfg.Host, cfg.Port)
 
 	if cfg.SSHEnabled && cfg.SSH != nil {
 		config.AppendDebugLog("[test] ssh enabled host=%s port=%d user=%s keyPath=%q", cfg.SSH.Host, cfg.SSH.Port, cfg.SSH.User, cfg.SSH.PrivateKeyPath)
@@ -218,8 +250,23 @@ func TestConnection(cfg config.ConnectionConfig) error {
 			return normalizeConnectError(fmt.Errorf("SSH tunnel error: %w", err))
 		}
 		sshClient = sc
-		dialer = ssh.MakeContextDialer(sc, redisConnectTimeout)
+		if cfg.IsCluster {
+			dialer = ssh.MakeContextDialer(sc, redisConnectTimeout)
+		} else {
+			forward, err := ssh.StartLocalForward(sc, redisAddr)
+			if err != nil {
+				sc.Close()
+				config.AppendDebugLog("[test] ssh local forward failed: %v", err)
+				return normalizeConnectError(fmt.Errorf("SSH local forward error: %w", err))
+			}
+			sshForward = forward
+			redisAddr = forward.Addr()
+			config.AppendDebugLog("[test] ssh local forward ready addr=%s", redisAddr)
+		}
 		defer sc.Close()
+		if sshForward != nil {
+			defer sshForward.Close()
+		}
 		config.AppendDebugLog("[test] ssh ready")
 	}
 	if dialer == nil && cfg.ProxyEnabled && strings.TrimSpace(cfg.ProxyURL) != "" {
@@ -237,12 +284,12 @@ func TestConnection(cfg config.ConnectionConfig) error {
 	if cfg.IsCluster {
 		addrs := normalizeAddrs(cfg.ClusterAddrs)
 		if len(addrs) == 0 {
-			addrs = []string{joinHostPort(cfg.Host, cfg.Port)}
+			addrs = []string{redisAddr}
 		}
 		opts := buildClusterOptions(addrs, cfg.Password, dialer)
 		client = redis.NewClusterClient(opts)
 	} else {
-		opts := buildRedisOptions(joinHostPort(cfg.Host, cfg.Port), cfg.Password, cfg.DB, dialer)
+		opts := buildRedisOptions(redisAddr, cfg.Password, cfg.DB, dialer)
 		client = redis.NewClient(opts)
 	}
 	defer client.Close()
@@ -267,6 +314,9 @@ func (m *ClientManager) DisconnectAll() {
 
 	for id, conn := range m.clients {
 		conn.client.Close()
+		if conn.sshForward != nil {
+			conn.sshForward.Close()
+		}
 		if conn.sshClient != nil {
 			conn.sshClient.Close()
 		}

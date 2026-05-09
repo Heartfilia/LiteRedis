@@ -3,6 +3,7 @@ package ssh
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -238,6 +239,124 @@ func (c *deadlineConn) Close() error {
 	c.stopTimer(&c.bothTimer)
 	c.mu.Unlock()
 	return c.Conn.Close()
+}
+
+type LocalForward struct {
+	listener   net.Listener
+	remoteAddr string
+	sshClient  *gossh.Client
+	closeOnce  sync.Once
+	done       chan struct{}
+	connMu     sync.Mutex
+	conns      map[net.Conn]struct{}
+}
+
+func StartLocalForward(sshClient *gossh.Client, remoteAddr string) (*LocalForward, error) {
+	if sshClient == nil {
+		return nil, fmt.Errorf("ssh client is nil")
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, err
+	}
+	forward := &LocalForward{
+		listener:   ln,
+		remoteAddr: remoteAddr,
+		sshClient:  sshClient,
+		done:       make(chan struct{}),
+		conns:      make(map[net.Conn]struct{}),
+	}
+	config.AppendDebugLog("[ssh] local forward listen addr=%s remote=%s", ln.Addr().String(), remoteAddr)
+	go forward.acceptLoop()
+	return forward, nil
+}
+
+func (f *LocalForward) Addr() string {
+	if f == nil || f.listener == nil {
+		return ""
+	}
+	return f.listener.Addr().String()
+}
+
+func (f *LocalForward) Close() error {
+	if f == nil {
+		return nil
+	}
+	var err error
+	f.closeOnce.Do(func() {
+		close(f.done)
+		if f.listener != nil {
+			err = f.listener.Close()
+		}
+		f.connMu.Lock()
+		for conn := range f.conns {
+			_ = conn.Close()
+		}
+		f.conns = map[net.Conn]struct{}{}
+		f.connMu.Unlock()
+	})
+	return err
+}
+
+func (f *LocalForward) acceptLoop() {
+	for {
+		conn, err := f.listener.Accept()
+		if err != nil {
+			select {
+			case <-f.done:
+				return
+			default:
+				config.AppendDebugLog("[ssh] local forward accept failed: %v", err)
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
+		}
+		config.AppendDebugLog("[ssh] local forward accept local=%s", conn.RemoteAddr())
+		f.trackConn(conn)
+		go f.handleConn(conn)
+	}
+}
+
+func (f *LocalForward) handleConn(localConn net.Conn) {
+	defer f.untrackConn(localConn)
+	defer localConn.Close()
+
+	remoteConn, err := f.sshClient.Dial("tcp", f.remoteAddr)
+	if err != nil {
+		config.AppendDebugLog("[ssh] local forward remote dial failed addr=%s err=%v", f.remoteAddr, err)
+		return
+	}
+	config.AppendDebugLog("[ssh] local forward remote dial ok addr=%s", f.remoteAddr)
+	f.trackConn(remoteConn)
+	defer f.untrackConn(remoteConn)
+	defer remoteConn.Close()
+
+	copyDone := make(chan struct{}, 2)
+	go func() {
+		_, _ = io.Copy(remoteConn, localConn)
+		copyDone <- struct{}{}
+	}()
+	go func() {
+		_, _ = io.Copy(localConn, remoteConn)
+		copyDone <- struct{}{}
+	}()
+
+	select {
+	case <-copyDone:
+	case <-f.done:
+	}
+}
+
+func (f *LocalForward) trackConn(conn net.Conn) {
+	f.connMu.Lock()
+	f.conns[conn] = struct{}{}
+	f.connMu.Unlock()
+}
+
+func (f *LocalForward) untrackConn(conn net.Conn) {
+	f.connMu.Lock()
+	delete(f.conns, conn)
+	f.connMu.Unlock()
 }
 
 // MakeDialer 返回一个使用 SSH 客户端拨号的 Dialer 函数
