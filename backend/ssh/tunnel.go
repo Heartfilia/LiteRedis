@@ -197,13 +197,12 @@ func (c *deadlineConn) resetTimer(timer **time.Timer, deadline time.Time, label 
 	}
 	d := time.Until(deadline)
 	if d <= 0 {
-		config.AppendDebugLog("[ssh] %s deadline reached immediately, closing conn", label)
-		_ = c.Conn.Close()
+		config.AppendDebugLog("[ssh] %s deadline already expired (%s), ignore close for ssh channel", label, d)
 		return
 	}
 	if d < minSupportedDeadline {
-		config.AppendDebugLog("[ssh] %s deadline too small (%s), clamp to %s", label, d, minSupportedDeadline)
-		d = minSupportedDeadline
+		config.AppendDebugLog("[ssh] %s deadline too small (%s), ignore close for ssh channel", label, d)
+		return
 	}
 	*timer = time.AfterFunc(d, func() {
 		config.AppendDebugLog("[ssh] %s deadline reached after %s, closing conn", label, d)
