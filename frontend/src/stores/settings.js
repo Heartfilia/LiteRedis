@@ -6,6 +6,7 @@ import { useWorkspaceStore } from './workspace.js'
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
     loaded: false,
+    debugMode: false,
     keyScanCount: 20,
     hashLoadCount: 20,
     listLoadCount: 20,
@@ -25,6 +26,10 @@ export const useSettingsStore = defineStore('settings', {
   }),
 
   actions: {
+    enableDebugMode() {
+      this.debugMode = true
+    },
+
     async load() {
       try {
         const s = await getSettings()

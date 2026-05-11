@@ -44,3 +44,6 @@ export const zRem = (connID, key, member) => callGo('ZRem', connID, key, member)
 // ===== 设置 =====
 export const getSettings = () => callGo('GetSettings')
 export const saveSettings = (s) => callGo('SaveSettings', s)
+export const getAppVersion = () => callGo('GetAppVersion')
+export const checkLatestRelease = () => callGo('CheckLatestRelease')
+export const startUpdate = () => callGo('StartUpdate')

@@ -12,6 +12,8 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+var AppVersion = "dev"
+
 const minAppWidth = 1220
 const minAppHeight = 720
 

@@ -3,6 +3,8 @@
 import {main} from '../models';
 import {config} from '../models';
 
+export function CheckLatestRelease():Promise<main.VersionInfo>;
+
 export function Connect(arg1:string):Promise<main.ConnectResult>;
 
 export function CreateKey(arg1:string,arg2:config.CreateKeyRequest):Promise<config.OperationResult>;
@@ -14,6 +16,8 @@ export function DeleteConnection(arg1:string):Promise<config.OperationResult>;
 export function DeleteKey(arg1:string,arg2:string):Promise<config.OperationResult>;
 
 export function Disconnect(arg1:string):Promise<config.OperationResult>;
+
+export function GetAppVersion():Promise<string>;
 
 export function GetKeyInfo(arg1:string,arg2:string):Promise<config.RedisKey>;
 
@@ -56,6 +60,8 @@ export function SelectDB(arg1:string,arg2:number):Promise<config.OperationResult
 export function SetString(arg1:string,arg2:string,arg3:string,arg4:number):Promise<config.OperationResult>;
 
 export function SetTTL(arg1:string,arg2:string,arg3:number):Promise<config.OperationResult>;
+
+export function StartUpdate():Promise<main.UpdateResult>;
 
 export function TestConnection(arg1:config.ConnectionConfig):Promise<config.OperationResult>;
 

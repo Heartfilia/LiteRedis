@@ -33,7 +33,7 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       - name: Build
-        run: wails build -platform darwin/arm64 -clean
+        run: wails build -platform darwin/arm64 -clean -ldflags "-X main.AppVersion=${{ github.ref_name }}"
 
       - name: Package .app → dmg
         run: |
@@ -87,7 +87,7 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       - name: Build
-        run: wails build -platform linux/amd64 -clean -tags webkit2_41
+        run: wails build -platform linux/amd64 -clean -tags webkit2_41 -ldflags "-X main.AppVersion=${{ github.ref_name }}"
 
       - name: Package → tar.gz
         run: |
@@ -123,7 +123,7 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       - name: Build
-        run: wails build -platform windows/amd64 -nsis -clean
+        run: wails build -platform windows/amd64 -nsis -clean -ldflags "-X main.AppVersion=${{ github.ref_name }}"
 
       - uses: actions/upload-artifact@v4
         with:

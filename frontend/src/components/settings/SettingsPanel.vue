@@ -1,7 +1,7 @@
 <template>
   <div class="settings-panel">
     <div class="settings-header">
-      <span>⚙️ {{ t('settings.title') }}</span>
+      <span class="settings-title-trigger" @click="handleTitleClick">⚙️ {{ t('settings.title') }}</span>
       <button class="btn-close" @click="$emit('close')">✕</button>
     </div>
 
@@ -206,9 +206,44 @@
     </Teleport>
 
     <div class="settings-footer">
-      <button class="btn-cancel" @click="reset">{{ t('settings.reset') }}</button>
-      <button class="btn-close-modal" @click="$emit('close')">{{ t('settings.close') }}</button>
-      <button class="btn-save" :disabled="saving" @click="doSave">{{ saving ? t('settings.applying') : t('settings.apply') }}</button>
+      <div class="footer-status">
+        <button class="version-box" :disabled="checkingUpdate" @click="checkUpdate">
+          {{ t('settings.version') }} v{{ appVersion }}
+        </button>
+        <span
+          v-if="hasUpdate"
+          class="mini-icon"
+          :title="t('settings.openRelease')"
+          role="button"
+          tabindex="0"
+          @click="openRelease"
+          @keydown.enter.prevent="openRelease"
+          @keydown.space.prevent="openRelease"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2C6.48 2 2 6.58 2 12.24c0 4.52 2.87 8.35 6.84 9.78.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.71-2.78.62-3.37-1.35-3.37-1.35-.46-1.18-1.12-1.49-1.12-1.49-.92-.64.07-.63.07-.63 1.02.07 1.56 1.07 1.56 1.07.9 1.57 2.36 1.12 2.94.86.09-.67.36-1.12.66-1.38-2.22-.26-4.56-1.15-4.56-5.13 0-1.13.39-2.06 1.03-2.78-.1-.26-.45-1.3.1-2.72 0 0 .84-.28 2.75 1.06a9.2 9.2 0 0 1 5 0c1.9-1.34 2.74-1.06 2.74-1.06.55 1.42.2 2.46.1 2.72.64.72 1.03 1.65 1.03 2.78 0 3.99-2.34 4.87-4.57 5.12.36.32.68.95.68 1.92 0 1.39-.01 2.5-.01 2.84 0 .26.18.58.69.48A10.55 10.55 0 0 0 22 12.24C22 6.58 17.52 2 12 2z"/>
+          </svg>
+        </span>
+        <span
+          v-if="hasUpdate"
+          class="mini-icon"
+          :title="t('settings.updateNow')"
+          role="button"
+          tabindex="0"
+          @click="performUpdate"
+          @keydown.enter.prevent="performUpdate"
+          @keydown.space.prevent="performUpdate"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M11 4h2v8.17l2.59-2.58L17 11l-5 5-5-5 1.41-1.41L11 12.17V4Zm-6 14h14v2H5v-2Z"/>
+          </svg>
+        </span>
+      </div>
+      <div class="footer-actions">
+        <button class="btn-cancel" @click="reset">{{ t('settings.reset') }}</button>
+        <button class="btn-close-modal" @click="$emit('close')">{{ t('settings.close') }}</button>
+        <button class="btn-save" :disabled="saving" @click="doSave">{{ saving ? t('settings.applying') : t('settings.apply') }}</button>
+      </div>
     </div>
   </div>
 </template>
@@ -217,6 +252,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
+import { getAppVersion, checkLatestRelease, startUpdate as runUpdate } from '../../api/wails.js'
+import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 
 const { t, setLanguage } = useI18n()
 
@@ -243,12 +280,22 @@ const form = reactive({
 })
 
 const saving = ref(false)
+const checkingUpdate = ref(false)
+const appVersion = ref('dev')
+const hasUpdate = ref(false)
 const msg = ref('')
 const ok = ref(true)
+const titleTapCount = ref(0)
+let titleTapTimer = null
 
 onMounted(async () => {
   await settingsStore.load()
   syncFromStore()
+  try {
+    appVersion.value = await getAppVersion()
+  } catch {
+    appVersion.value = 'dev'
+  }
 })
 
 function syncFromStore() {
@@ -289,6 +336,23 @@ function reset() {
   form.language = 'zh'
 }
 
+function handleTitleClick() {
+  titleTapCount.value += 1
+  if (titleTapTimer) clearTimeout(titleTapTimer)
+  titleTapTimer = setTimeout(() => {
+    titleTapCount.value = 0
+    titleTapTimer = null
+  }, 1200)
+
+  if (titleTapCount.value >= 5) {
+    titleTapCount.value = 0
+    settingsStore.enableDebugMode()
+    ok.value = true
+    msg.value = t('settings.debugModeEnabled')
+    setTimeout(() => { msg.value = '' }, 3000)
+  }
+}
+
 async function doSave() {
   saving.value = true
   msg.value = ''
@@ -305,6 +369,60 @@ async function doSave() {
     msg.value = e.message || String(e)
   } finally {
     saving.value = false
+  }
+}
+
+async function checkUpdate() {
+  checkingUpdate.value = true
+  msg.value = ''
+  try {
+    const result = await checkLatestRelease()
+    if (result.error) {
+      hasUpdate.value = false
+      ok.value = false
+      msg.value = result.error || t('settings.updateFailed')
+      setTimeout(() => { msg.value = '' }, 3000)
+      return
+    }
+    ok.value = true
+    if (result.need_update) {
+      hasUpdate.value = true
+      msg.value = t('settings.updateAvailable').replace('{version}', `v${result.latest}`)
+      setTimeout(() => { msg.value = '' }, 3000)
+      return
+    }
+    hasUpdate.value = false
+    msg.value = t('settings.latestVersion')
+    setTimeout(() => { msg.value = '' }, 3000)
+  } catch (e) {
+    hasUpdate.value = false
+    ok.value = false
+    msg.value = e.message || String(e) || t('settings.updateFailed')
+    setTimeout(() => { msg.value = '' }, 3000)
+  } finally {
+    checkingUpdate.value = false
+  }
+}
+
+function openRelease() {
+  BrowserOpenURL('https://github.com/Heartfilia/LiteRedis/releases/latest')
+}
+
+async function performUpdate() {
+  checkingUpdate.value = true
+  msg.value = ''
+  try {
+    const result = await runUpdate()
+    ok.value = result.success
+    if (result.success) hasUpdate.value = false
+    msg.value = result.message || (result.success ? t('settings.updateStarted') : t('settings.updateFailed'))
+    setTimeout(() => { msg.value = '' }, 3000)
+  } catch (e) {
+    ok.value = false
+    msg.value = e.message || String(e) || t('settings.updateFailed')
+    setTimeout(() => { msg.value = '' }, 3000)
+  } finally {
+    checkingUpdate.value = false
   }
 }
 </script>
@@ -328,6 +446,10 @@ async function doSave() {
   font-size: 14px;
   color: #111827;
   background: #f9fafb;
+}
+.settings-title-trigger {
+  cursor: pointer;
+  user-select: none;
 }
 .btn-close {
   background: transparent;
@@ -434,10 +556,31 @@ async function doSave() {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
   padding: 12px 16px;
   border-top: 1px solid #e5e7eb;
   background: #f9fafb;
+}
+.footer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.version-box {
+  min-width: 0;
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 0 0 2px;
 }
 .save-msg {
   flex: 1;
@@ -472,6 +615,38 @@ async function doSave() {
   transition: background 0.12s, border-color 0.12s;
 }
 .btn-cancel:hover { background: #f3f4f6; border-color: #9ca3af; }
+.mini-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: #6b7280;
+  border-radius: 999px;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: color 0.12s, background 0.12s;
+}
+.mini-icon:hover {
+  color: #111827;
+  background: rgba(255, 255, 255, 0.6);
+}
+.mini-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+.mini-icon:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+}
+.version-box:hover {
+  color: #374151;
+}
+.version-box:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 .btn-close-modal {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 6px 14px;

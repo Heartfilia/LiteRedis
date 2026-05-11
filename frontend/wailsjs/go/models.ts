@@ -323,6 +323,48 @@ export namespace main {
 	        this.init_db = source["init_db"];
 	    }
 	}
+	export class UpdateResult {
+	    success: boolean;
+	    message?: string;
+	    release_url?: string;
+	    asset_name?: string;
+	    asset_path?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.message = source["message"];
+	        this.release_url = source["release_url"];
+	        this.asset_name = source["asset_name"];
+	        this.asset_path = source["asset_path"];
+	    }
+	}
+	export class VersionInfo {
+	    version: string;
+	    latest: string;
+	    need_update: boolean;
+	    release_url?: string;
+	    checked_at?: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new VersionInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.latest = source["latest"];
+	        this.need_update = source["need_update"];
+	        this.release_url = source["release_url"];
+	        this.checked_at = source["checked_at"];
+	        this.error = source["error"];
+	    }
+	}
 
 }
 

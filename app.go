@@ -17,6 +17,15 @@ type App struct {
 	initWindowState config.WindowState
 }
 
+type VersionInfo struct {
+	Version    string `json:"version"`
+	Latest     string `json:"latest"`
+	NeedUpdate bool   `json:"need_update"`
+	ReleaseURL string `json:"release_url,omitempty"`
+	CheckedAt  string `json:"checked_at,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
@@ -42,6 +51,11 @@ func (a *App) shutdown(ctx context.Context) {
 	_ = config.SaveWindowState(config.WindowState{X: x, Y: y, Width: w, Height: h})
 
 	a.manager.DisconnectAll()
+}
+
+// GetAppVersion 返回当前构建版本
+func (a *App) GetAppVersion() string {
+	return AppVersion
 }
 
 // ============================================================

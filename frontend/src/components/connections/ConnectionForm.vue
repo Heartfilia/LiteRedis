@@ -198,6 +198,7 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useI18n } from '../../i18n/index.js'
+import { formatDebugMessage } from '../../utils/debug.js'
 const props = defineProps({
   connection: { type: Object, default: null },
 })
@@ -371,10 +372,12 @@ async function handleTest() {
   try {
     const result = await connectionsStore.test(buildCfg())
     testOk.value = result.success
-    testMsg.value = result.success ? '✓ ' + (result.message || t('connManager.testOk')) : '✗ ' + (result.message || t('connManager.testFailed'))
+    testMsg.value = result.success
+      ? '✓ ' + formatDebugMessage(result.message, t('connManager.testOk'))
+      : '✗ ' + formatDebugMessage(result.message, t('connManager.testFailed'))
   } catch (e) {
     testOk.value = false
-    testMsg.value = '✗ ' + (e.message || String(e))
+    testMsg.value = '✗ ' + formatDebugMessage(e.message || String(e), t('connManager.testFailed'))
   } finally {
     testing.value = false
   }
@@ -395,10 +398,10 @@ async function handleSave() {
       initialSnapshot.value = snapshotValue()
       emit('saved')
     } else {
-      saveMsg.value = result.message || t('connManager.saveFailed')
+      saveMsg.value = formatDebugMessage(result.message, t('connManager.saveFailed'))
     }
   } catch (e) {
-    saveMsg.value = e.message || String(e)
+    saveMsg.value = formatDebugMessage(e.message || String(e), t('connManager.saveFailed'))
   } finally {
     saving.value = false
   }
