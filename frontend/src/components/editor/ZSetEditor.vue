@@ -50,8 +50,7 @@
                 @blur="saveEdit(m.member)" @keydown.enter="saveEdit(m.member)" @keydown.esc="editingMember = null" />
             </td>
             <td class="member-cell">
-              <span class="val-preview">{{ truncate(m.member) }}</span>
-              <span v-if="m.member.length > 80" class="val-ellipsis" @click="openExpand(m.member)">…{{ t('keyEditor.expand') }}</span>
+              <span class="val-preview">{{ m.member }}</span>
             </td>
             <td class="action-cell">
               <div class="action-btns">
@@ -367,18 +366,6 @@ function clearSearch() {
 function startEdit(m) { editingMember.value = m.member; editScore.value = m.score }
 function cancelEdit() { editingMember.value = null }
 
-function truncate(val, max = 80) {
-  if (!val) return val
-  return val.length > max ? val.slice(0, max) : val
-}
-
-function openExpand(member) {
-  expandTitle.value = 'member'
-  expandContent.value = member
-  expandEditable.value = false
-  expandShow.value = true
-}
-
 function openEdit(m) {
   expandTitle.value = 'member'
   expandContent.value = m.member
@@ -505,23 +492,22 @@ async function copyMember(member) {
 .score-cell input { width: 80px; padding: 3px 6px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 12px; outline: none; }
 .member-th,
 .member-cell {
-  width: 55ch;
-  min-width: 55ch;
-  max-width: 55ch;
+  min-width: 0;
 }
 .member-cell {
   font-family: monospace;
   overflow: hidden;
 }
 .val-preview {
-  word-break: break-all;
   color: #374151;
   font-size: 12px;
-  display: inline-block;
-  max-width: 55ch;
+  display: block;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; margin-left: 2px; }
-.val-ellipsis:hover { text-decoration: underline; }
 .action-th,
 .action-cell {
   width: 170px;

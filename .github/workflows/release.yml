@@ -41,6 +41,7 @@ jobs:
           rm -rf dmg-root
           mkdir -p dmg-root
           cp -R LiteRedis.app dmg-root/
+          cp "../../安装后不能打开运行后请同意.command" "dmg-root/安装后不能打开运行后请同意.command"
           ln -s /Applications dmg-root/Applications
           hdiutil create \
             -volname "LiteRedis" \

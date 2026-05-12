@@ -41,8 +41,7 @@
       <div v-for="(m, idx) in displayMembers" :key="m" class="set-item">
         <span class="num-badge">{{ idx + 1 }}</span>
         <span class="member-val">
-          <span class="val-preview">{{ truncate(m) }}</span>
-          <span v-if="m.length > 80" class="val-ellipsis" @click="openExpand(idx, m)">…{{ t('keyEditor.expand') }}</span>
+          <span class="val-preview">{{ m }}</span>
         </span>
         <div class="item-actions">
           <button class="btn-tiny" @click="copyMember(m, idx)">{{ copiedMember === m + idx ? '✓' : t('keyEditor.copy') }}</button>
@@ -273,18 +272,6 @@ function clearSearch() {
   }
 }
 
-function truncate(val, max = 80) {
-  if (!val) return val
-  return val.length > max ? val.slice(0, max) : val
-}
-
-function openExpand(idx, val) {
-  expandTitle.value = `member[${idx + 1}]`
-  expandContent.value = val
-  expandEditable.value = false
-  expandShow.value = true
-}
-
 function openEdit(idx, val) {
   expandTitle.value = `member[${idx + 1}]`
   expandContent.value = val
@@ -376,10 +363,21 @@ async function removeMember(m) {
 .set-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
 .set-item:hover { background: #f9fafb; }
 .num-badge { background: #faf5ff; color: #7c3aed; padding: 1px 6px; border-radius: 4px; font-size: 11px; flex-shrink: 0; min-width: 28px; text-align: center; font-weight: 500; }
-.member-val { font-family: monospace; flex: 1; display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; }
-.val-preview { word-break: break-all; color: #374151; font-size: 12px; }
-.val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; }
-.val-ellipsis:hover { text-decoration: underline; }
+.member-val {
+  font-family: monospace;
+  flex: 1;
+  min-width: 0;
+  display: block;
+}
+.val-preview {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #374151;
+  font-size: 12px;
+}
 .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .sortable-col { cursor: pointer; user-select: none; }
 .sortable-col:hover { color: #374151; }

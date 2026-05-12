@@ -58,6 +58,36 @@ wails dev
 
 ---
 
+## 首次运行说明
+
+### macOS
+
+首次打开从 GitHub Release 下载的 `.app` / `.dmg` 时，macOS 可能会提示“无法验证开发者”或“已阻止打开”。如果遇到这类提示，可按下面方式处理：
+
+1. 在 Finder 中找到 `LiteRedis.app`
+2. 右键应用，选择“打开”
+3. 在系统弹窗中再次点击“打开”
+
+如果仍被拦截，可前往：
+
+`系统设置 -> 隐私与安全性`
+
+在页面底部找到被阻止的应用提示，然后点击“仍要打开”。
+
+如果你希望直接打开这个系统页面，也可以双击项目内附带的辅助脚本：
+
+`安装后不能打开运行后请同意.command`
+
+这个脚本会自动打开 `系统设置 -> 隐私与安全性`，并提示你在页面底部点击“仍要打开”。
+
+发布到 GitHub Release 时，这个脚本也会随 macOS 的 `.dmg` 一起打包进去，用户打开镜像后可以直接运行。
+
+### Windows
+
+首次运行时如果出现 SmartScreen 提示，可点击“更多信息”后选择“仍要运行”。
+
+---
+
 ## 打包发布
 
 ### macOS 打包
@@ -76,6 +106,18 @@ wails build -platform darwin/universal
 ```
 
 产物路径：`build/bin/LiteRedis.app`
+
+GitHub Actions 中的 macOS Release 流程会额外把：
+
+`安装后不能打开运行后请同意.command`
+
+一起放进 `.dmg`，方便用户在被系统拦截时直接打开 `隐私与安全性` 页面。
+
+如果你需要编写 GitHub Release 发布说明，可以直接复用：
+
+`.github/RELEASE_TEMPLATE.md`
+
+把里面的 `{{VERSION}}` 替换成当前 Tag，例如 `v0.0.6`。
 
 ---
 

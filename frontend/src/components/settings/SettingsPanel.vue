@@ -224,20 +224,6 @@
             <path d="M12 2C6.48 2 2 6.58 2 12.24c0 4.52 2.87 8.35 6.84 9.78.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.71-2.78.62-3.37-1.35-3.37-1.35-.46-1.18-1.12-1.49-1.12-1.49-.92-.64.07-.63.07-.63 1.02.07 1.56 1.07 1.56 1.07.9 1.57 2.36 1.12 2.94.86.09-.67.36-1.12.66-1.38-2.22-.26-4.56-1.15-4.56-5.13 0-1.13.39-2.06 1.03-2.78-.1-.26-.45-1.3.1-2.72 0 0 .84-.28 2.75 1.06a9.2 9.2 0 0 1 5 0c1.9-1.34 2.74-1.06 2.74-1.06.55 1.42.2 2.46.1 2.72.64.72 1.03 1.65 1.03 2.78 0 3.99-2.34 4.87-4.57 5.12.36.32.68.95.68 1.92 0 1.39-.01 2.5-.01 2.84 0 .26.18.58.69.48A10.55 10.55 0 0 0 22 12.24C22 6.58 17.52 2 12 2z"/>
           </svg>
         </span>
-        <span
-          v-if="hasUpdate"
-          class="mini-icon"
-          :title="t('settings.updateNow')"
-          role="button"
-          tabindex="0"
-          @click="performUpdate"
-          @keydown.enter.prevent="performUpdate"
-          @keydown.space.prevent="performUpdate"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M11 4h2v8.17l2.59-2.58L17 11l-5 5-5-5 1.41-1.41L11 12.17V4Zm-6 14h14v2H5v-2Z"/>
-          </svg>
-        </span>
       </div>
       <div class="footer-actions">
         <button class="btn-cancel" @click="reset">{{ t('settings.reset') }}</button>
@@ -252,7 +238,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
-import { getAppVersion, checkLatestRelease, startUpdate as runUpdate } from '../../api/wails.js'
+import { getAppVersion, checkLatestRelease } from '../../api/wails.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 
 const { t, setLanguage } = useI18n()
@@ -406,24 +392,6 @@ async function checkUpdate() {
 
 function openRelease() {
   BrowserOpenURL('https://github.com/Heartfilia/LiteRedis/releases/latest')
-}
-
-async function performUpdate() {
-  checkingUpdate.value = true
-  msg.value = ''
-  try {
-    const result = await runUpdate()
-    ok.value = result.success
-    if (result.success) hasUpdate.value = false
-    msg.value = result.message || (result.success ? t('settings.updateStarted') : t('settings.updateFailed'))
-    setTimeout(() => { msg.value = '' }, 3000)
-  } catch (e) {
-    ok.value = false
-    msg.value = e.message || String(e) || t('settings.updateFailed')
-    setTimeout(() => { msg.value = '' }, 3000)
-  } finally {
-    checkingUpdate.value = false
-  }
 }
 </script>
 

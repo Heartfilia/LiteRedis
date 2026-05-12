@@ -44,8 +44,7 @@
           class="item-val"
           @dblclick="searchResults === null && sortOrder === 'none' && startEdit(displayOriginalIndices[idx], item)"
         >
-          <span class="val-preview">{{ truncate(item) }}</span>
-          <span v-if="item.length > 80" class="val-ellipsis" @click="openExpand(idx, item)">…{{ t('keyEditor.expand') }}</span>
+          <span class="val-preview">{{ item }}</span>
         </span>
         <input
           v-else
@@ -292,24 +291,12 @@ function clearSearch() {
   }
 }
 
-function truncate(val, max = 80) {
-  if (!val) return val
-  return val.length > max ? val.slice(0, max) : val
-}
-
 function startEdit(idx, val) {
   if (idx === -1) return   // 搜索/排序模式下不可编辑
   editingIdx.value = idx
   editValue.value = val
 }
 function cancelEdit() { editingIdx.value = -1 }
-
-function openExpand(idx, val) {
-  expandTitle.value = `item[${idx + 1}]`
-  expandContent.value = val
-  expandEditable.value = false
-  expandShow.value = true
-}
 
 function openEdit(idx, val) {
   if (idx === -1) return
@@ -406,10 +393,22 @@ async function addItem() {
 .list-item { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
 .list-item:hover { background: #f9fafb; }
 .idx-badge { background: #eff6ff; color: #1d4ed8; padding: 1px 6px; border-radius: 4px; font-size: 11px; flex-shrink: 0; min-width: 28px; text-align: center; font-weight: 500; }
-.item-val { flex: 1; font-family: monospace; display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; cursor: pointer; }
-.val-preview { word-break: break-all; color: #374151; font-size: 12px; }
-.val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; }
-.val-ellipsis:hover { text-decoration: underline; }
+.item-val {
+  flex: 1;
+  min-width: 0;
+  font-family: monospace;
+  display: block;
+  cursor: pointer;
+}
+.val-preview {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #374151;
+  font-size: 12px;
+}
 .list-item input { flex: 1; padding: 3px 6px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 12px; outline: none; }
 .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .sortable-col { cursor: pointer; user-select: none; }

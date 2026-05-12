@@ -3,16 +3,9 @@
     <FloatingMessage :message="msg" :success="ok" />
     <textarea v-model="localVal" rows="10" :disabled="saving" />
     <div class="editor-actions">
-      <button class="btn-action" @click="openExpand">⛶ {{ t('keyEditor.expand') }}</button>
       <button class="btn-action" @click="copyValue">{{ copied ? '✓ ' + t('keyEditor.copied') : '📋 ' + t('keyEditor.copy') }}</button>
       <button class="btn-primary" @click="save" :disabled="saving">{{ saving ? t('keyEditor.saving') : t('keyEditor.save') }}</button>
     </div>
-    <ExpandModal
-      :show="expandShow"
-      :title="props.keyValue?.key || 'string'"
-      :content="localVal"
-      @close="expandShow = false"
-    />
   </div>
 </template>
 
@@ -22,7 +15,6 @@ import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { setString } from '../../api/wails.js'
-import ExpandModal from './ExpandModal.vue'
 import FloatingMessage from '../common/FloatingMessage.vue'
 
 const props = defineProps({ keyValue: Object })
@@ -34,16 +26,11 @@ const saving = ref(false)
 const msg = ref('')
 const ok = ref(true)
 const copied = ref(false)
-const expandShow = ref(false)
 
 watch(() => props.keyValue, (kv) => {
   localVal.value = kv?.string_val || ''
   msg.value = ''
 })
-
-function openExpand() {
-  expandShow.value = true
-}
 
 async function copyValue() {
   const result = await copyToClipboard(localVal.value)

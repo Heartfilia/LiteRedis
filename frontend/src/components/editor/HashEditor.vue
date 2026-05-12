@@ -53,8 +53,7 @@
             <td class="field-cell" :style="fieldColumnStyle">{{ field }}</td>
             <td class="value-cell">
               <span v-if="editingField !== field" class="value-text">
-                <span class="val-preview">{{ truncate(val) }}</span>
-                <span v-if="val.length > 80" class="val-ellipsis" @click="openExpand(field, val)">…{{ t('keyEditor.expand') }}</span>
+                <span class="val-preview">{{ val }}</span>
               </span>
               <input v-else v-model="editValue" @keydown.enter="saveEdit(field)" @keydown.esc="cancelEdit()" />
             </td>
@@ -288,11 +287,6 @@ function clearSearch() {
   }
 }
 
-function truncate(val, max = 80) {
-  if (!val) return val
-  return val.length > max ? val.slice(0, max) : val
-}
-
 function startEdit(field, val) {
   editingField.value = field
   editValue.value = val
@@ -300,13 +294,6 @@ function startEdit(field, val) {
 
 function cancelEdit() {
   editingField.value = null
-}
-
-function openExpand(field, val) {
-  expandTitle.value = field
-  expandContent.value = val
-  expandEditable.value = false
-  expandShow.value = true
 }
 
 function openEdit(field, val) {
@@ -451,17 +438,22 @@ async function addField() {
 .field-cell { color: #1d4ed8; font-weight: 500; word-break: break-all; min-width: 0; }
 .value-th,
 .value-cell { min-width: 0; }
-.value-text { cursor: pointer; display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; }
+.value-text {
+  display: block;
+  min-width: 0;
+  width: 100%;
+}
 .val-preview {
   font-family: monospace;
   font-size: 12px;
-  word-break: break-all;
   color: #374151;
-  display: inline-block;
-  max-width: 100%;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.val-ellipsis:hover { text-decoration: underline; }
 .value-cell input { width: 100%; padding: 3px 6px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 12px; outline: none; }
 .action-th,
 .action-cell {

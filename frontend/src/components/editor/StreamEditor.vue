@@ -16,15 +16,11 @@
           <span v-for="(val, key) in entry.fields" :key="key" class="field-pair">
             <span class="field-key">{{ key }}</span>
             <span class="field-sep">:</span>
-            <span class="field-val">{{ truncate(val) }}</span>
-            <span v-if="val.length > 80" class="val-ellipsis" @click="openExpand(key, val)">…{{ t('keyEditor.expand') }}</span>
+            <span class="field-val">{{ val }}</span>
           </span>
         </div>
       </div>
     </div>
-
-
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" @close="expandShow = false" />
   </div>
 </template>
 
@@ -33,7 +29,6 @@ import { ref, computed, watch } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
-import ExpandModal from './ExpandModal.vue'
 
 const props = defineProps({ keyValue: Object })
 const settingsStore = useSettingsStore()
@@ -41,9 +36,6 @@ const { t } = useI18n()
 
 const entries = ref([])
 const copiedEntry = ref(null)
-const expandShow = ref(false)
-const expandTitle = ref('')
-const expandContent = ref('')
 
 // Stream 暂不分页，直接显示全部
 const displayEntries = computed(() => entries.value)
@@ -56,17 +48,6 @@ async function copyEntry(entry) {
   await copyToClipboard(JSON.stringify(entry.fields, null, 2))
   copiedEntry.value = entry.id
   setTimeout(() => { copiedEntry.value = null }, 1200)
-}
-
-function truncate(val, max = 80) {
-  if (!val) return val
-  return val.length > max ? val.slice(0, max) : val
-}
-
-function openExpand(key, val) {
-  expandTitle.value = key
-  expandContent.value = val
-  expandShow.value = true
 }
 </script>
 
@@ -105,13 +86,29 @@ function openExpand(key, val) {
   flex-shrink: 0;
 }
 .btn-entry-copy:hover { background: #f3f4f6; border-color: #d1d5db; color: #374151; }
-.entry-fields { display: flex; flex-wrap: wrap; gap: 6px; }
-.field-pair { display: flex; align-items: baseline; gap: 2px; background: #ecfeff; padding: 2px 7px; border-radius: 4px; flex-wrap: wrap; border: 1px solid #cffafe; }
+.entry-fields { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field-pair {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #ecfeff;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid #cffafe;
+  min-width: 0;
+}
 .field-key { color: #0e7490; font-weight: 600; font-size: 11px; }
 .field-sep { color: #94a3b8; }
-.field-val { color: #1f2937; font-family: monospace; word-break: break-all; max-width: 200px; font-size: 11px; }
-.val-ellipsis { font-size: 11px; color: #3b82f6; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.val-ellipsis:hover { text-decoration: underline; }
+.field-val {
+  color: #1f2937;
+  font-family: monospace;
+  font-size: 11px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .load-more { display: flex; justify-content: center; padding: 6px 0; flex-shrink: 0; }
 .btn-load-more {
   display: inline-flex; align-items: center; justify-content: center;
