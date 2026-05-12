@@ -208,7 +208,7 @@
     <div class="settings-footer">
       <div class="footer-status">
         <button class="version-box" :disabled="checkingUpdate" @click="checkUpdate">
-          {{ t('settings.version') }} v{{ appVersion }}
+          {{ t('settings.version') }} {{ appVersion }}
         </button>
         <span
           v-if="hasUpdate"
@@ -590,6 +590,7 @@ async function performUpdate() {
 .save-msg.err { color: #991b1b; }
 .btn-save {
   display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px;
   padding: 6px 18px;
   background: #3b82f6;
   color: white;
@@ -597,13 +598,16 @@ async function performUpdate() {
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
+  line-height: 1;
   font-weight: 500;
+  box-sizing: border-box;
   transition: background 0.15s;
 }
 .btn-save:hover { background: #2563eb; }
 .btn-save:disabled { background: #93c5fd; cursor: not-allowed; }
 .btn-cancel {
   display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px;
   padding: 6px 14px;
   background: #fff;
   color: #374151;
@@ -611,7 +615,9 @@ async function performUpdate() {
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
+  line-height: 1;
   font-weight: 500;
+  box-sizing: border-box;
   transition: background 0.12s, border-color 0.12s;
 }
 .btn-cancel:hover { background: #f3f4f6; border-color: #9ca3af; }
@@ -649,6 +655,7 @@ async function performUpdate() {
 }
 .btn-close-modal {
   display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px;
   padding: 6px 14px;
   background: #fff;
   color: #374151;
@@ -656,7 +663,9 @@ async function performUpdate() {
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
+  line-height: 1;
   font-weight: 500;
+  box-sizing: border-box;
   transition: background 0.12s, border-color 0.12s;
 }
 .btn-close-modal:hover { background: #f3f4f6; border-color: #9ca3af; }

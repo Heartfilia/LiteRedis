@@ -457,11 +457,12 @@ async function copyMember(member) {
 <style scoped>
 .zset-editor { position: relative; display: flex; flex-direction: column; height: 100%; gap: 8px; }
 .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.search-bar { display: flex; align-items: center; }
+.search-bar { display: flex; align-items: center; min-height: 28px; }
 .search-input {
-  width: 130px; padding: 3px 8px;
+  width: 130px; height: 28px; min-height: 28px; padding: 0 8px;
   border: 1px solid #d1d5db; border-right: none;
   border-radius: 5px 0 0 5px; font-size: 12px; outline: none; color: #333;
+  line-height: 28px; box-sizing: border-box;
 }
 .search-input:focus { border-color: #3b82f6; }
 .count { font-size: 12px; color: #9ca3af; margin-left: auto; white-space: nowrap; }

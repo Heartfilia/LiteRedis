@@ -308,14 +308,20 @@ onBeforeUnmount(() => {
 .ttl-input { width: 70px; padding: 2px 6px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 12px; outline: none; }
 .key-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
   padding: 4px 12px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
+  line-height: 1;
   background: white;
   color: #374151;
   font-weight: 500;
+  box-sizing: border-box;
   transition: background 0.12s, border-color 0.12s;
 }
 .btn-sm:hover { background: #f3f4f6; border-color: #9ca3af; }
@@ -332,13 +338,19 @@ onBeforeUnmount(() => {
 }
 .btn-confirm-no:hover { background: #dc2626; color: white; }
 .btn-xs {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
   padding: 2px 8px;
   border: 1px solid #d1d5db;
   border-radius: 4px;
   cursor: pointer;
   font-size: 11px;
+  line-height: 1;
   background: white;
   color: #374151;
+  box-sizing: border-box;
   transition: background 0.12s;
 }
 .btn-xs:hover { background: #f3f4f6; }

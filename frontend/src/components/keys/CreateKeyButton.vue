@@ -179,7 +179,8 @@ async function submit() {
   flex-shrink: 0;
 }
 .create-key-btn {
-  height: 27px;
+  height: 28px;
+  min-height: 28px;
   min-width: 28px;
   padding: 0 8px;
   border-radius: 6px;
@@ -190,6 +191,8 @@ async function submit() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  line-height: 1;
+  box-sizing: border-box;
   transition: all 0.15s ease;
 }
 .create-key-btn span {
@@ -223,11 +226,17 @@ async function submit() {
   color: #1f2937;
 }
 .popover-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   border: none;
   background: transparent;
   color: #9ca3af;
   cursor: pointer;
   font-size: 12px;
+  line-height: 1;
 }
 .form-grid,
 .default-value-box {
@@ -276,10 +285,13 @@ async function submit() {
 }
 .btn-cancel,
 .btn-create {
+  min-height: 30px;
   padding: 6px 12px;
   border-radius: 8px;
   font-size: 12px;
   cursor: pointer;
+  line-height: 1;
+  box-sizing: border-box;
 }
 .btn-cancel {
   border: 1px solid #d1d5db;

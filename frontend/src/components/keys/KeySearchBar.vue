@@ -204,6 +204,8 @@ async function doSearch() {
   align-items: stretch;
   flex: 1;
   min-width: 0;
+  min-height: 30px;
+  height: 30px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   background: #fff;
@@ -213,9 +215,11 @@ async function doSearch() {
 .search-input-shell input {
   flex: 1;
   min-width: 0;
-  padding: 5px 10px;
+  height: 100%;
+  padding: 0 10px;
   border: none;
   font-size: 12px;
+  line-height: 1;
   outline: none;
   color: #1f2937;
   box-sizing: border-box;
@@ -229,6 +233,7 @@ async function doSearch() {
   display: inline-flex; align-items: center; justify-content: center;
   width: 34px;
   min-width: 34px;
+  height: 100%;
   padding: 0;
   background: #f8fafc;
   color: #3b82f6;

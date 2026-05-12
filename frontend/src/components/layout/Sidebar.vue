@@ -528,9 +528,11 @@ async function disconnectConn(id) {
   border: none;
   border-radius: 4px;
   width: 24px; height: 24px;
+  min-width: 24px; min-height: 24px;
   font-size: 14px; line-height: 1;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
+  box-sizing: border-box;
 }
 .btn-icon:hover { background: #3a85e0; }
 .btn-settings { background: #4a5568; }

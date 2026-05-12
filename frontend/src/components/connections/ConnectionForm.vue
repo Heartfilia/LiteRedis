@@ -527,6 +527,7 @@ textarea { resize: vertical; font-family: monospace; }
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px;
   padding: 6px 18px;
   background: #3b82f6;
   color: white;
@@ -534,7 +535,9 @@ textarea { resize: vertical; font-family: monospace; }
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
+  line-height: 1;
   font-weight: 500;
+  box-sizing: border-box;
   transition: background 0.15s;
 }
 .btn-primary:hover { background: #2563eb; }
@@ -542,6 +545,7 @@ textarea { resize: vertical; font-family: monospace; }
 .btn-primary.disabled:hover { background: #93c5fd; }
 .btn-secondary {
   display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px;
   padding: 6px 14px;
   background: #fff;
   color: #374151;
@@ -549,7 +553,9 @@ textarea { resize: vertical; font-family: monospace; }
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
+  line-height: 1;
   font-weight: 500;
+  box-sizing: border-box;
   transition: background 0.12s, border-color 0.12s;
 }
 .btn-secondary:hover { background: #f3f4f6; border-color: #9ca3af; }

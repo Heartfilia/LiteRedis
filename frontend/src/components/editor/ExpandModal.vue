@@ -121,15 +121,18 @@ async function copy() {
 .btn-copy-modal,
 .btn-save-modal {
   display: inline-flex; align-items: center; justify-content: center;
+  min-height: 30px;
   padding: 4px 13px;
   background: #fff;
   color: #374151;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 12px;
+  line-height: 1;
   font-weight: 500;
   cursor: pointer;
   min-width: 74px;
+  box-sizing: border-box;
   transition: background 0.12s, border-color 0.12s;
 }
 .btn-save-modal {
@@ -141,6 +144,7 @@ async function copy() {
 .btn-copy-modal:hover { background: #f3f4f6; border-color: #9ca3af; }
 .btn-close-modal {
   display: inline-flex; align-items: center; justify-content: center;
+  min-height: 30px;
   background: transparent;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
@@ -148,7 +152,8 @@ async function copy() {
   cursor: pointer;
   color: #9ca3af;
   padding: 4px 9px;
-  line-height: 1.4;
+  line-height: 1;
+  box-sizing: border-box;
   transition: color 0.12s, border-color 0.12s;
 }
 .btn-close-modal:hover { color: #dc2626; border-color: #fca5a5; background: #fff1f2; }
