@@ -238,10 +238,12 @@ function mapSessionForDisplay(source) {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 12px;
+  min-height: 34px;
+  padding: 4px 12px;
   border-top: 1px solid #e8e8e8;
   background: #fafafa;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 .db-label {
   font-size: 11px;

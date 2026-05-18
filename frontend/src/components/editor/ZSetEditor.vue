@@ -465,6 +465,18 @@ async function copyMember(member) {
 .zset-table td { padding: 5px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
 .num-col { width: 36px; text-align: center; }
 .num-cell { width: 36px; text-align: center; color: #d1d5db; font-size: 11px; }
+.zset-table thead,
+.num-col,
+.num-cell,
+.score-th,
+.score-cell,
+.score-text,
+.action-th,
+.action-cell,
+.action-btns {
+  user-select: none;
+  -webkit-user-select: none;
+}
 .score-th { position: relative; min-width: 60px; }
 .member-th { width: auto; }
 .action-th { width: 1px; white-space: nowrap; }
@@ -516,11 +528,23 @@ async function copyMember(member) {
   text-align: center;
   white-space: nowrap;
 }
+.member-th { user-select: none; -webkit-user-select: none; }
 .sortable-col { cursor: pointer; user-select: none; }
 .sortable-col:hover { background: #f3f4f6 !important; }
 .sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; color: #d1d5db; }
 .sort-icon.asc, .sort-icon.desc { color: #3b82f6; font-weight: bold; }
-.load-more { display: flex; justify-content: center; padding: 6px 0; flex-shrink: 0; }
+.load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 4px 12px;
+  margin: -8px -10px 0;
+  border-top: 1px solid #e8e8e8;
+  background: #fafafa;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
 .btn-load-more {
   display: inline-flex;
   align-items: center;
@@ -546,6 +570,7 @@ async function copyMember(member) {
 .load-more-hint {
   font-size: 12px;
   color: #9ca3af;
+  line-height: 1;
 }
 .action-btns { display: inline-flex; gap: 4px; justify-content: center; }
 </style>

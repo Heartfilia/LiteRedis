@@ -393,6 +393,12 @@ async function addItem() {
 .list-item { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
 .list-item:hover { background: #f9fafb; }
 .idx-badge { background: #eff6ff; color: #1d4ed8; padding: 1px 6px; border-radius: 4px; font-size: 11px; flex-shrink: 0; min-width: 28px; text-align: center; font-weight: 500; }
+.list-header,
+.idx-badge,
+.item-actions {
+  user-select: none;
+  -webkit-user-select: none;
+}
 .item-val {
   flex: 1;
   min-width: 0;
@@ -415,7 +421,18 @@ async function addItem() {
 .sortable-col:hover { color: #374151; }
 .sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; color: #d1d5db; }
 .sort-icon.asc, .sort-icon.desc { color: #3b82f6; font-weight: bold; }
-.load-more { display: flex; justify-content: center; padding: 6px 0; flex-shrink: 0; }
+.load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 4px 12px;
+  margin: -8px -10px 0;
+  border-top: 1px solid #e8e8e8;
+  background: #fafafa;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
 .btn-load-more {
   display: inline-flex;
   align-items: center;
@@ -441,6 +458,7 @@ async function addItem() {
 .load-more-hint {
   font-size: 12px;
   color: #9ca3af;
+  line-height: 1;
 }
 
 </style>

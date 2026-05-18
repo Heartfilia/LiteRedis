@@ -26,11 +26,11 @@ import KeyTree from '../keys/KeyTree.vue'
 import KeyEditor from '../editor/KeyEditor.vue'
 import { useSettingsStore } from '../../stores/settings.js'
 
-const MIN_WIDTH = 250
+const MIN_WIDTH = 220
 const MAX_WIDTH = 600
 const DEFAULT_WIDTH = 320
-const RESIZER_WIDTH = 7
-const MIN_EDITOR_WIDTH = 760
+const RESIZER_WIDTH = 5
+const MIN_EDITOR_WIDTH = 700
 
 const panelWidth = ref(DEFAULT_WIDTH)
 const mainContentRef = ref(null)
@@ -59,8 +59,11 @@ const watermarkItemStyle = computed(() => ({
 
 function getPanelBounds() {
   const containerWidth = mainContentRef.value?.clientWidth || 0
+  const safeEditorMin = containerWidth > 0
+    ? Math.min(MIN_EDITOR_WIDTH, Math.max(420, Math.floor(containerWidth * 0.56)))
+    : MIN_EDITOR_WIDTH
   const dynamicMax = containerWidth > 0
-    ? Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, containerWidth - MIN_EDITOR_WIDTH - RESIZER_WIDTH))
+    ? Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, containerWidth - safeEditorMin - RESIZER_WIDTH))
     : MAX_WIDTH
   return {
     min: MIN_WIDTH,
@@ -69,10 +72,13 @@ function getPanelBounds() {
 }
 
 function startResize(e) {
+  e.preventDefault()
   const startX = e.clientX
   const startWidth = panelWidth.value
+  const root = mainContentRef.value
 
   function onMouseMove(ev) {
+    ev.preventDefault()
     const delta = ev.clientX - startX
     const bounds = getPanelBounds()
     const newWidth = Math.max(bounds.min, Math.min(bounds.max, startWidth + delta))
@@ -83,11 +89,13 @@ function startResize(e) {
     document.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('mouseup', onMouseUp)
     document.body.style.cursor = ''
-    document.body.style.userSelect = ''
+    document.body.classList.remove('is-resizing-panels')
+    if (root) root.classList.remove('is-resizing')
   }
 
   document.body.style.cursor = 'col-resize'
-  document.body.style.userSelect = 'none'
+  document.body.classList.add('is-resizing-panels')
+  if (root) root.classList.add('is-resizing')
   document.addEventListener('mousemove', onMouseMove)
   document.addEventListener('mouseup', onMouseUp)
 }
@@ -101,24 +109,43 @@ function startResize(e) {
   height: 100vh;
   min-width: 0;
 }
+.main-content.is-resizing,
+.main-content.is-resizing * {
+  cursor: col-resize !important;
+}
+.main-content.is-resizing .key-tree-panel,
+.main-content.is-resizing .resizer {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.main-content.is-resizing .key-editor-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: auto;
+}
 .key-tree-panel {
-  min-width: 250px;
+  min-width: 220px;
   max-width: 600px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border-right: 1px solid #e0e0e0;
   flex: 0 1 auto;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .resizer {
-  width: 7px;
+  width: 5px;
   cursor: col-resize;
-  background: #f3f4f6;
-  border-left: 1px solid #e5e7eb;
-  border-right: 1px solid #e5e7eb;
+  background: linear-gradient(90deg, #eef2f7 0, #dbe4ef 50%, #eef2f7 100%);
+  border-left: 1px solid #d7dee8;
+  border-right: 1px solid #d7dee8;
   flex-shrink: 0;
   transition: background 0.15s, border-color 0.15s;
   z-index: 10;
+  position: relative;
 }
 .resizer:hover,
 .resizer:active {
@@ -127,7 +154,7 @@ function startResize(e) {
 }
 .key-editor-panel {
   flex: 1;
-  min-width: 760px;
+  min-width: 700px;
   overflow: hidden;
   display: flex;
   flex-direction: column;

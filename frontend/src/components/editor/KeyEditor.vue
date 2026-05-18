@@ -375,10 +375,26 @@ onBeforeUnmount(() => {
 }
 .rename-bar input:focus { border-color: #3b82f6; }
 .rename-msg { font-size: 12px; color: #991b1b; }
+.key-header,
+.key-meta,
+.key-actions,
+.type-badge,
+.ttl-info,
+.ttl-val,
+.btn-sm,
+.btn-xs,
+.btn-retry,
+.rename-bar,
+.rename-msg,
+.spinner,
+.error-icon {
+  user-select: none;
+  -webkit-user-select: none;
+}
 .editor-body {
   flex: 1;
   overflow: hidden;
-  padding: 12px 16px;
+  padding: 12px 10px 0;
   display: flex;
   flex-direction: column;
 }

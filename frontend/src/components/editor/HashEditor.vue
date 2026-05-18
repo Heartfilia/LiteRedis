@@ -417,6 +417,16 @@ async function addField() {
 .hash-table td { padding: 5px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
 .num-col { width: 36px; text-align: center; }
 .num-cell { width: 36px; text-align: center; color: #d1d5db; font-size: 11px; }
+.hash-table thead,
+.num-col,
+.num-cell,
+.field-th,
+.action-th,
+.action-cell,
+.action-btns {
+  user-select: none;
+  -webkit-user-select: none;
+}
 .field-th { position: relative; min-width: 80px; }
 .value-th { width: auto; }
 .action-th { width: 1px; white-space: nowrap; }
@@ -435,7 +445,14 @@ async function addField() {
   z-index: 5;
 }
 .col-resizer:hover { background: #3b82f6; border-color: #3b82f6; }
-.field-cell { color: #1d4ed8; font-weight: 500; word-break: break-all; min-width: 0; }
+.field-cell {
+  color: #1d4ed8;
+  font-weight: 500;
+  word-break: break-all;
+  min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
 .value-th,
 .value-cell { min-width: 0; }
 .value-text {
@@ -468,7 +485,18 @@ async function addField() {
 .sortable-col:hover { background: #f3f4f6 !important; }
 .sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; color: #d1d5db; }
 .sort-icon.asc, .sort-icon.desc { color: #3b82f6; font-weight: bold; }
-.load-more { display: flex; justify-content: center; padding: 6px 0; flex-shrink: 0; }
+.load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 4px 12px;
+  margin: -8px -10px 0;
+  border-top: 1px solid #e8e8e8;
+  background: #fafafa;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
 .btn-load-more {
   display: inline-flex;
   align-items: center;
@@ -494,6 +522,7 @@ async function addField() {
 .load-more-hint {
   font-size: 12px;
   color: #9ca3af;
+  line-height: 1;
 }
 .value-cell {
   background: #f8fafc;

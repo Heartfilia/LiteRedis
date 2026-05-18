@@ -475,8 +475,10 @@ async function disconnectConn(id) {
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  padding: 8px 12px;
+  min-height: 34px;
+  padding: 4px 12px;
   border-top: 1px solid #2d3748;
+  box-sizing: border-box;
 }
 .sidebar-links {
   display: flex;

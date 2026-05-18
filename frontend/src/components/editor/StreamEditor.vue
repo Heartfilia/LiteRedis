@@ -59,6 +59,15 @@ async function copyEntry(entry) {
 .stream-entry { border-bottom: 1px solid #f0f0f0; padding: 7px 10px; font-size: 12px; }
 .stream-entry:hover { background: #f9fafb; }
 .entry-header { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.entry-header,
+.entry-num,
+.entry-id,
+.btn-entry-copy,
+.field-key,
+.field-sep {
+  user-select: none;
+  -webkit-user-select: none;
+}
 .entry-num {
   background: #ecfeff;
   color: #0e7490;
@@ -109,7 +118,18 @@ async function copyEntry(entry) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.load-more { display: flex; justify-content: center; padding: 6px 0; flex-shrink: 0; }
+.load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 4px 12px;
+  margin: -8px -10px 0;
+  border-top: 1px solid #e8e8e8;
+  background: #fafafa;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
 .btn-load-more {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 4px 18px;
