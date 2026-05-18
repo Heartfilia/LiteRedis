@@ -37,19 +37,57 @@
 
     <!-- 历史记录下拉（fixed 定位，避免被父容器 overflow:hidden 裁切） -->
     <div
-      v-if="showHistory && filteredHistory.length"
+      v-if="showHistory && filteredHistoryItems.length"
       class="history-dropdown"
       :style="dropdownStyle"
     >
-      <div
-        v-for="(item, idx) in filteredHistory"
-        :key="item"
-        :class="['history-item', { active: idx === activeIndex }]"
-        @mousedown.prevent="selectHistory(item)"
-        @mouseenter="activeIndex = idx"
-      >
-        {{ item }}
-      </div>
+      <template v-if="filteredPinnedHistory.length">
+        <div class="history-section-title">{{ t('keyTree.pinnedHistory') }}</div>
+        <div
+          v-for="(item, idx) in filteredPinnedHistory"
+          :key="`pinned:${item}`"
+          :class="['history-item', { active: idx === activeIndex }]"
+          @mousedown.prevent="selectHistory(item)"
+          @mouseenter="activeIndex = idx"
+        >
+          <button
+            class="history-pin-btn pinned"
+            :title="t('keyTree.unpinHistory')"
+            @mousedown.prevent.stop="togglePin(item)"
+          >
+            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+              <path d="M10.8 1.5a.75.75 0 01.53 1.28L10.1 4v2.12l1.52 1.52a.75.75 0 01-.53 1.28H8.75v4.35a.75.75 0 01-1.28.53l-1.5-1.5a.75.75 0 01-.22-.53V8.92H3.41a.75.75 0 01-.53-1.28L4.4 6.12V4L3.17 2.78A.75.75 0 013.7 1.5h7.1z" fill="currentColor" />
+            </svg>
+          </button>
+          <span class="history-item-text">{{ item }}</span>
+        </div>
+      </template>
+
+      <template v-if="filteredPinnedHistory.length && filteredNormalHistory.length">
+        <div class="history-section-divider" />
+      </template>
+
+      <template v-if="filteredNormalHistory.length">
+        <div class="history-section-title">{{ t('keyTree.recentHistory') }}</div>
+        <div
+          v-for="(item, idx) in filteredNormalHistory"
+          :key="`history:${item}`"
+          :class="['history-item', { active: idx + filteredPinnedHistory.length === activeIndex }]"
+          @mousedown.prevent="selectHistory(item)"
+          @mouseenter="activeIndex = idx + filteredPinnedHistory.length"
+        >
+          <button
+            class="history-pin-btn"
+            :title="t('keyTree.pinHistory')"
+            @mousedown.prevent.stop="togglePin(item)"
+          >
+            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+              <path d="M10.8 1.5a.75.75 0 01.53 1.28L10.1 4v2.12l1.52 1.52a.75.75 0 01-.53 1.28H8.75v4.35a.75.75 0 01-1.28.53l-1.5-1.5a.75.75 0 01-.22-.53V8.92H3.41a.75.75 0 01-.53-1.28L4.4 6.12V4L3.17 2.78A.75.75 0 013.7 1.5h7.1z" fill="currentColor" />
+            </svg>
+          </button>
+          <span class="history-item-text">{{ item }}</span>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -75,18 +113,36 @@ const activeIndex = ref(-1)
 const inputRowRef = ref(null)
 const shellRef = ref(null)
 const dropdownStyle = ref({})
+let blurTimer = null
 const activeConn = computed(() => connectionsStore.connections.find(c => c.id === workspaceStore.activeConnID))
 const isCluster = computed(() => !!activeConn.value?.is_cluster)
 
-const filteredHistory = computed(() => {
+const filteredPinnedHistory = computed(() => {
   const id = workspaceStore.activeConnID
   if (!id) return []
-  const list = workspaceStore.connSearchHistory[id] || []
+  const entry = workspaceStore.getConnSearchHistory(id)
   const maxCount = settingsStore.loaded ? settingsStore.searchHistoryLimit : 10
   const term = pattern.value.trim()
+  const list = entry.pinned || []
   if (!term || term === '*') return list.slice(0, maxCount)
   return list.filter(h => h.toLowerCase().includes(term.toLowerCase())).slice(0, maxCount)
 })
+
+const filteredNormalHistory = computed(() => {
+  const id = workspaceStore.activeConnID
+  if (!id) return []
+  const entry = workspaceStore.getConnSearchHistory(id)
+  const maxCount = settingsStore.loaded ? settingsStore.searchHistoryLimit : 10
+  const term = pattern.value.trim()
+  const list = entry.history || []
+  if (!term || term === '*') return list.slice(0, maxCount)
+  return list.filter(h => h.toLowerCase().includes(term.toLowerCase())).slice(0, maxCount)
+})
+
+const filteredHistoryItems = computed(() => [
+  ...filteredPinnedHistory.value,
+  ...filteredNormalHistory.value,
+])
 
 function updateDropdownPosition() {
   const rect = shellRef.value?.getBoundingClientRect()
@@ -125,9 +181,22 @@ watch(() => workspaceStore.currentDB, () => {
   activeIndex.value = -1
 })
 
-function onFocus() {
+function togglePin(item) {
   const id = workspaceStore.activeConnID
-  if (id && (workspaceStore.connSearchHistory[id] || []).length > 0) {
+  if (!id) return
+  workspaceStore.togglePinnedSearchHistory(id, item)
+  nextTick(updateDropdownPosition)
+}
+
+function onFocus() {
+  if (blurTimer) {
+    clearTimeout(blurTimer)
+    blurTimer = null
+  }
+  const id = workspaceStore.activeConnID
+  if (id) {
+    const entry = workspaceStore.getConnSearchHistory(id)
+    if (!entry.pinned.length && !entry.history.length) return
     showHistory.value = true
     activeIndex.value = -1
     nextTick(updateDropdownPosition)
@@ -135,23 +204,27 @@ function onFocus() {
 }
 
 function onBlur() {
-  showHistory.value = false
-  activeIndex.value = -1
+  if (blurTimer) clearTimeout(blurTimer)
+  blurTimer = setTimeout(() => {
+    showHistory.value = false
+    activeIndex.value = -1
+    blurTimer = null
+  }, 120)
 }
 
 function onArrowDown() {
-  if (!showHistory.value || !filteredHistory.value.length) return
-  activeIndex.value = (activeIndex.value + 1) % filteredHistory.value.length
+  if (!showHistory.value || !filteredHistoryItems.value.length) return
+  activeIndex.value = (activeIndex.value + 1) % filteredHistoryItems.value.length
 }
 
 function onArrowUp() {
-  if (!showHistory.value || !filteredHistory.value.length) return
-  activeIndex.value = (activeIndex.value - 1 + filteredHistory.value.length) % filteredHistory.value.length
+  if (!showHistory.value || !filteredHistoryItems.value.length) return
+  activeIndex.value = (activeIndex.value - 1 + filteredHistoryItems.value.length) % filteredHistoryItems.value.length
 }
 
 function onEnter() {
-  if (showHistory.value && activeIndex.value >= 0 && filteredHistory.value[activeIndex.value]) {
-    selectHistory(filteredHistory.value[activeIndex.value])
+  if (showHistory.value && activeIndex.value >= 0 && filteredHistoryItems.value[activeIndex.value]) {
+    selectHistory(filteredHistoryItems.value[activeIndex.value])
   } else {
     doSearch()
   }
@@ -278,16 +351,70 @@ async function doSearch() {
   overflow-y: auto;
   width: max-content;
 }
+.history-section-title {
+  padding: 7px 10px 5px;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  background: #f8fafc;
+}
+.history-section-divider {
+  height: 1px;
+  margin: 2px 0;
+  background: #e5e7eb;
+}
 .history-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 10px;
   font-size: 12px;
   color: #374151;
   cursor: pointer;
   white-space: nowrap;
+  min-width: 0;
+}
+.history-item-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.history-pin-btn {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.history-pin-btn:hover {
+  color: #64748b;
+  background: #e2e8f0;
+}
+.history-pin-btn.pinned {
+  color: #2563eb;
 }
 .history-item:hover,
 .history-item.active {
   background: #eff6ff;
+  color: #2563eb;
+}
+.history-item:hover .history-pin-btn,
+.history-item.active .history-pin-btn {
+  color: #64748b;
+}
+.history-item:hover .history-pin-btn.pinned,
+.history-item.active .history-pin-btn.pinned {
   color: #2563eb;
 }
 </style>

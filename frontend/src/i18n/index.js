@@ -48,6 +48,10 @@ const messages = {
       defaultMember: '默认 member',
       defaultScore: '默认 score',
       listDefaultHint: '首个元素',
+      pinnedHistory: '已置顶',
+      recentHistory: '最近使用',
+      pinHistory: '置顶',
+      unpinHistory: '取消置顶',
     },
     keyEditor: {
       selectKeyHint: '从左侧选择一个 key 查看详情',
@@ -274,6 +278,10 @@ const messages = {
       defaultMember: 'Default member',
       defaultScore: 'Default score',
       listDefaultHint: 'First element',
+      pinnedHistory: 'Pinned',
+      recentHistory: 'Recent',
+      pinHistory: 'Pin',
+      unpinHistory: 'Unpin',
     },
     keyEditor: {
       selectKeyHint: 'Select a key from the left to view details',

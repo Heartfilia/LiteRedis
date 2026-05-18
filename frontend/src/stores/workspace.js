@@ -3,13 +3,59 @@ import { scanKeys, getValue, getKeyInfo, deleteKey, renameKey, setTTL, selectDB,
 import { buildKeyTree } from '../utils/keyTree.js'
 import { useSettingsStore } from './settings.js'
 
+function ensureConnSearchEntry(entry) {
+  if (Array.isArray(entry)) {
+    return {
+      pinned: [],
+      history: entry.filter(item => typeof item === 'string' && item.trim()),
+    }
+  }
+
+  if (!entry || typeof entry !== 'object') {
+    return { pinned: [], history: [] }
+  }
+
+  const pinned = Array.isArray(entry.pinned) ? entry.pinned.filter(item => typeof item === 'string' && item.trim()) : []
+  const pinnedSet = new Set(pinned)
+  const history = Array.isArray(entry.history)
+    ? entry.history.filter(item => typeof item === 'string' && item.trim() && !pinnedSet.has(item))
+    : []
+
+  const pinnedUnchanged =
+    Array.isArray(entry.pinned) &&
+    entry.pinned.length === pinned.length &&
+    entry.pinned.every((item, idx) => item === pinned[idx])
+  const historyUnchanged =
+    Array.isArray(entry.history) &&
+    entry.history.length === history.length &&
+    entry.history.every((item, idx) => item === history[idx])
+
+  if (pinnedUnchanged && historyUnchanged) {
+    return entry
+  }
+
+  return { pinned, history }
+}
+
+function normalizePersistedSearchHistory(raw) {
+  if (!raw || typeof raw !== 'object') return {}
+  const normalized = {}
+  for (const [connId, entry] of Object.entries(raw)) {
+    normalized[connId] = ensureConnSearchEntry(entry)
+  }
+  return normalized
+}
+
 export const useWorkspaceStore = defineStore('workspace', {
   state: () => {
     // 从 localStorage 加载持久化的搜索历史
     let persistedHistory = {}
     try {
       const raw = localStorage.getItem('liteRedis_searchHistory')
-      if (raw) persistedHistory = JSON.parse(raw)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        persistedHistory = normalizePersistedSearchHistory(parsed)
+      }
     } catch (e) {}
 
     return {
@@ -39,7 +85,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       // 每个连接展开的目录节点，key 为 connID，value 为 { [fullPath]: boolean }
       expandedNodes: {},
 
-      // 每个连接的搜索历史，key 为 connID，value 为 pattern 数组（最多10条）
+      // 每个连接的搜索历史，key 为 connID，value 为 { history: [], pinned: [] }
       connSearchHistory: persistedHistory,
 
       // 编辑器内搜索状态缓存，key 为 'connID:keyType:key'，value 为 { query, fuzzy }
@@ -197,7 +243,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       try {
         const raw = localStorage.getItem('liteRedis_searchHistory')
         if (raw) {
-          this.connSearchHistory = JSON.parse(raw)
+          this.connSearchHistory = normalizePersistedSearchHistory(JSON.parse(raw))
         }
       } catch (e) {
         this.connSearchHistory = {}
@@ -210,17 +256,54 @@ export const useWorkspaceStore = defineStore('workspace', {
       } catch (e) {}
     },
 
+    getConnSearchHistory(connId) {
+      const normalized = ensureConnSearchEntry(this.connSearchHistory[connId])
+      if (this.connSearchHistory[connId] !== normalized) {
+        this.connSearchHistory[connId] = normalized
+      }
+      return normalized
+    },
+
     _recordSearchHistory(pattern) {
       if (!this.activeConnID || !pattern) return
       const p = pattern.trim()
       if (!p || p === '*') return
       const settingsStore = useSettingsStore()
       const limit = settingsStore.loaded ? settingsStore.searchHistoryLimit : 10
-      let list = this.connSearchHistory[this.activeConnID] || []
-      list = list.filter(item => item !== p)
+      const entry = this.getConnSearchHistory(this.activeConnID)
+      if (entry.pinned.includes(p)) {
+        this._saveSearchHistory()
+        return
+      }
+      let list = entry.history.filter(item => item !== p)
       list.unshift(p)
       if (list.length > limit) list = list.slice(0, limit)
-      this.connSearchHistory[this.activeConnID] = list
+      this.connSearchHistory[this.activeConnID] = {
+        pinned: [...entry.pinned],
+        history: list,
+      }
+      this._saveSearchHistory()
+    },
+
+    togglePinnedSearchHistory(connId, pattern) {
+      if (!connId || !pattern) return
+      const p = pattern.trim()
+      if (!p || p === '*') return
+      const settingsStore = useSettingsStore()
+      const limit = settingsStore.loaded ? settingsStore.searchHistoryLimit : 10
+      const entry = this.getConnSearchHistory(connId)
+      const isPinned = entry.pinned.includes(p)
+
+      if (isPinned) {
+        const pinned = entry.pinned.filter(item => item !== p)
+        const history = [p, ...entry.history.filter(item => item !== p)].slice(0, limit)
+        this.connSearchHistory[connId] = { pinned, history }
+      } else {
+        const pinned = [p, ...entry.pinned.filter(item => item !== p)]
+        const history = entry.history.filter(item => item !== p)
+        this.connSearchHistory[connId] = { pinned, history }
+      }
+
       this._saveSearchHistory()
     },
 
@@ -229,7 +312,11 @@ export const useWorkspaceStore = defineStore('workspace', {
       if (!Number.isFinite(normalizedLimit) || normalizedLimit < 1) return
       const next = {}
       for (const [connId, history] of Object.entries(this.connSearchHistory || {})) {
-        next[connId] = Array.isArray(history) ? history.slice(0, normalizedLimit) : []
+        const entry = ensureConnSearchEntry(history)
+        next[connId] = {
+          pinned: [...entry.pinned],
+          history: entry.history.slice(0, normalizedLimit),
+        }
       }
       this.connSearchHistory = next
       this._saveSearchHistory()
