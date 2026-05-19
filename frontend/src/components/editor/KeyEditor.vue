@@ -46,8 +46,8 @@
           </span>
         </div>
         <div class="key-actions">
-          <button class="btn-sm" @click="startRename">{{ t('keyEditor.rename') }}</button>
-          <button class="btn-sm" @click="refreshKey">{{ t('keyEditor.refresh') }}</button>
+          <button class="btn-tiny" @click="startRename">{{ t('keyEditor.rename') }}</button>
+          <button class="btn-tiny" @click="refreshKey">{{ t('keyEditor.refresh') }}</button>
           <InlineDeleteConfirm
             :label="t('keyEditor.delete')"
             :confirm-text="t('keyEditor.confirmDelete')"

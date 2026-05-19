@@ -250,7 +250,7 @@ onBeforeUnmount(() => {
 
 // 编辑连接（打开 ConnectionManager）
 function openEdit(conn) {
-  openConnManager()
+  openConnManager(conn)
 }
 
 function openGitHub() {
@@ -584,7 +584,13 @@ async function disconnectConn(id) {
 .btn-collapse:hover { background: #a0aec0; }
 
 /* ===== 连接列表 ===== */
-.conn-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+.conn-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
 .conn-item {
   display: flex;
   align-items: center;

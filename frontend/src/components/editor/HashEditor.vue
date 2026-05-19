@@ -44,7 +44,7 @@
               <span class="col-resizer" @mousedown.stop="startResizeField" />
             </th>
             <th class="value-th">Value</th>
-            <th class="action-th">{{ t('keyEditor.action') }}</th>
+            <th class="action-th"><span class="action-th-label">{{ t('keyEditor.action') }}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -429,7 +429,18 @@ async function addField() {
 }
 .field-th { position: relative; min-width: 80px; }
 .value-th { width: auto; }
-.action-th { width: 1px; white-space: nowrap; }
+.action-th {
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+  white-space: nowrap;
+  text-align: center;
+}
+.action-th-label {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
 .th-content { display: inline-block; }
 .col-resizer {
   position: absolute;

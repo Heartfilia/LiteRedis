@@ -2,7 +2,11 @@
   <div class="app-layout" :class="fontSizeClass">
     <Sidebar />
     <MainContent />
-    <ConnectionManager v-if="showConnManager" @close="showConnManager = false" />
+    <ConnectionManager
+      v-if="showConnManager"
+      :initial-connection="connManagerInitialConnection"
+      @close="showConnManager = false"
+    />
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
   </div>
 </template>
@@ -21,9 +25,13 @@ const settingsStore = useSettingsStore()
 
 const showConnManager = ref(false)
 const showSettings = ref(false)
+const connManagerInitialConnection = ref(null)
 const fontSizeClass = computed(() => `font-${settingsStore.fontSizeLevel || 'small'}`)
 
-provide('openConnManager', () => { showConnManager.value = true })
+provide('openConnManager', (connection = null) => {
+  connManagerInitialConnection.value = connection
+  showConnManager.value = true
+})
 provide('openSettings', () => { showSettings.value = true })
 
 onMounted(() => {

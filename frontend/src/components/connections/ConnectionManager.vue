@@ -116,11 +116,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import ConnectionForm from './ConnectionForm.vue'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useI18n } from '../../i18n/index.js'
+
+const props = defineProps({
+  initialConnection: { type: Object, default: null },
+})
 
 const emit = defineEmits(['close'])
 const connectionsStore = useConnectionsStore()
@@ -156,6 +160,14 @@ function selectConn(conn) {
     sshEnabled: conn.ssh_enabled,
   }
 }
+
+watch(() => props.initialConnection, (conn) => {
+  if (conn) {
+    selectConn(conn)
+  } else {
+    selectedConn.value = null
+  }
+}, { immediate: true })
 
 function toggleGroup(group) {
   collapsed.value[group] = !collapsed.value[group]
@@ -405,8 +417,12 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 /* 右侧表单区 */
 .cm-form-area {
   flex: 1;
-  overflow-y: auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   padding: 8px 0;
+  display: flex;
+  flex-direction: column;
 }
 /* 右键菜单 */
 .ctx-menu {

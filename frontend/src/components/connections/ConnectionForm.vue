@@ -1,183 +1,180 @@
 <template>
   <div class="connection-form">
-    <h3>{{ isEdit ? t('connManager.editConn') : t('connManager.newConn') }}</h3>
+    <div class="form-scroll">
+      <h3>{{ isEdit ? t('connManager.editConn') : t('connManager.newConn') }}</h3>
 
-    <div class="form-group">
-      <label>{{ t('connManager.nameRequired') }}</label>
-      <input v-model="form.name" type="text" placeholder="My Redis" />
-    </div>
-
-    <div class="form-group">
-      <label>{{ t('connManager.groupOptional') }}</label>
-      <input
-        v-model="form.group"
-        type="text"
-        :placeholder="t('connManager.groupPlaceholder')"
-        @focus="showGroupSuggestions = true"
-        @blur="hideGroupSuggestions"
-      />
-      <div v-if="showGroupSuggestions && filteredGroups.length" class="group-suggestions">
-        <button
-          v-for="g in filteredGroups"
-          :key="g"
-          type="button"
-          class="group-suggestion-item"
-          @mousedown.prevent="selectGroup(g)"
-        >
-          {{ g }}
-        </button>
+      <div class="form-group">
+        <label>{{ t('connManager.nameRequired') }}</label>
+        <input v-model="form.name" type="text" placeholder="My Redis" />
       </div>
-    </div>
 
-    <!-- 集群模式切换 -->
-    <div class="form-group toggle-row">
-      <label>{{ t('connManager.clusterMode') }}</label>
-      <input type="checkbox" v-model="form.isCluster" />
-    </div>
-
-    <!-- 普通模式地址 -->
-    <template v-if="!form.isCluster">
-      <div class="form-row">
-        <div class="form-group flex1">
-          <label>Host *</label>
-          <input v-model="form.host" type="text" placeholder="127.0.0.1" />
-        </div>
-        <div class="form-group w100">
-          <label>Port</label>
-          <input v-model.number="form.port" type="number" placeholder="6379" min="1" max="65535" />
+      <div class="form-group">
+        <label>{{ t('connManager.groupOptional') }}</label>
+        <input
+          v-model="form.group"
+          type="text"
+          :placeholder="t('connManager.groupPlaceholder')"
+          @focus="showGroupSuggestions = true"
+          @blur="hideGroupSuggestions"
+        />
+        <div v-if="showGroupSuggestions && filteredGroups.length" class="group-suggestions">
+          <button
+            v-for="g in filteredGroups"
+            :key="g"
+            type="button"
+            class="group-suggestion-item"
+            @mousedown.prevent="selectGroup(g)"
+          >
+            {{ g }}
+          </button>
         </div>
       </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input v-model="form.password" type="password" :placeholder="t('connManager.passwordPlaceholder')" />
-      </div>
-      <div class="form-group w80">
-        <label>{{ t('connManager.dbIndex') }}</label>
-        <input v-model.number="form.db" type="number" min="0" max="15" placeholder="0" />
-      </div>
-    </template>
 
-    <!-- 集群模式地址列表 -->
-    <template v-else>
-      <div class="form-group">
-        <label>{{ t('connManager.clusterAddrsLabel') }}</label>
-        <textarea v-model="clusterAddrsText" rows="4" placeholder="127.0.0.1:7000&#10;127.0.0.1:7001&#10;127.0.0.1:7002" />
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input v-model="form.password" type="password" :placeholder="t('connManager.passwordPlaceholder')" />
-      </div>
-    </template>
-
-    <div class="proxy-section">
       <div class="form-group toggle-row">
-        <label>{{ t('connManager.proxyEnabled') }}</label>
-        <input type="checkbox" v-model="form.proxyEnabled" />
+        <label>{{ t('connManager.clusterMode') }}</label>
+        <input type="checkbox" v-model="form.isCluster" />
       </div>
 
-      <template v-if="form.proxyEnabled">
-        <div class="proxy-panel">
-          <div class="form-group">
-            <label>{{ t('connManager.proxyUrl') }}</label>
-            <input
-              v-model="form.proxyUrl"
-              type="text"
-              :placeholder="t('connManager.proxyUrlPlaceholder')"
-            />
+      <template v-if="!form.isCluster">
+        <div class="form-row">
+          <div class="form-group flex1">
+            <label>Host *</label>
+            <input v-model="form.host" type="text" placeholder="127.0.0.1" />
           </div>
+          <div class="form-group w100">
+            <label>Port</label>
+            <input v-model.number="form.port" type="number" placeholder="6379" min="1" max="65535" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input v-model="form.password" type="password" :placeholder="t('connManager.passwordPlaceholder')" />
+        </div>
+        <div class="form-group w80">
+          <label>{{ t('connManager.dbIndex') }}</label>
+          <input v-model.number="form.db" type="number" min="0" max="15" placeholder="0" />
         </div>
       </template>
-    </div>
 
-    <!-- SSH 配置 -->
-    <div class="ssh-section">
-      <div class="form-group toggle-row">
-        <label>{{ t('connManager.sshEnabled') }}</label>
-        <input type="checkbox" v-model="form.sshEnabled" />
-      </div>
-
-      <template v-if="form.sshEnabled">
-        <div class="ssh-panel">
-          <div class="form-row">
-            <div class="form-group flex1">
-              <label>{{ t('connManager.sshHostRequired') }}</label>
-              <input v-model="form.ssh.host" type="text" placeholder="jump.example.com" />
-            </div>
-            <div class="form-group w80">
-              <label>Port</label>
-              <input v-model.number="form.ssh.port" type="number" placeholder="22" min="1" max="65535" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group flex1">
-              <label>{{ t('connManager.sshUserRequired') }}</label>
-              <input v-model="form.ssh.user" type="text" placeholder="ubuntu" />
-            </div>
-            <div class="form-group flex1">
-              <label>SSH Password</label>
-              <input v-model="form.ssh.password" type="password" :placeholder="t('connManager.sshPasswordPlaceholder')" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group flex1">
-              <label>{{ t('connManager.sshPrivateKey') }}</label>
-              <input v-model="form.ssh.private_key_path" type="text" :placeholder="t('connManager.sshPrivateKeyPlaceholder')" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group flex1">
-              <label>{{ t('connManager.sshPassphrase') }}</label>
-              <input v-model="form.ssh.passphrase" type="password" :placeholder="t('connManager.sshPassphrasePlaceholder')" />
-            </div>
-          </div>
+      <template v-else>
+        <div class="form-group">
+          <label>{{ t('connManager.clusterAddrsLabel') }}</label>
+          <textarea v-model="clusterAddrsText" rows="4" placeholder="127.0.0.1:7000&#10;127.0.0.1:7001&#10;127.0.0.1:7002" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input v-model="form.password" type="password" :placeholder="t('connManager.passwordPlaceholder')" />
         </div>
       </template>
-    </div>
 
-    <div class="icon-color-section">
-      <div class="form-group">
-        <label>Icon Color</label>
-        <div class="icon-color-card">
-          <div class="icon-color-preview">
-            <span class="icon-preview-badge" :style="{ background: previewIconColor }">
-              {{ previewInitial }}
-            </span>
-            <div class="icon-preview-text">
-              <div class="icon-preview-title">Connection Icon</div>
-              <div class="icon-preview-subtitle">
-                {{ normalizedIconColor ? normalizedIconColor.toUpperCase() : 'Default palette' }}
+      <div class="proxy-section">
+        <div class="form-group toggle-row">
+          <label>{{ t('connManager.proxyEnabled') }}</label>
+          <input type="checkbox" v-model="form.proxyEnabled" />
+        </div>
+
+        <template v-if="form.proxyEnabled">
+          <div class="proxy-panel">
+            <div class="form-group">
+              <label>{{ t('connManager.proxyUrl') }}</label>
+              <input
+                v-model="form.proxyUrl"
+                type="text"
+                :placeholder="t('connManager.proxyUrlPlaceholder')"
+              />
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div class="ssh-section">
+        <div class="form-group toggle-row">
+          <label>{{ t('connManager.sshEnabled') }}</label>
+          <input type="checkbox" v-model="form.sshEnabled" />
+        </div>
+
+        <template v-if="form.sshEnabled">
+          <div class="ssh-panel">
+            <div class="form-row">
+              <div class="form-group flex1">
+                <label>{{ t('connManager.sshHostRequired') }}</label>
+                <input v-model="form.ssh.host" type="text" placeholder="jump.example.com" />
+              </div>
+              <div class="form-group w80">
+                <label>Port</label>
+                <input v-model.number="form.ssh.port" type="number" placeholder="22" min="1" max="65535" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex1">
+                <label>{{ t('connManager.sshUserRequired') }}</label>
+                <input v-model="form.ssh.user" type="text" placeholder="ubuntu" />
+              </div>
+              <div class="form-group flex1">
+                <label>SSH Password</label>
+                <input v-model="form.ssh.password" type="password" :placeholder="t('connManager.sshPasswordPlaceholder')" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex1">
+                <label>{{ t('connManager.sshPrivateKey') }}</label>
+                <input v-model="form.ssh.private_key_path" type="text" :placeholder="t('connManager.sshPrivateKeyPlaceholder')" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex1">
+                <label>{{ t('connManager.sshPassphrase') }}</label>
+                <input v-model="form.ssh.passphrase" type="password" :placeholder="t('connManager.sshPassphrasePlaceholder')" />
               </div>
             </div>
           </div>
-          <div class="icon-color-row">
-            <input v-model="form.iconColor" class="icon-color-picker" type="color" />
-            <input
-              v-model="form.iconColor"
-              class="icon-color-text"
-              type="text"
-              placeholder="#5C7F9E"
-            />
-            <button type="button" class="btn-secondary btn-color-reset" @click="form.iconColor = ''">
-              Default
-            </button>
+        </template>
+      </div>
+
+      <div class="icon-color-section">
+        <div class="form-group">
+          <label>Icon Color</label>
+          <div class="icon-color-card">
+            <div class="icon-color-preview">
+              <span class="icon-preview-badge" :style="{ background: previewIconColor }">
+                {{ previewInitial }}
+              </span>
+              <div class="icon-preview-text">
+                <div class="icon-preview-title">Connection Icon</div>
+                <div class="icon-preview-subtitle">
+                  {{ normalizedIconColor ? normalizedIconColor.toUpperCase() : 'Default palette' }}
+                </div>
+              </div>
+            </div>
+            <div class="icon-color-row">
+              <input v-model="form.iconColor" class="icon-color-picker" type="color" />
+              <input
+                v-model="form.iconColor"
+                class="icon-color-text"
+                type="text"
+                placeholder="#5C7F9E"
+              />
+              <button type="button" class="btn-secondary btn-color-reset" @click="form.iconColor = ''">
+                Default
+              </button>
+            </div>
+            <div class="icon-color-swatches">
+              <button
+                v-for="color in ICON_COLOR_PRESETS"
+                :key="color"
+                type="button"
+                class="icon-swatch"
+                :class="{ active: normalizedIconColor === color }"
+                :style="{ background: color }"
+                @click="form.iconColor = color"
+              />
+            </div>
           </div>
-          <div class="icon-color-swatches">
-            <button
-              v-for="color in ICON_COLOR_PRESETS"
-              :key="color"
-              type="button"
-              class="icon-swatch"
-              :class="{ active: normalizedIconColor === color }"
-              :style="{ background: color }"
-              @click="form.iconColor = color"
-            />
-          </div>
+          <div class="field-hint">Leave empty to use the default connection color.</div>
         </div>
-        <div class="field-hint">Leave empty to use the default connection color.</div>
       </div>
     </div>
 
-    <!-- 操作按钮 -->
     <div class="form-actions">
       <button class="btn-secondary" @click="$emit('cancel')">{{ t('connManager.cancel') }}</button>
       <button class="btn-secondary" :disabled="testing" @click="handleTest">
@@ -187,10 +184,11 @@
         {{ saving ? t('connManager.saving') : t('connManager.save') }}
       </button>
     </div>
-
-    <div v-if="testMsg" :class="['test-msg', testOk ? 'ok' : 'err']">{{ testMsg }}</div>
-    <div v-if="saveOkMsg" class="test-msg ok">{{ saveOkMsg }}</div>
-    <div v-if="saveMsg" class="test-msg err">{{ saveMsg }}</div>
+    <div class="form-messages">
+      <div v-if="testMsg" :class="['test-msg', testOk ? 'ok' : 'err']">{{ testMsg }}</div>
+      <div v-if="saveOkMsg" class="test-msg ok">{{ saveOkMsg }}</div>
+      <div v-if="saveMsg" class="test-msg err">{{ saveMsg }}</div>
+    </div>
   </div>
 </template>
 
@@ -410,8 +408,17 @@ async function handleSave() {
 
 <style scoped>
 .connection-form {
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   max-width: 480px;
+  min-height: 0;
+}
+.form-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 16px 12px;
 }
 h3 { margin: 0 0 16px; font-size: 15px; color: #111827; font-weight: 600; }
 .form-group { margin-bottom: 12px; position: relative; }
@@ -524,7 +531,20 @@ textarea { resize: vertical; font-family: monospace; }
   box-shadow: 0 0 0 1px #1f2937;
 }
 .field-hint { margin-top: 4px; font-size: 12px; color: #9ca3af; }
-.form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+  flex-shrink: 0;
+}
+.form-messages {
+  padding: 0 16px 16px;
+  background: #fff;
+  flex-shrink: 0;
+}
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 32px;

@@ -38,7 +38,7 @@
             <th class="sortable-col member-th" @click="cycleMemberSort">
               Member <span class="sort-icon" :class="memberSortOrder">{{ memberSortIcon }}</span>
             </th>
-            <th class="action-th">{{ t('keyEditor.action') }}</th>
+            <th class="action-th"><span class="action-th-label">{{ t('keyEditor.action') }}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -479,7 +479,18 @@ async function copyMember(member) {
 }
 .score-th { position: relative; min-width: 60px; }
 .member-th { width: auto; }
-.action-th { width: 1px; white-space: nowrap; }
+.action-th {
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+  white-space: nowrap;
+  text-align: center;
+}
+.action-th-label {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
 .th-content { display: inline-block; }
 .col-resizer {
   position: absolute;
