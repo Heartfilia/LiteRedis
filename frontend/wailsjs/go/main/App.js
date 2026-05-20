@@ -82,6 +82,10 @@ export function RenameKey(arg1, arg2, arg3) {
   return window['go']['main']['App']['RenameKey'](arg1, arg2, arg3);
 }
 
+export function ReorderConnections(arg1) {
+  return window['go']['main']['App']['ReorderConnections'](arg1);
+}
+
 export function SAdd(arg1, arg2, arg3) {
   return window['go']['main']['App']['SAdd'](arg1, arg2, arg3);
 }

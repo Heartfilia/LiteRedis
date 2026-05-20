@@ -18,6 +18,9 @@ const messages = {
       deleteFailed: '删除失败',
       cancel: '取消',
       jsonParser: 'JSON解析',
+      dropBefore: '放到此项前',
+      dropAfter: '放到此项后',
+      moveToUngrouped: '移动到未分组末尾',
     },
     keyTree: {
       selectConn: '请在左侧选择一个连接',
@@ -229,6 +232,9 @@ const messages = {
       hostRequiredErr: '请填写 Host',
       saveFailed: '保存失败',
       newGroupPrompt: '请输入新分组名称：',
+      dropBefore: '放到此项前',
+      dropAfter: '放到此项后',
+      moveToUngrouped: '移动到未分组末尾',
     },
   },
   en: {
@@ -248,6 +254,9 @@ const messages = {
       deleteFailed: 'Delete failed',
       cancel: 'Cancel',
       jsonParser: 'JSON Parser',
+      dropBefore: 'Drop before',
+      dropAfter: 'Drop after',
+      moveToUngrouped: 'Move to end of ungrouped',
     },
     keyTree: {
       selectConn: 'Select a connection on the left',
@@ -459,6 +468,9 @@ const messages = {
       hostRequiredErr: 'Please enter host',
       saveFailed: 'Save failed',
       newGroupPrompt: 'Enter new group name:',
+      dropBefore: 'Drop before',
+      dropAfter: 'Drop after',
+      moveToUngrouped: 'Move to end of ungrouped',
     },
   },
 }

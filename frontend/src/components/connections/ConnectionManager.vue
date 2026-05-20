@@ -14,26 +14,46 @@
         <!-- 主体：左侧分组列表 + 右侧表单 -->
         <div class="cm-body">
           <!-- 左侧连接列表 -->
-          <div class="cm-sidebar">
+          <div ref="sidebarRef" class="cm-sidebar" :class="{ 'suppress-hover': suppressHover }">
             <!-- 未分组连接 -->
             <div
               class="cm-group-zone"
-              :class="{ 'drag-over': dragOverGroup === '' }"
-              @dragover.prevent="dragOverGroup = ''"
-              @dragleave="dragOverGroup = null"
-              @drop.prevent="onDropToGroup('')"
+              :class="{
+                'drag-over': isGroupDropPreview(''),
+                'cross-group-preview': isCrossGroupDropPreview(''),
+              }"
+              @dragover.prevent="onDragOverGroup('', $event)"
+              @dragleave="onDragLeaveContainer"
+              @drop.prevent="onDropToGroup('', '')"
             >
-              <div class="cm-group-label">{{ t('connManager.ungrouped') }}</div>
+              <div class="cm-group-label">
+                {{ t('connManager.ungrouped') }}
+                <span
+                  v-if="isGroupDropPreview('')"
+                  class="cm-drop-group-hint"
+                  :class="{ 'cross-group-preview': isCrossGroupDropPreview('') }"
+                >{{ groupDropHint('') }}</span>
+              </div>
               <div
                 v-for="conn in (groupedConnections[''] || [])"
                 :key="conn.id"
-                :class="['cm-conn-item', { selected: selectedConn?.id === conn.id }]"
+                :class="['cm-conn-item', {
+                  selected: selectedConn?.id === conn.id,
+                  dragging: dragId === conn.id,
+                  'drop-before': isItemDropPreview(conn.id, 'before'),
+                  'drop-after': isItemDropPreview(conn.id, 'after'),
+                  'cross-group-preview': isItemCrossGroupPreview(conn.id),
+                }]"
                 draggable="true"
                 @dragstart="onDragStart(conn.id)"
-                @dragend="dragOverGroup = null"
+                @dragend="onDragEnd"
+                @dragover.prevent="onDragOverItem('', conn.id, $event)"
+                @drop.prevent="onDropToGroup('', conn.id)"
                 @click="selectConn(conn)"
                 @contextmenu.prevent="showCtxMenu($event, conn)"
               >
+                <div v-if="isItemDropPreview(conn.id, 'before')" class="cm-drop-indicator before" />
+                <div v-if="isItemDropPreview(conn.id, 'after')" class="cm-drop-indicator after" />
                 <span :class="['conn-dot', connectionsStore.isConnected(conn.id) ? 'connected' : 'disconnected']" />
                 <div class="conn-info">
                   <span class="conn-name">{{ conn.name }}</span>
@@ -46,27 +66,45 @@
             <div v-for="(conns, group) in namedGroups" :key="group" class="cm-group-block">
               <div
                 class="cm-group-header"
-                :class="{ 'drag-over': dragOverGroup === group }"
+                :class="{
+                  'drag-over': isGroupDropPreview(group),
+                  'cross-group-preview': isCrossGroupDropPreview(group),
+                }"
                 @click="toggleGroup(group)"
-                @dragover.prevent="dragOverGroup = group"
-                @dragleave="dragOverGroup = null"
-                @drop.prevent="onDropToGroup(group)"
+                @dragover.prevent="onDragOverGroup(group, $event)"
+                @dragleave="onDragLeaveContainer"
+                @drop.prevent="onDropToGroup(group, '')"
               >
                 <span class="arrow">{{ collapsed[group] ? '▶' : '▼' }}</span>
                 <span class="gname">{{ group }}</span>
                 <span class="gcount">{{ conns.length }}</span>
+                <span
+                  v-if="isGroupDropPreview(group)"
+                  class="cm-drop-group-hint"
+                  :class="{ 'cross-group-preview': isCrossGroupDropPreview(group) }"
+                >{{ groupDropHint(group) }}</span>
               </div>
               <div v-if="!collapsed[group]" class="cm-group-conns">
                 <div
                   v-for="conn in conns"
                   :key="conn.id"
-                  :class="['cm-conn-item', { selected: selectedConn?.id === conn.id }]"
+                  :class="['cm-conn-item', {
+                    selected: selectedConn?.id === conn.id,
+                    dragging: dragId === conn.id,
+                    'drop-before': isItemDropPreview(conn.id, 'before'),
+                    'drop-after': isItemDropPreview(conn.id, 'after'),
+                    'cross-group-preview': isItemCrossGroupPreview(conn.id),
+                  }]"
                   draggable="true"
                   @dragstart="onDragStart(conn.id)"
-                  @dragend="dragOverGroup = null"
+                  @dragend="onDragEnd"
+                  @dragover.prevent="onDragOverItem(group, conn.id, $event)"
+                  @drop.prevent="onDropToGroup(group, conn.id)"
                   @click="selectConn(conn)"
                   @contextmenu.prevent="showCtxMenu($event, conn)"
                 >
+                  <div v-if="isItemDropPreview(conn.id, 'before')" class="cm-drop-indicator before" />
+                  <div v-if="isItemDropPreview(conn.id, 'after')" class="cm-drop-indicator after" />
                   <span :class="['conn-dot', connectionsStore.isConnected(conn.id) ? 'connected' : 'disconnected']" />
                   <div class="conn-info">
                     <span class="conn-name">{{ conn.name }}</span>
@@ -135,6 +173,11 @@ const selectedConn = ref(null)
 const collapsed = ref({})
 const dragId = ref(null)
 const dragOverGroup = ref(null)
+const dragPreview = ref({ group: null, targetId: '', placement: 'before', mode: null })
+const suppressHover = ref(false)
+const sidebarRef = ref(null)
+let dragExpandTimer = null
+let suppressHoverTimer = null
 
 const groupedConnections = computed(() => connectionsStore.groupedConnections)
 const namedGroups = computed(() => {
@@ -175,16 +218,120 @@ function toggleGroup(group) {
 
 function onDragStart(connId) {
   dragId.value = connId
+  dragPreview.value = { group: null, targetId: '', placement: 'before', mode: null }
 }
 
-async function onDropToGroup(targetGroup) {
+function onDragOverItem(group, targetId, event) {
+  if (!dragId.value || dragId.value === targetId) return
+  const rect = event.currentTarget.getBoundingClientRect()
+  const placement = event.clientY - rect.top > rect.height / 2 ? 'after' : 'before'
+  dragOverGroup.value = null
+  dragPreview.value = { group, targetId, placement, mode: 'item' }
+}
+
+function onDragOverGroup(group) {
+  if (!dragId.value) return
+  if (dragExpandTimer) {
+    clearTimeout(dragExpandTimer)
+    dragExpandTimer = null
+  }
+  if (group && collapsed.value[group]) {
+    dragExpandTimer = setTimeout(() => {
+      collapsed.value[group] = false
+      dragExpandTimer = null
+    }, 420)
+  }
+  dragOverGroup.value = group
+  dragPreview.value = { group, targetId: '', placement: 'after', mode: 'group' }
+}
+
+function onDragLeaveContainer(event) {
+  if (event.currentTarget?.contains(event.relatedTarget)) return
+  if (dragExpandTimer) {
+    clearTimeout(dragExpandTimer)
+    dragExpandTimer = null
+  }
+  dragOverGroup.value = null
+  if (dragPreview.value.mode === 'group') {
+    dragPreview.value = { group: null, targetId: '', placement: 'before', mode: null }
+  }
+}
+
+function onDragEnd() {
+  if (dragExpandTimer) {
+    clearTimeout(dragExpandTimer)
+    dragExpandTimer = null
+  }
+  releaseHoverState()
+  dragOverGroup.value = null
+  dragId.value = null
+  dragPreview.value = { group: null, targetId: '', placement: 'before', mode: null }
+}
+
+function isItemDropPreview(targetId, placement) {
+  return dragPreview.value.mode === 'item' &&
+    dragPreview.value.targetId === targetId &&
+    dragPreview.value.placement === placement
+}
+
+function isGroupDropPreview(group) {
+  return dragPreview.value.mode === 'group' && dragPreview.value.group === group
+}
+function draggedConnectionGroup() {
+  return connectionsStore.connections.find(conn => conn.id === dragId.value)?.group || ''
+}
+function isCrossGroupDropPreview(group) {
+  return isGroupDropPreview(group) && draggedConnectionGroup() !== group
+}
+function isItemCrossGroupPreview(targetId) {
+  if (dragPreview.value.mode !== 'item' || dragPreview.value.targetId !== targetId) return false
+  const targetGroup = connectionsStore.connections.find(conn => conn.id === targetId)?.group || ''
+  return draggedConnectionGroup() !== targetGroup
+}
+
+function groupDropHint(group) {
+  return group ? `${t('connManager.moveToGroup')} ${group}` : t('connManager.moveToUngrouped')
+}
+
+async function onDropToGroup(targetGroup, targetId = '') {
+  const placement = dragPreview.value.targetId === targetId ? dragPreview.value.placement : 'before'
   dragOverGroup.value = null
   if (!dragId.value) return
-  const conn = connectionsStore.connections.find(c => c.id === dragId.value)
-  if (conn && conn.group !== targetGroup) {
-    await connectionsStore.save(buildCfg(conn, targetGroup))
+  if (dragId.value !== targetId) {
+    await connectionsStore.moveConnection(dragId.value, targetId, targetGroup, placement)
   }
-  dragId.value = null
+  onDragEnd()
+}
+
+function clearSuppressHover() {
+  suppressHover.value = false
+  if (suppressHoverTimer) {
+    clearTimeout(suppressHoverTimer)
+    suppressHoverTimer = null
+  }
+  window.removeEventListener('mousemove', clearSuppressHover)
+}
+
+function releaseHoverState() {
+  suppressHover.value = true
+  const sidebarEl = sidebarRef.value
+  if (sidebarEl) {
+    sidebarEl.style.pointerEvents = 'none'
+    void sidebarEl.offsetHeight
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (sidebarRef.value) {
+          sidebarRef.value.style.pointerEvents = ''
+        }
+      })
+    })
+  }
+  if (suppressHoverTimer) clearTimeout(suppressHoverTimer)
+  window.removeEventListener('mousemove', clearSuppressHover)
+  window.addEventListener('mousemove', clearSuppressHover, { once: true })
+  suppressHoverTimer = setTimeout(() => {
+    clearSuppressHover()
+  }, 180)
 }
 
 function buildCfg(conn, group) {
@@ -264,7 +411,15 @@ function onDocClick() {
 }
 
 onMounted(() => document.addEventListener('click', onDocClick))
-onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocClick)
+  if (dragExpandTimer) clearTimeout(dragExpandTimer)
+  if (suppressHoverTimer) clearTimeout(suppressHoverTimer)
+  window.removeEventListener('mousemove', clearSuppressHover)
+  if (sidebarRef.value) {
+    sidebarRef.value.style.pointerEvents = ''
+  }
+})
 </script>
 
 <style scoped>
@@ -332,29 +487,42 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   display: flex;
   flex: 1;
   overflow: hidden;
+  background: linear-gradient(180deg, #f8fafc 0%, #f4f7fb 100%);
 }
 /* 左侧 */
 .cm-sidebar {
   width: 260px;
   flex-shrink: 0;
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid #e6ebf2;
   overflow-y: auto;
-  padding: 8px 0;
-  background: #f9fafb;
+  padding: 10px 0;
+  background: linear-gradient(180deg, #f8fafc 0%, #f3f6fa 100%);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.6);
+}
+.cm-sidebar.suppress-hover .cm-conn-item:hover {
+  background: transparent;
+}
+.cm-sidebar.suppress-hover .cm-conn-item.selected:hover {
+  background: #dbeafe;
 }
 .cm-group-zone {
   padding: 2px 0;
   border-radius: 4px;
+  position: relative;
   transition: background 0.15s;
 }
 .cm-group-zone.drag-over { background: #dbeafe; }
+.cm-group-zone.cross-group-preview.drag-over { background: rgba(16, 185, 129, 0.12); }
 .cm-group-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 10px;
   font-weight: 700;
-  color: #9ca3af;
+  color: #94a3b8;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
-  padding: 4px 14px 2px;
+  letter-spacing: 0.72px;
+  padding: 5px 14px 3px;
 }
 .cm-conn-item {
   display: flex;
@@ -362,12 +530,75 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   gap: 8px;
   padding: 7px 14px;
   cursor: pointer;
-  border-radius: 6px;
-  margin: 1px 6px;
-  transition: background 0.12s;
+  border-radius: 8px;
+  margin: 2px 8px;
+  position: relative;
+  border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
 }
-.cm-conn-item:hover { background: #e8edf3; }
-.cm-conn-item.selected { background: #dbeafe; }
+.cm-conn-item:hover {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(203, 213, 225, 0.7);
+}
+.cm-conn-item.selected {
+  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: rgba(96, 165, 250, 0.38);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+}
+.cm-conn-item.drop-before,
+.cm-conn-item.drop-after {
+  background: rgba(59, 130, 246, 0.08);
+}
+.cm-conn-item.cross-group-preview.drop-before,
+.cm-conn-item.cross-group-preview.drop-after {
+  background: rgba(16, 185, 129, 0.1);
+}
+.cm-conn-item.dragging {
+  opacity: 0.46;
+  transform: scale(0.988);
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.18);
+}
+.cm-drop-indicator {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  height: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.cm-drop-indicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #3b82f6;
+  border-radius: 999px;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.22);
+}
+.cm-conn-item.cross-group-preview .cm-drop-indicator::before {
+  background: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.24);
+}
+.cm-drop-indicator::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 0 2px #f9fafb, 0 0 10px rgba(59, 130, 246, 0.26);
+}
+.cm-conn-item.cross-group-preview .cm-drop-indicator::after {
+  background: #10b981;
+  box-shadow: 0 0 0 2px #f9fafb, 0 0 10px rgba(16, 185, 129, 0.3);
+}
+.cm-drop-indicator.before { top: -1px; }
+.cm-drop-indicator.after { bottom: -1px; }
+.cm-drop-indicator.after::after { top: -3px; }
 .conn-dot {
   width: 7px; height: 7px;
   border-radius: 50%;
@@ -377,31 +608,56 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 .conn-dot.disconnected { background: #d1d5db; }
 .conn-info { min-width: 0; flex: 1; }
 .conn-name { display: block; font-size: 13px; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.conn-host { display: block; font-size: 11px; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cm-conn-item.selected .conn-name { color: #0f172a; }
+.conn-host { display: block; font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cm-conn-item.selected .conn-host { color: #64748b; }
 .cm-group-block { margin: 4px 0; }
 .cm-group-header {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 14px;
+  padding: 5px 14px;
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
-  color: #6b7280;
+  color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-radius: 5px;
-  margin: 0 6px;
+  letter-spacing: 0.58px;
+  border-radius: 8px;
+  margin: 1px 8px;
   user-select: none;
-  transition: background 0.12s;
+  border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
 }
-.cm-group-header:hover { background: #e8edf3; }
+.cm-group-header:hover {
+  background: rgba(255, 255, 255, 0.64);
+  border-color: rgba(226, 232, 240, 0.8);
+}
 .cm-group-header.drag-over { background: #dbeafe; border: 1px dashed #3b82f6; }
+.cm-group-header.cross-group-preview.drag-over {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #10b981;
+}
+.cm-drop-group-hint {
+  margin-left: auto;
+  font-size: 10px;
+  color: #2563eb;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  border-radius: 999px;
+  padding: 1px 6px;
+  line-height: 1.5;
+}
+.cm-drop-group-hint.cross-group-preview {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.26);
+}
 .arrow { font-size: 9px; }
 .gname { flex: 1; }
 .gcount {
-  background: #e5e7eb;
-  color: #6b7280;
+  background: rgba(226, 232, 240, 0.9);
+  color: #64748b;
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 10px;
@@ -420,9 +676,10 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: 8px 0;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f7f9fc 100%);
 }
 /* 右键菜单 */
 .ctx-menu {

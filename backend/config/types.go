@@ -6,6 +6,7 @@ import "time"
 type ConnectionConfig struct {
 	ID           string     `json:"id"`
 	Name         string     `json:"name"`
+	SortOrder    int        `json:"sort_order"`
 	Group        string     `json:"group,omitempty"`
 	Host         string     `json:"host"`
 	Port         int        `json:"port"`
@@ -20,6 +21,12 @@ type ConnectionConfig struct {
 	SSH          *SSHConfig `json:"ssh,omitempty"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+type ConnectionOrderItem struct {
+	ID        string `json:"id"`
+	Group     string `json:"group,omitempty"`
+	SortOrder int    `json:"sort_order"`
 }
 
 // SSHConfig SSH 配置

@@ -81,6 +81,13 @@ func (a *App) SaveConnection(cfg config.ConnectionConfig) config.OperationResult
 	return config.OperationResult{Success: true}
 }
 
+func (a *App) ReorderConnections(items []config.ConnectionOrderItem) config.OperationResult {
+	if err := config.ReorderConnections(items); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
 // DeleteConnection 删除连接配置
 func (a *App) DeleteConnection(id string) config.OperationResult {
 	// 先断开连接

@@ -486,8 +486,13 @@ async function copyMember(member) {
   white-space: nowrap;
   text-align: center;
 }
+.zset-table th.action-th {
+  text-align: center !important;
+}
 .action-th-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   text-align: center;
 }

@@ -67,6 +67,7 @@ export namespace config {
 	export class ConnectionConfig {
 	    id: string;
 	    name: string;
+	    sort_order: number;
 	    group?: string;
 	    host: string;
 	    port: number;
@@ -92,6 +93,7 @@ export namespace config {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.name = source["name"];
+	        this.sort_order = source["sort_order"];
 	        this.group = source["group"];
 	        this.host = source["host"];
 	        this.port = source["port"];
@@ -125,6 +127,22 @@ export namespace config {
 		    }
 		    return a;
 		}
+	}
+	export class ConnectionOrderItem {
+	    id: string;
+	    group?: string;
+	    sort_order: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConnectionOrderItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.group = source["group"];
+	        this.sort_order = source["sort_order"];
+	    }
 	}
 	export class CreateKeyRequest {
 	    key: string;

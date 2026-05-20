@@ -10,6 +10,7 @@ function callGo(method, ...args) {
 // ===== 连接管理 =====
 export const listConnections = () => callGo('ListConnections')
 export const saveConnection = (cfg) => callGo('SaveConnection', cfg)
+export const reorderConnections = (items) => callGo('ReorderConnections', items)
 export const deleteConnection = (id) => callGo('DeleteConnection', id)
 export const testConnection = (cfg) => callGo('TestConnection', cfg)
 export const connect = (id) => callGo('Connect', id)

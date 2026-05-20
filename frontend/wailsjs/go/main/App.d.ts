@@ -43,6 +43,8 @@ export function RPush(arg1:string,arg2:string,arg3:string):Promise<config.Operat
 
 export function RenameKey(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
+export function ReorderConnections(arg1:Array<config.ConnectionOrderItem>):Promise<config.OperationResult>;
+
 export function SAdd(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
 export function SRem(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;

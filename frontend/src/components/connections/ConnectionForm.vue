@@ -220,6 +220,7 @@ const ICON_COLOR_PRESETS = [
 const defaultForm = () => ({
   id: '',
   name: '',
+  sort_order: 0,
   group: '',
   host: '127.0.0.1',
   port: 6379,
@@ -333,6 +334,7 @@ function buildCfg() {
   const cfg = {
     id: form.id,
     name: form.name,
+    sort_order: form.sort_order || 0,
     group: form.group || '',
     host: form.host,
     port: form.port || 6379,
@@ -413,14 +415,26 @@ async function handleSave() {
   height: 100%;
   max-width: 480px;
   min-height: 0;
+  background: #ffffff;
+  border: 1px solid #eef2f7;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
 }
 .form-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 16px 12px;
+  padding: 14px 16px 6px;
 }
-h3 { margin: 0 0 16px; font-size: 15px; color: #111827; font-weight: 600; }
+h3 {
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 15px;
+  color: #111827;
+  font-weight: 600;
+}
 .form-group { margin-bottom: 12px; position: relative; }
 .form-group label { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; font-weight: 500; }
 input[type=text], input[type=password], input[type=number], textarea {
@@ -535,15 +549,20 @@ textarea { resize: vertical; font-family: monospace; }
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  padding: 12px 16px;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
+  align-items: center;
+  min-height: 46px;
+  padding: 6px 16px 4px;
+  border-top: 1px solid #eef2f7;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 .form-messages {
-  padding: 0 16px 16px;
-  background: #fff;
+  min-height: 10px;
+  padding: 0 16px 4px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
@@ -580,7 +599,7 @@ textarea { resize: vertical; font-family: monospace; }
 }
 .btn-secondary:hover { background: #f3f4f6; border-color: #9ca3af; }
 .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
-.test-msg { margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 12px; }
+.test-msg { margin-top: 2px; padding: 6px 10px; border-radius: 6px; font-size: 12px; }
 .test-msg.ok { background: #f0fdf4; color: #166534; }
 .test-msg.err { background: #fff1f2; color: #991b1b; }
 </style>

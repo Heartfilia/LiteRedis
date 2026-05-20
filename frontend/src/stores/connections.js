@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { listConnections, saveConnection, deleteConnection, testConnection, connect, disconnect, isConnected } from '../api/wails.js'
+import { listConnections, saveConnection, reorderConnections, deleteConnection, testConnection, connect, disconnect, isConnected } from '../api/wails.js'
 
 export const useConnectionsStore = defineStore('connections', {
   state: () => ({
@@ -42,6 +42,48 @@ export const useConnectionsStore = defineStore('connections', {
         await this.loadConnections()
       }
       return result
+    },
+
+    async reorder(items) {
+      const result = await reorderConnections(items)
+      if (result.success) {
+        await this.loadConnections()
+      }
+      return result
+    },
+
+    async moveConnection(id, targetId = '', targetGroup = '', placement = 'before') {
+      const current = [...this.connections]
+      const sourceIndex = current.findIndex(conn => conn.id === id)
+      if (sourceIndex === -1) return { success: false, message: 'connection not found' }
+
+      const [moved] = current.splice(sourceIndex, 1)
+      moved.group = targetGroup
+
+      let insertIndex = current.length
+      if (targetId) {
+        const targetIndex = current.findIndex(conn => conn.id === targetId)
+        if (targetIndex !== -1) {
+          insertIndex = targetIndex + (placement === 'after' ? 1 : 0)
+        }
+      } else {
+        const lastGroupIndex = [...current].map((conn, index) => ({ conn, index }))
+          .filter(({ conn }) => (conn.group || '') === targetGroup)
+          .at(-1)?.index
+        if (typeof lastGroupIndex === 'number') {
+          insertIndex = lastGroupIndex + 1
+        }
+      }
+
+      current.splice(insertIndex, 0, moved)
+
+      const payload = current.map((conn, index) => ({
+        id: conn.id,
+        group: conn.group || '',
+        sort_order: index,
+      }))
+
+      return await this.reorder(payload)
     },
 
     async remove(id) {

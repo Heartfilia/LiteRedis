@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -45,16 +46,38 @@ func loadStore() (*ConfigStore, error) {
 	if store.Settings.KeyScanCount == 0 || store.Settings.SearchHistoryLimit == 0 {
 		store.Settings = DefaultSettings()
 	}
+	ensureConnectionOrder(&store)
 	return &store, nil
 }
 
 // saveStore 写入磁盘（不加锁，调用方负责）
 func saveStore(store *ConfigStore) error {
+	ensureConnectionOrder(store)
 	data, err := json.MarshalIndent(store, "", "  ")
 	if err != nil {
 		return err
 	}
 	return atomicWriteFile(configPath, data, 0644)
+}
+
+func ensureConnectionOrder(store *ConfigStore) {
+	if store == nil {
+		return
+	}
+	sort.SliceStable(store.Connections, func(i, j int) bool {
+		left := store.Connections[i]
+		right := store.Connections[j]
+		if left.SortOrder != right.SortOrder {
+			return left.SortOrder < right.SortOrder
+		}
+		if !left.CreatedAt.Equal(right.CreatedAt) {
+			return left.CreatedAt.Before(right.CreatedAt)
+		}
+		return left.ID < right.ID
+	})
+	for i := range store.Connections {
+		store.Connections[i].SortOrder = i
+	}
 }
 
 // ListConnections 返回所有连接配置
@@ -65,6 +88,7 @@ func ListConnections() ([]ConnectionConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+	ensureConnectionOrder(store)
 	return store.Connections, nil
 }
 
@@ -90,6 +114,7 @@ func SaveConnection(cfg ConnectionConfig) (ConnectionConfig, error) {
 		if cfg.SSH != nil && cfg.SSH.Port == 0 {
 			cfg.SSH.Port = 22
 		}
+		cfg.SortOrder = len(store.Connections)
 		store.Connections = append(store.Connections, cfg)
 	} else {
 		// 更新
@@ -98,6 +123,7 @@ func SaveConnection(cfg ConnectionConfig) (ConnectionConfig, error) {
 			if c.ID == cfg.ID {
 				cfg.CreatedAt = c.CreatedAt
 				cfg.UpdatedAt = now
+				cfg.SortOrder = c.SortOrder
 				store.Connections[i] = cfg
 				found = true
 				break
@@ -106,11 +132,37 @@ func SaveConnection(cfg ConnectionConfig) (ConnectionConfig, error) {
 		if !found {
 			cfg.CreatedAt = now
 			cfg.UpdatedAt = now
+			cfg.SortOrder = len(store.Connections)
 			store.Connections = append(store.Connections, cfg)
 		}
 	}
 
 	return cfg, saveStore(store)
+}
+
+func ReorderConnections(items []ConnectionOrderItem) error {
+	storeMu.Lock()
+	defer storeMu.Unlock()
+
+	store, err := loadStore()
+	if err != nil {
+		return err
+	}
+
+	orderByID := make(map[string]ConnectionOrderItem, len(items))
+	for _, item := range items {
+		orderByID[item.ID] = item
+	}
+
+	for i, conn := range store.Connections {
+		if item, ok := orderByID[conn.ID]; ok {
+			store.Connections[i].Group = item.Group
+			store.Connections[i].SortOrder = item.SortOrder
+			store.Connections[i].UpdatedAt = time.Now()
+		}
+	}
+
+	return saveStore(store)
 }
 
 // DeleteConnection 删除连接配置
