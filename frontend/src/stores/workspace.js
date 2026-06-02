@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { scanKeys, getValue, getKeyInfo, deleteKey, renameKey, setTTL, selectDB, dbSize, createKey } from '../api/wails.js'
 import { buildKeyTree } from '../utils/keyTree.js'
 import { useSettingsStore } from './settings.js'
+import { useConnectionsStore } from './connections.js'
+import { isConnectionErrorMessage, formatConnectionLostMessage } from '../utils/connection.js'
 
 function ensureConnSearchEntry(entry) {
   if (Array.isArray(entry)) {
@@ -108,6 +110,56 @@ export const useWorkspaceStore = defineStore('workspace', {
   },
 
   actions: {
+    async _handleConnectionFailure(error, options = {}) {
+      if (!this.activeConnID || !isConnectionErrorMessage(error)) return null
+      const connectionsStore = useConnectionsStore()
+      await connectionsStore.handleConnectionFailure(this.activeConnID, error)
+      const message = formatConnectionLostMessage(error)
+      if (options.clearKeyValue !== false) {
+        this.keyValue = null
+      }
+      if (options.setKeyError !== false) {
+        this.keyValueError = message
+      }
+      this.keyValueLoading = false
+      this._loadingKey = null
+      return {
+        success: false,
+        disconnected: true,
+        message,
+      }
+    },
+
+    applyConnectionLostState(connId, message) {
+      if (!connId || this.activeConnID !== connId) return
+      this.keyValue = null
+      this.keyValueLoading = false
+      this.keyValueError = message
+      this._loadingKey = null
+    },
+
+    async refreshAfterReconnect(connId) {
+      if (!connId || this.activeConnID !== connId) return
+      this.keyValueError = null
+
+      if (this.activeSession?.pattern) {
+        const pattern = this.activeSession.pattern
+        if (pattern !== '*') {
+          await this.search(pattern)
+        } else {
+          await this.search('*')
+        }
+      } else {
+        await this.search('*')
+      }
+
+      if (this.selectedKey) {
+        await this.selectKey(this.selectedKey)
+      }
+
+      await this.fetchTotalKeys()
+    },
+
     _patternToRegExp(pattern) {
       const normalized = pattern && pattern.trim() ? pattern.trim() : '*'
       const escaped = normalized.replace(/[.+^${}()|[\]\\]/g, '\\$&')
@@ -236,6 +288,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.totalKeys = await dbSize(this.activeConnID)
       } catch (e) {
         this.totalKeys = 0
+        await this._handleConnectionFailure(e)
       }
     },
 
@@ -371,6 +424,7 @@ export const useWorkspaceStore = defineStore('workspace', {
           this._autoExpandSessionId = sessionId
         }
       } catch (e) {
+        await this._handleConnectionFailure(e, { clearKeyValue: false, setKeyError: false })
         const idx = this.searchSessions.findIndex(s => s.id === sessionId)
         if (idx !== -1) {
           this.searchSessions[idx] = {
@@ -407,6 +461,7 @@ export const useWorkspaceStore = defineStore('workspace', {
           }
         }
       } catch (e) {
+        await this._handleConnectionFailure(e, { clearKeyValue: false, setKeyError: false })
         if (idx !== -1) {
           this.searchSessions[idx] = {
             ...this.searchSessions[idx],
@@ -460,6 +515,7 @@ export const useWorkspaceStore = defineStore('workspace', {
           await this.selectKey(key)
         }
       } catch (e) {
+        await this._handleConnectionFailure(e, { clearKeyValue: false, setKeyError: false })
         const idx = this.searchSessions.findIndex(s => s.id === sessionId)
         if (idx !== -1) {
           this.searchSessions[idx] = {
@@ -508,7 +564,8 @@ export const useWorkspaceStore = defineStore('workspace', {
         if (this._loadingKey !== key) return
 
         this.keyValue = null
-        this.keyValueError = e.message || String(e)
+        const disconnected = await this._handleConnectionFailure(e)
+        this.keyValueError = disconnected?.message || e.message || String(e)
       } finally {
         // 仅当本次令牌仍有效时才清除 loading
         if (this._loadingKey === key) {
@@ -521,7 +578,11 @@ export const useWorkspaceStore = defineStore('workspace', {
     async deleteCurrentKey() {
       if (!this.selectedKey || !this.activeConnID) return
       const deletedKey = this.selectedKey
-      await deleteKey(this.activeConnID, deletedKey)
+      try {
+        await deleteKey(this.activeConnID, deletedKey)
+      } catch (e) {
+        return await this._handleConnectionFailure(e)
+      }
       this.searchSessions = this.searchSessions.map(session => {
         const nextKeys = session.keys.filter(key => key?.name !== deletedKey)
         return {
@@ -543,6 +604,9 @@ export const useWorkspaceStore = defineStore('workspace', {
     async renameCurrentKey(newKey) {
       if (!this.selectedKey || !this.activeConnID) return
       const result = await renameKey(this.activeConnID, this.selectedKey, newKey)
+      if (!result.success && isConnectionErrorMessage(result.message)) {
+        return await this._handleConnectionFailure(result.message)
+      }
       if (result.success) {
         if (this.activeSession) {
           await this.search(this.activeSession.pattern)
@@ -556,6 +620,9 @@ export const useWorkspaceStore = defineStore('workspace', {
     async updateTTL(ttlSec) {
       if (!this.selectedKey || !this.activeConnID) return
       const result = await setTTL(this.activeConnID, this.selectedKey, ttlSec)
+      if (!result.success && isConnectionErrorMessage(result.message)) {
+        return await this._handleConnectionFailure(result.message)
+      }
       if (result.success && this.keyValue) {
         this.keyValue.ttl = ttlSec
       }
@@ -565,6 +632,9 @@ export const useWorkspaceStore = defineStore('workspace', {
     async createKey(req) {
       if (!this.activeConnID) return { success: false, message: 'No active connection' }
       const result = await createKey(this.activeConnID, req)
+      if (!result.success && isConnectionErrorMessage(result.message)) {
+        return await this._handleConnectionFailure(result.message, { clearKeyValue: false, setKeyError: false })
+      }
       if (!result.success) return result
 
       this.totalKeys = (this.totalKeys || 0) + 1
@@ -597,6 +667,9 @@ export const useWorkspaceStore = defineStore('workspace', {
     async switchDB(db) {
       if (!this.activeConnID) return
       const result = await selectDB(this.activeConnID, db)
+      if (!result.success && isConnectionErrorMessage(result.message)) {
+        return await this._handleConnectionFailure(result.message)
+      }
       if (result.success) {
         this.currentDB = db
         this.searchSessions = []

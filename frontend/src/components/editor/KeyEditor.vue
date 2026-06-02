@@ -97,6 +97,7 @@ import SetEditor from './SetEditor.vue'
 import ZSetEditor from './ZSetEditor.vue'
 import StreamEditor from './StreamEditor.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
+import { isConnectionErrorMessage } from '../../utils/connection.js'
 
 const { t } = useI18n()
 
@@ -149,34 +150,12 @@ async function doRename() {
   }
 }
 
-// 判断是否为连接类错误
-function isConnectionError(err) {
-  if (!err) return false
-  const msg = String(err).toLowerCase()
-  return msg.includes('connection reset')
-    || msg.includes('broken pipe')
-    || msg.includes('eof')
-    || msg.includes('network')
-    || msg.includes('timeout')
-    || msg.includes('refused')
-    || msg.includes('closed')
-    || msg.includes('dial')
-    || msg.includes('ssh')
-}
-
 // 刷新
 async function refreshKey() {
   if (!selectedKey.value) return
   await workspaceStore.selectKey(selectedKey.value)
-  // 若因网络断开导致失败，自动重连后再试一次
-  if (keyValueError.value && isConnectionError(keyValueError.value)) {
-    const connID = workspaceStore.activeConnID
-    if (connID) {
-      const result = await connectionsStore.connect(connID)
-      if (result.success) {
-        await workspaceStore.selectKey(selectedKey.value)
-      }
-    }
+  if (keyValueError.value && isConnectionErrorMessage(keyValueError.value)) {
+    await connectionsStore.handleConnectionFailure(workspaceStore.activeConnID, keyValueError.value)
   }
 }
 

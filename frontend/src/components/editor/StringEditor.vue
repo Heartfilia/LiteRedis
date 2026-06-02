@@ -18,13 +18,16 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useConnectionsStore } from '../../stores/connections.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { setString } from '../../api/wails.js'
 import FloatingMessage from '../common/FloatingMessage.vue'
+import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
+const connectionsStore = useConnectionsStore()
 const { t } = useI18n()
 
 const localVal = ref(props.keyValue?.string_val || '')
@@ -34,6 +37,14 @@ const ok = ref(true)
 const copied = ref(false)
 const originalVal = ref(props.keyValue?.string_val || '')
 const isDirty = computed(() => localVal.value !== originalVal.value)
+
+async function handleConnectionFailure(error) {
+  if (!isConnectionErrorMessage(error)) return false
+  await connectionsStore.handleConnectionFailure(workspaceStore.activeConnID, error)
+  ok.value = false
+  msg.value = formatConnectionLostMessage(error)
+  return true
+}
 
 watch(() => props.keyValue, (kv) => {
   localVal.value = kv?.string_val || ''
@@ -54,14 +65,17 @@ async function save() {
   msg.value = ''
   try {
     const result = await setString(workspaceStore.activeConnID, props.keyValue.key, localVal.value, props.keyValue.ttl)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.saveSuccess') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
       originalVal.value = localVal.value
     }
   } catch(e) {
-    ok.value = false
-    msg.value = e.message || String(e)
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message || String(e)
+    }
   } finally {
     saving.value = false
   }

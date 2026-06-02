@@ -8,11 +8,22 @@
       @close="showConnManager = false"
     />
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
+    <Teleport to="body">
+      <Transition name="app-toast">
+        <div
+          v-if="connectionsStore.globalToast"
+          class="app-toast"
+          :class="connectionsStore.globalToastOk ? 'ok' : 'err'"
+        >
+          {{ connectionsStore.globalToast }}
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, provide } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, provide, Teleport, Transition, watch } from 'vue'
 import Sidebar from './components/layout/Sidebar.vue'
 import MainContent from './components/layout/MainContent.vue'
 import ConnectionManager from './components/connections/ConnectionManager.vue'
@@ -37,6 +48,27 @@ provide('openSettings', () => { showSettings.value = true })
 onMounted(() => {
   connectionsStore.loadConnections()
   settingsStore.load()
+})
+
+let toastTimer = null
+watch(() => connectionsStore.globalToast, (message) => {
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+    toastTimer = null
+  }
+  if (message) {
+    toastTimer = setTimeout(() => {
+      connectionsStore.clearGlobalToast()
+      toastTimer = null
+    }, 2600)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+    toastTimer = null
+  }
 })
 </script>
 
@@ -119,5 +151,38 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
 .app-layout .connecting-inline,
 .app-layout .group-count {
   font-size: var(--ui-font-badge) !important;
+}
+.app-toast {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6000;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  border: 1px solid transparent;
+  max-width: min(520px, calc(100vw - 24px));
+  word-break: break-word;
+}
+.app-toast.ok {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+.app-toast.err {
+  background: #fff1f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+.app-toast-enter-active,
+.app-toast-leave-active {
+  transition: opacity 0.25s, transform 0.25s;
+}
+.app-toast-enter-from,
+.app-toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-12px);
 }
 </style>

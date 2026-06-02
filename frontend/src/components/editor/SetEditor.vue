@@ -78,6 +78,7 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
@@ -85,9 +86,11 @@ import { sAdd, sRem, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import FloatingMessage from '../common/FloatingMessage.vue'
+import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
+const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
@@ -124,6 +127,14 @@ const editModalMember = ref('')
 const hasMore = ref(false)
 const nextCursor = ref(0)
 const valueLoading = ref(false)
+
+async function handleConnectionFailure(error) {
+  if (!isConnectionErrorMessage(error)) return false
+  await connectionsStore.handleConnectionFailure(workspaceStore.activeConnID, error)
+  ok.value = false
+  msg.value = formatConnectionLostMessage(error)
+  return true
+}
 const totalMembers = computed(() => totalMemberCount.value >= 0 ? totalMemberCount.value : rawMembers.value.length)
 
 const sourceMembers = computed(() =>
@@ -198,8 +209,10 @@ async function loadMore() {
     hasMore.value = result.has_more || false
     nextCursor.value = result.next_cursor || 0
   } catch (e) {
-    ok.value = false
-    msg.value = e.message || String(e)
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message || String(e)
+    }
   } finally {
     valueLoading.value = false
   }
@@ -259,7 +272,12 @@ async function executeSearch() {
     const exact = !fuzzySearch.value
     const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'set', pattern, exact)
     searchResults.value = kv.set_val || []
-  } catch(e) { ok.value = false; msg.value = e.message }
+  } catch(e) {
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
+  }
   finally { isSearching.value = false }
 }
 
@@ -286,12 +304,14 @@ async function saveFromModal(newVal) {
   expandSaving.value = true
   try {
     let result = await sRem(workspaceStore.activeConnID, props.keyValue.key, oldMember)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     if (!result.success) {
       ok.value = false
       msg.value = result.message || t('keyEditor.deleteOldFailed')
       return
     }
     result = await sAdd(workspaceStore.activeConnID, props.keyValue.key, newVal)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
@@ -299,8 +319,10 @@ async function saveFromModal(newVal) {
       expandShow.value = false
     }
   } catch (e) {
-    ok.value = false
-    msg.value = e.message
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
   } finally {
     expandSaving.value = false
   }
@@ -316,21 +338,33 @@ async function addMember() {
   if (!newMember.value.trim()) return
   try {
     const result = await sAdd(workspaceStore.activeConnID, props.keyValue.key, newMember.value)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
       addLocalMember(newMember.value)
       newMember.value = ''
       showAdd.value = false
     }
-  } catch(e) { ok.value = false; msg.value = e.message }
+  } catch(e) {
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
+  }
 }
 
 async function removeMember(m) {
   try {
     const result = await sRem(workspaceStore.activeConnID, props.keyValue.key, m)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) removeLocalMember(m)
-  } catch(e) { ok.value = false; msg.value = e.message }
+  } catch(e) {
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
+  }
 }
 </script>
 

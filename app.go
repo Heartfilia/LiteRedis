@@ -136,6 +136,14 @@ func (a *App) IsConnected(id string) bool {
 	return a.manager.IsConnected(id)
 }
 
+// PingConnection 检测连接是否仍然可用
+func (a *App) PingConnection(id string) config.OperationResult {
+	if err := a.manager.Ping(id); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
 // SelectDB 切换数据库
 func (a *App) SelectDB(id string, db int) config.OperationResult {
 	if err := a.manager.SelectDB(id, db); err != nil {

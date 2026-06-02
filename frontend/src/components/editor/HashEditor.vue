@@ -102,6 +102,7 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
@@ -109,9 +110,11 @@ import { hSet, hDel, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import FloatingMessage from '../common/FloatingMessage.vue'
+import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
+const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
@@ -171,6 +174,14 @@ const editModalField = ref('')
 const hasMore = ref(false)
 const nextCursor = ref(0)
 const valueLoading = ref(false)
+
+async function handleConnectionFailure(error) {
+  if (!isConnectionErrorMessage(error)) return false
+  await connectionsStore.handleConnectionFailure(workspaceStore.activeConnID, error)
+  ok.value = false
+  msg.value = formatConnectionLostMessage(error)
+  return true
+}
 
 const fieldCount = computed(() => Object.keys(rawHashVal.value).length)
 const totalFields = computed(() => totalFieldCount.value >= 0 ? totalFieldCount.value : fieldCount.value)
@@ -253,8 +264,10 @@ async function loadMore() {
     hasMore.value = result.has_more || false
     nextCursor.value = result.next_cursor || 0
   } catch (e) {
-    ok.value = false
-    msg.value = e.message || String(e)
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message || String(e)
+    }
   } finally {
     valueLoading.value = false
   }
@@ -274,7 +287,12 @@ async function executeSearch() {
     const exact = !fuzzySearch.value
     const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'hash', pattern, exact)
     searchResults.value = Object.entries(kv.hash_val || {})
-  } catch(e) { ok.value = false; msg.value = e.message }
+  } catch(e) {
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
+  }
   finally { isSearching.value = false }
 }
 
@@ -310,6 +328,7 @@ async function saveFromModal(newVal) {
   expandSaving.value = true
   try {
     const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, field, newVal)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
@@ -320,8 +339,10 @@ async function saveFromModal(newVal) {
       expandShow.value = false
     }
   } catch (e) {
-    ok.value = false
-    msg.value = e.message
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
   } finally {
     expandSaving.value = false
   }
@@ -338,6 +359,7 @@ async function saveEdit(field) {
   editingField.value = null
   try {
     const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, field, editValue.value)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
@@ -347,13 +369,17 @@ async function saveEdit(field) {
       }
     }
   } catch(e) {
-    ok.value = false; msg.value = e.message
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
   }
 }
 
 async function deleteField(field) {
   try {
     const result = await hDel(workspaceStore.activeConnID, props.keyValue.key, field)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
@@ -366,7 +392,10 @@ async function deleteField(field) {
       }
     }
   } catch(e) {
-    ok.value = false; msg.value = e.message
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
   }
 }
 
@@ -376,6 +405,7 @@ async function addField() {
     const field = newField.value.trim()
     const existed = Object.prototype.hasOwnProperty.call(rawHashVal.value, field)
     const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, field, newValue.value)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
@@ -386,7 +416,10 @@ async function addField() {
       newField.value = ''; newValue.value = ''; showAdd.value = false
     }
   } catch(e) {
-    ok.value = false; msg.value = e.message
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
   }
 }
 </script>

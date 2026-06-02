@@ -187,6 +187,24 @@ func (m *ClientManager) IsConnected(id string) bool {
 	return ok
 }
 
+// Ping 检测现有连接是否仍可用
+func (m *ClientManager) Ping(id string) error {
+	m.mu.RLock()
+	conn, ok := m.clients[id]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("connection %s not found or not connected", id)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := conn.client.Ping(ctx).Err(); err != nil {
+		return normalizeConnectError(fmt.Errorf("Redis ping failed: %w", err))
+	}
+	return nil
+}
+
 // SelectDB 切换数据库（仅普通模式支持）
 func (m *ClientManager) SelectDB(id string, db int) error {
 	m.mu.Lock()

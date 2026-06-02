@@ -99,6 +99,7 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
@@ -106,9 +107,11 @@ import { zAdd, zRem, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import FloatingMessage from '../common/FloatingMessage.vue'
+import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
+const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
@@ -181,6 +184,14 @@ const editModalScore = ref(0)
 const hasMore = ref(false)
 const nextOffset = ref(0)
 const valueLoading = ref(false)
+
+async function handleConnectionFailure(error) {
+  if (!isConnectionErrorMessage(error)) return false
+  await connectionsStore.handleConnectionFailure(workspaceStore.activeConnID, error)
+  ok.value = false
+  msg.value = formatConnectionLostMessage(error)
+  return true
+}
 const totalMembers = computed(() => totalMemberCount.value >= 0 ? totalMemberCount.value : rawMembers.value.length)
 
 const sourceMembers = computed(() =>
@@ -351,7 +362,12 @@ async function executeSearch() {
   try {
     const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'zset', pattern, false)
     searchResults.value = kv.zset_val || []
-  } catch(e) { ok.value = false; msg.value = e.message }
+  } catch(e) {
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
+  }
   finally { isSearching.value = false }
 }
 
@@ -382,12 +398,14 @@ async function saveFromModal(newMember) {
   expandSaving.value = true
   try {
     let result = await zRem(workspaceStore.activeConnID, props.keyValue.key, oldMember)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     if (!result.success) {
       ok.value = false
       msg.value = result.message || t('keyEditor.deleteOldFailed')
       return
     }
     result = await zAdd(workspaceStore.activeConnID, props.keyValue.key, newMember, score)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
@@ -395,8 +413,10 @@ async function saveFromModal(newMember) {
       expandShow.value = false
     }
   } catch (e) {
-    ok.value = false
-    msg.value = e.message
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
   } finally {
     expandSaving.value = false
   }
@@ -407,15 +427,22 @@ async function saveEdit(member) {
   editingMember.value = null
   try {
     const result = await zAdd(workspaceStore.activeConnID, props.keyValue.key, member, editScore.value)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) upsertLocalMember(member, editScore.value)
-  } catch(e) { ok.value = false; msg.value = e.message }
+  } catch(e) {
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
+  }
 }
 
 async function addMember() {
   if (!newMember.value.trim()) return
   try {
     const result = await zAdd(workspaceStore.activeConnID, props.keyValue.key, newMember.value, newScore.value)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
       upsertLocalMember(newMember.value, newScore.value)
@@ -423,15 +450,26 @@ async function addMember() {
       newScore.value = 0
       showAdd.value = false
     }
-  } catch(e) { ok.value = false; msg.value = e.message }
+  } catch(e) {
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
+  }
 }
 
 async function removeMember(member) {
   try {
     const result = await zRem(workspaceStore.activeConnID, props.keyValue.key, member)
+    if (!result.success && await handleConnectionFailure(result.message)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) removeLocalMember(member)
-  } catch(e) { ok.value = false; msg.value = e.message }
+  } catch(e) {
+    if (!(await handleConnectionFailure(e))) {
+      ok.value = false
+      msg.value = e.message
+    }
+  }
 }
 
 async function copyMember(member) {

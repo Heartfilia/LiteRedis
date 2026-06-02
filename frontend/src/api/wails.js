@@ -16,6 +16,7 @@ export const testConnection = (cfg) => callGo('TestConnection', cfg)
 export const connect = (id) => callGo('Connect', id)
 export const disconnect = (id) => callGo('Disconnect', id)
 export const isConnected = (id) => callGo('IsConnected', id)
+export const pingConnection = (id) => callGo('PingConnection', id)
 export const selectDB = (id, db) => callGo('SelectDB', id, db)
 
 // ===== Key 操作 =====

@@ -2,6 +2,8 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import { loadLanguage } from './i18n/index.js'
+import { useConnectionsStore } from './stores/connections.js'
+import { useWorkspaceStore } from './stores/workspace.js'
 
 loadLanguage()
 
@@ -21,5 +23,14 @@ if (isWindows) {
 }
 
 const app = createApp(App)
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
 app.mount('#app')
+
+const connectionsStore = useConnectionsStore(pinia)
+const workspaceStore = useWorkspaceStore(pinia)
+connectionsStore.startHeartbeat(workspaceStore)
+
+document.addEventListener('visibilitychange', () => {
+  connectionsStore.setHeartbeatVisibility(document.visibilityState === 'visible')
+})

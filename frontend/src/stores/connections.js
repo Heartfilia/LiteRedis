@@ -1,11 +1,18 @@
 import { defineStore } from 'pinia'
-import { listConnections, saveConnection, reorderConnections, deleteConnection, testConnection, connect, disconnect, isConnected } from '../api/wails.js'
+import { listConnections, saveConnection, reorderConnections, deleteConnection, testConnection, connect, disconnect as disconnectAPI, isConnected, pingConnection } from '../api/wails.js'
+import { isConnectionErrorMessage, formatConnectionLostMessage } from '../utils/connection.js'
 
 export const useConnectionsStore = defineStore('connections', {
   state: () => ({
     connections: [],
     connectedIds: new Set(),
     connectingIds: new Set(),
+    heartbeatFailures: {},
+    heartbeatTimer: null,
+    heartbeatRunning: false,
+    heartbeatVisible: true,
+    globalToast: '',
+    globalToastOk: true,
     loading: false,
     error: null,
   }),
@@ -96,6 +103,29 @@ export const useConnectionsStore = defineStore('connections', {
       return result
     },
 
+    async handleConnectionFailure(id, error) {
+      if (!id || !isConnectionErrorMessage(error)) return null
+      this.connectedIds.delete(id)
+      this.connectingIds.delete(id)
+      try {
+        await disconnectAPI(id)
+      } catch (e) {}
+      return {
+        success: false,
+        disconnected: true,
+        message: formatConnectionLostMessage(error),
+      }
+    },
+
+    showGlobalToast(message, ok = true) {
+      this.globalToast = message || ''
+      this.globalToastOk = ok
+    },
+
+    clearGlobalToast() {
+      this.globalToast = ''
+    },
+
     async test(cfg) {
       // 前端兜底超时：防止 Go 的 TestConnection 在网络异常时永久卡住
       return await Promise.race([
@@ -121,6 +151,7 @@ export const useConnectionsStore = defineStore('connections', {
         ])
         if (result.success) {
           this.connectedIds.add(id)
+          this.heartbeatFailures = { ...this.heartbeatFailures, [id]: 0 }
         }
         return result
       } catch (e) {
@@ -131,9 +162,76 @@ export const useConnectionsStore = defineStore('connections', {
     },
 
     async disconnect(id) {
-      await disconnect(id)
+      await disconnectAPI(id)
       this.connectedIds.delete(id)
       this.connectingIds.delete(id)
+      if (this.heartbeatFailures[id] !== undefined) {
+        const nextFailures = { ...this.heartbeatFailures }
+        delete nextFailures[id]
+        this.heartbeatFailures = nextFailures
+      }
+    },
+
+    setHeartbeatVisibility(visible) {
+      this.heartbeatVisible = visible
+    },
+
+    stopHeartbeat() {
+      if (this.heartbeatTimer) {
+        clearInterval(this.heartbeatTimer)
+        this.heartbeatTimer = null
+      }
+      this.heartbeatRunning = false
+    },
+
+    startHeartbeat(workspaceStore) {
+      if (this.heartbeatRunning) return
+      this.heartbeatRunning = true
+      this.heartbeatTimer = setInterval(async () => {
+        if (!this.heartbeatVisible) return
+        const ids = [...this.connectedIds]
+        if (!ids.length) return
+
+        for (const id of ids) {
+          if (this.connectingIds.has(id)) continue
+          try {
+            const result = await pingConnection(id)
+            if (result?.success) {
+              const hadFailures = (this.heartbeatFailures[id] || 0) > 0
+              if ((this.heartbeatFailures[id] || 0) !== 0) {
+                this.heartbeatFailures = { ...this.heartbeatFailures, [id]: 0 }
+              }
+              if (hadFailures && workspaceStore?.activeConnID === id) {
+                this.showGlobalToast('当前 Redis 连接已恢复', true)
+                await workspaceStore.refreshAfterReconnect(id)
+              }
+              continue
+            }
+
+            const failCount = (this.heartbeatFailures[id] || 0) + 1
+            this.heartbeatFailures = { ...this.heartbeatFailures, [id]: failCount }
+            if (failCount >= 2) {
+              const failure = await this.handleConnectionFailure(id, result?.message || 'Redis connection lost')
+              this.heartbeatFailures = { ...this.heartbeatFailures, [id]: 0 }
+              if (workspaceStore?.activeConnID === id && failure?.message) {
+                workspaceStore.applyConnectionLostState(id, failure.message)
+                this.showGlobalToast('当前 Redis 连接已断开', false)
+              }
+            }
+          } catch (e) {
+            const failCount = (this.heartbeatFailures[id] || 0) + 1
+            this.heartbeatFailures = { ...this.heartbeatFailures, [id]: failCount }
+            if (failCount >= 2) {
+              const failure = await this.handleConnectionFailure(id, e)
+              this.heartbeatFailures = { ...this.heartbeatFailures, [id]: 0 }
+              if (workspaceStore?.activeConnID === id && failure?.message) {
+                workspaceStore.applyConnectionLostState(id, failure.message)
+                this.showGlobalToast('当前 Redis 连接已断开', false)
+              }
+            }
+          }
+        }
+      }, 20000)
     },
   },
 })
