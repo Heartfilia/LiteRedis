@@ -39,6 +39,8 @@ export function LSet(arg1:string,arg2:string,arg3:number,arg4:string):Promise<co
 
 export function ListConnections():Promise<Array<config.ConnectionConfig>>;
 
+export function PingConnection(arg1:string):Promise<config.OperationResult>;
+
 export function RPush(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
 export function RenameKey(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;

@@ -35,65 +35,67 @@
       </div>
     </div>
 
-    <!-- 历史记录下拉（fixed 定位，避免被父容器 overflow:hidden 裁切） -->
-    <div
-      v-if="showHistory && filteredHistoryItems.length"
-      class="history-dropdown"
-      :style="dropdownStyle"
-    >
-      <template v-if="filteredPinnedHistory.length">
-        <div class="history-section-title">{{ t('keyTree.pinnedHistory') }}</div>
-        <div
-          v-for="(item, idx) in filteredPinnedHistory"
-          :key="`pinned:${item}`"
-          :class="['history-item', { active: idx === activeIndex }]"
-          @mousedown.prevent="selectHistory(item)"
-          @mouseenter="activeIndex = idx"
-        >
-          <button
-            class="history-pin-btn pinned"
-            :title="t('keyTree.unpinHistory')"
-            @mousedown.prevent.stop="togglePin(item)"
+    <Teleport to="body">
+      <!-- 历史记录下拉（fixed 定位 + Teleport，避免被父容器裁切或层级覆盖） -->
+      <div
+        v-if="showHistory && filteredHistoryItems.length"
+        class="history-dropdown"
+        :style="dropdownStyle"
+      >
+        <template v-if="filteredPinnedHistory.length">
+          <div class="history-section-title">{{ t('keyTree.pinnedHistory') }}</div>
+          <div
+            v-for="(item, idx) in filteredPinnedHistory"
+            :key="`pinned:${item}`"
+            :class="['history-item', { active: idx === activeIndex }]"
+            @mousedown.prevent="selectHistory(item)"
+            @mouseenter="activeIndex = idx"
           >
-            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
-              <path d="M10.8 1.5a.75.75 0 01.53 1.28L10.1 4v2.12l1.52 1.52a.75.75 0 01-.53 1.28H8.75v4.35a.75.75 0 01-1.28.53l-1.5-1.5a.75.75 0 01-.22-.53V8.92H3.41a.75.75 0 01-.53-1.28L4.4 6.12V4L3.17 2.78A.75.75 0 013.7 1.5h7.1z" fill="currentColor" />
-            </svg>
-          </button>
-          <span class="history-item-text">{{ item }}</span>
-        </div>
-      </template>
+            <button
+              class="history-pin-btn pinned"
+              :title="t('keyTree.unpinHistory')"
+              @mousedown.prevent.stop="togglePin(item)"
+            >
+              <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+                <path d="M10.8 1.5a.75.75 0 01.53 1.28L10.1 4v2.12l1.52 1.52a.75.75 0 01-.53 1.28H8.75v4.35a.75.75 0 01-1.28.53l-1.5-1.5a.75.75 0 01-.22-.53V8.92H3.41a.75.75 0 01-.53-1.28L4.4 6.12V4L3.17 2.78A.75.75 0 013.7 1.5h7.1z" fill="currentColor" />
+              </svg>
+            </button>
+            <span class="history-item-text">{{ item }}</span>
+          </div>
+        </template>
 
-      <template v-if="filteredPinnedHistory.length && filteredNormalHistory.length">
-        <div class="history-section-divider" />
-      </template>
+        <template v-if="filteredPinnedHistory.length && filteredNormalHistory.length">
+          <div class="history-section-divider" />
+        </template>
 
-      <template v-if="filteredNormalHistory.length">
-        <div class="history-section-title">{{ t('keyTree.recentHistory') }}</div>
-        <div
-          v-for="(item, idx) in filteredNormalHistory"
-          :key="`history:${item}`"
-          :class="['history-item', { active: idx + filteredPinnedHistory.length === activeIndex }]"
-          @mousedown.prevent="selectHistory(item)"
-          @mouseenter="activeIndex = idx + filteredPinnedHistory.length"
-        >
-          <button
-            class="history-pin-btn"
-            :title="t('keyTree.pinHistory')"
-            @mousedown.prevent.stop="togglePin(item)"
+        <template v-if="filteredNormalHistory.length">
+          <div class="history-section-title">{{ t('keyTree.recentHistory') }}</div>
+          <div
+            v-for="(item, idx) in filteredNormalHistory"
+            :key="`history:${item}`"
+            :class="['history-item', { active: idx + filteredPinnedHistory.length === activeIndex }]"
+            @mousedown.prevent="selectHistory(item)"
+            @mouseenter="activeIndex = idx + filteredPinnedHistory.length"
           >
-            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
-              <path d="M10.8 1.5a.75.75 0 01.53 1.28L10.1 4v2.12l1.52 1.52a.75.75 0 01-.53 1.28H8.75v4.35a.75.75 0 01-1.28.53l-1.5-1.5a.75.75 0 01-.22-.53V8.92H3.41a.75.75 0 01-.53-1.28L4.4 6.12V4L3.17 2.78A.75.75 0 013.7 1.5h7.1z" fill="currentColor" />
-            </svg>
-          </button>
-          <span class="history-item-text">{{ item }}</span>
-        </div>
-      </template>
-    </div>
+            <button
+              class="history-pin-btn"
+              :title="t('keyTree.pinHistory')"
+              @mousedown.prevent.stop="togglePin(item)"
+            >
+              <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+                <path d="M10.8 1.5a.75.75 0 01.53 1.28L10.1 4v2.12l1.52 1.52a.75.75 0 01-.53 1.28H8.75v4.35a.75.75 0 01-1.28.53l-1.5-1.5a.75.75 0 01-.22-.53V8.92H3.41a.75.75 0 01-.53-1.28L4.4 6.12V4L3.17 2.78A.75.75 0 013.7 1.5h7.1z" fill="currentColor" />
+              </svg>
+            </button>
+            <span class="history-item-text">{{ item }}</span>
+          </div>
+        </template>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, Teleport, onMounted, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useConnectionsStore } from '../../stores/connections.js'
@@ -154,6 +156,12 @@ function updateDropdownPosition() {
   }
 }
 
+function handleViewportChange() {
+  if (showHistory.value) {
+    updateDropdownPosition()
+  }
+}
+
 watch(keep, val => {
   if (isCluster.value) {
     workspaceStore.keepPrevSearch = true
@@ -179,6 +187,16 @@ watch(() => workspaceStore.activeConnID, () => {
 watch(() => workspaceStore.currentDB, () => {
   showHistory.value = false
   activeIndex.value = -1
+})
+
+onMounted(() => {
+  window.addEventListener('resize', handleViewportChange)
+  window.addEventListener('scroll', handleViewportChange, true)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleViewportChange)
+  window.removeEventListener('scroll', handleViewportChange, true)
 })
 
 function togglePin(item) {
@@ -261,13 +279,14 @@ async function doSearch() {
 
 <style scoped>
 .key-search-bar {
-  padding: 8px 10px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.9));
+  backdrop-filter: blur(10px);
 }
 .search-input-row {
   display: flex;
-  gap: 6px;
+  gap: 2px;
   position: relative;
   align-items: center;
   min-width: 0;
@@ -279,17 +298,18 @@ async function doSearch() {
   min-width: 0;
   min-height: 30px;
   height: 30px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
   overflow: hidden;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 8px 16px rgba(148, 163, 184, 0.07);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 .search-input-shell input {
   flex: 1;
   min-width: 0;
   height: 100%;
-  padding: 0 10px;
+  padding: 0 11px;
   border: none;
   font-size: 12px;
   line-height: 1;
@@ -298,95 +318,115 @@ async function doSearch() {
   box-sizing: border-box;
   background: transparent;
 }
+.search-input-shell input::placeholder {
+  color: #94a3b8;
+}
 .search-input-shell:focus-within {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59,130,246,.12);
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12), 0 10px 20px rgba(191, 219, 254, 0.22);
+  transform: translateY(-1px);
 }
 .btn-search {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 34px;
-  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
   height: 100%;
   padding: 0;
-  background: #f8fafc;
-  color: #3b82f6;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.94), rgba(241, 245, 249, 0.98));
+  color: #2563eb;
   border: none;
-  border-left: 1px solid #e5e7eb;
+  border-left: 1px solid rgba(226, 232, 240, 0.95);
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
 }
-.btn-search:hover:not(:disabled) { color: #2563eb; background: #eff6ff; border-color: #bfdbfe; }
+.btn-search:hover:not(:disabled) {
+  color: #1d4ed8;
+  background: linear-gradient(180deg, #f8fbff, #eff6ff);
+  border-color: #bfdbfe;
+}
 .btn-search:disabled { color: #93c5fd; cursor: not-allowed; }
 .search-loading {
   font-size: 11px;
   letter-spacing: 0.5px;
 }
-.search-options { margin-top: 5px; }
+.search-options { margin-top: 6px; }
 .keep-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #6b7280;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   cursor: pointer;
+}
+.keep-label input {
+  accent-color: #3b82f6;
 }
 .cluster-hint {
   font-size: 12px;
   color: #b45309;
-  line-height: 1.4;
+  line-height: 1.5;
+  padding: 2px 0 1px;
 }
 
 .history-dropdown {
   position: fixed;
-  background: white;
-  border: 1px solid #d1d5db;
-  border-radius: 0 6px 6px 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(14px);
   z-index: 10000;
-  max-height: 240px;
+  max-height: 280px;
   overflow-y: auto;
   width: max-content;
+  padding: 6px;
 }
 .history-section-title {
-  padding: 7px 10px 5px;
+  padding: 8px 10px 6px;
   font-size: 10px;
   line-height: 1;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #94a3b8;
-  background: #f8fafc;
+  background: transparent;
 }
 .history-section-divider {
   height: 1px;
-  margin: 2px 0;
-  background: #e5e7eb;
+  margin: 4px 6px;
+  background: rgba(226, 232, 240, 0.96);
 }
 .history-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
   font-size: 12px;
   color: #374151;
   cursor: pointer;
   white-space: nowrap;
   min-width: 0;
+  border-radius: 10px;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 .history-item-text {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .history-pin-btn {
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: #cbd5e1;
   display: inline-flex;
@@ -398,15 +438,15 @@ async function doSearch() {
 }
 .history-pin-btn:hover {
   color: #64748b;
-  background: #e2e8f0;
+  background: rgba(226, 232, 240, 0.92);
 }
 .history-pin-btn.pinned {
   color: #2563eb;
 }
 .history-item:hover,
 .history-item.active {
-  background: #eff6ff;
-  color: #2563eb;
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.92), rgba(219, 234, 254, 0.86));
+  color: #1d4ed8;
 }
 .history-item:hover .history-pin-btn,
 .history-item.active .history-pin-btn {

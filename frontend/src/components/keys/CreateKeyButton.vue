@@ -179,31 +179,35 @@ async function submit() {
   flex-shrink: 0;
 }
 .create-key-btn {
-  height: 28px;
-  min-height: 28px;
-  min-width: 28px;
-  padding: 0 8px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #4b5563;
+  height: 30px;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(191, 219, 254, 0.92);
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  color: #2563eb;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
   box-sizing: border-box;
-  transition: all 0.15s ease;
+  box-shadow: 0 8px 16px rgba(191, 219, 254, 0.16);
+  transition: all 0.16s ease;
 }
 .create-key-btn span {
   font-size: 16px;
+  font-weight: 700;
   line-height: 1;
   transform: translateY(-1px);
 }
 .create-key-btn:hover {
-  color: #2563eb;
+  color: #1d4ed8;
   border-color: #93c5fd;
-  background: #f8fbff;
+  background: linear-gradient(180deg, #f8fbff, #eff6ff);
+  box-shadow: 0 10px 18px rgba(191, 219, 254, 0.22);
+  transform: translateY(-1px);
 }
 .create-key-popover {
   position: fixed;

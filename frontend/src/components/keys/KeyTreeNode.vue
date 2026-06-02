@@ -67,42 +67,73 @@ function selectKey(fullPath) {
 .node-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
+  gap: 6px;
+  padding: 0 10px;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 12px;
   font-size: 13px;
-  min-height: 24px;
+  min-height: 32px;
+  color: #334155;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
-.node-row:hover { background: #f0f4ff; }
-.node-row.selected { background: #dbeafe; color: #1d4ed8; }
-.dir-row { color: #444; }
-.expand-icon { font-size: 8px; color: #999; width: 12px; flex-shrink: 0; }
-.folder-icon { font-size: 12px; }
+.node-row:hover {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(241, 245, 249, 0.92));
+  color: #0f172a;
+}
+.node-row.selected {
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.96), rgba(219, 234, 254, 0.92));
+  color: #1d4ed8;
+  box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.7);
+}
+.dir-row { color: #475569; }
+.expand-icon {
+  font-size: 9px;
+  color: #94a3b8;
+  width: 12px;
+  flex-shrink: 0;
+}
+.folder-icon {
+  font-size: 12px;
+  filter: saturate(0.8);
+}
 .node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.leaf-label { font-family: monospace; font-size: 12px; }
-.node-count { font-size: 11px; color: #999; flex-shrink: 0; }
-.leaf-indent { width: 20px; flex-shrink: 0; }
+.leaf-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+.node-count {
+  font-size: 11px;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+.leaf-indent { width: 16px; flex-shrink: 0; }
 .type-dot {
-  width: 8px; height: 8px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.9);
 }
 .type-badge {
   font-size: 10px;
-  padding: 1px 4px;
-  border-radius: 3px;
+  padding: 2px 6px;
+  border-radius: 999px;
   flex-shrink: 0;
-  font-weight: 500;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
 .ttl-badge {
   font-size: 10px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: #fef3c7;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(254, 243, 199, 0.95);
   color: #b45309;
   font-weight: 600;
   flex-shrink: 0;
 }
-.children { padding-left: 16px; }
+.children {
+  padding-left: 14px;
+  margin-left: 9px;
+  border-left: 1px dashed rgba(203, 213, 225, 0.72);
+}
 </style>

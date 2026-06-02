@@ -33,29 +33,104 @@
           <span class="type-badge" :style="{ background: typeColor.bg, color: typeColor.text }">
             {{ typeColor.label }}
           </span>
-          <span class="ttl-info">
-            {{ t('keyEditor.ttl') }}:
-            <span v-if="editingTTL">
-              <input v-model.number="ttlInput" type="number" class="ttl-input" />
-              <button class="btn-xs" @click="saveTTL">✓</button>
-              <button class="btn-xs" @click="editingTTL = false">✕</button>
-            </span>
-            <span v-else class="ttl-val" @click="startTTLEdit">
-              {{ displayTTL }}
-            </span>
-          </span>
+          <button
+            ref="ttlTriggerRef"
+            class="ttl-chip"
+            :class="ttlChipClass"
+            type="button"
+            @click="toggleTTLEdit"
+          >
+            TTL
+          </button>
         </div>
         <div class="key-actions">
-          <button class="btn-tiny" @click="startRename">{{ t('keyEditor.rename') }}</button>
-          <button class="btn-tiny" @click="refreshKey">{{ t('keyEditor.refresh') }}</button>
+          <button class="btn-tiny icon-btn top-action-btn" :title="t('keyEditor.rename')" @click="startRename">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+              <path
+                d="M4.75 19.25l4.05-.88L18.35 8.82a2.14 2.14 0 000-3.03l-.14-.14a2.14 2.14 0 00-3.03 0L5.63 15.2l-.88 4.05z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M13.75 7.08l3.17 3.17"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+          <button class="btn-tiny icon-btn top-action-btn" :title="t('keyEditor.refresh')" @click="refreshKey">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+              <path
+                d="M19.25 10.25a7.35 7.35 0 00-13.38-3.1L4.75 8.72"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M4.7 4.55v4.2h4.2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M4.75 13.75a7.35 7.35 0 0013.38 3.1l1.12-1.57"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M19.3 19.45v-4.2h-4.2"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
           <InlineDeleteConfirm
+            class="header-delete-confirm header-action-delete"
             :label="t('keyEditor.delete')"
             :confirm-text="t('keyEditor.confirmDelete')"
             :reset-token="selectedKey || ''"
+            :icon-only="true"
             @confirm="doDelete"
           />
         </div>
       </div>
+
+      <Teleport to="body">
+        <div
+          v-if="editingTTL"
+          ref="ttlPopoverRef"
+          class="ttl-popover"
+          :style="ttlPopoverStyle"
+        >
+          <div class="ttl-popover-title">TTL</div>
+          <div class="ttl-popover-row">
+            <input
+              v-model.number="ttlInput"
+              type="number"
+              class="ttl-input"
+              @keydown.enter.prevent="saveTTL"
+              @keydown.esc.prevent="closeTTLEdit"
+            />
+            <button class="btn-xs ttl-popover-btn" @click="saveTTL">✓</button>
+            <button class="btn-xs ttl-popover-btn" @click="closeTTLEdit">✕</button>
+          </div>
+        </div>
+      </Teleport>
 
       <!-- 重命名输入 -->
       <div v-if="renamingKey" class="rename-bar">
@@ -84,7 +159,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, Teleport } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useI18n } from '../../i18n/index.js'
@@ -108,6 +183,9 @@ const keyValue = computed(() => workspaceStore.keyValue)
 const keyValueLoading = computed(() => workspaceStore.keyValueLoading)
 const keyValueError = computed(() => workspaceStore.keyValueError)
 const typeColor = computed(() => getTypeColor(keyValue.value?.type))
+const ttlTriggerRef = ref(null)
+const ttlPopoverRef = ref(null)
+const ttlPopoverStyle = ref({})
 
 // 复制 key 名（点击 key-name 触发）
 const keyCopied = ref(false)
@@ -123,12 +201,23 @@ async function copyKeyName() {
 const editingTTL = ref(false)
 const ttlInput = ref(0)
 function startTTLEdit() {
-  ttlInput.value = keyValue.value?.ttl ?? -1
+  ttlInput.value = currentTTLValue()
   editingTTL.value = true
+  nextTick(updateTTLPopoverPosition)
+}
+function closeTTLEdit() {
+  editingTTL.value = false
+}
+function toggleTTLEdit() {
+  if (editingTTL.value) {
+    closeTTLEdit()
+    return
+  }
+  startTTLEdit()
 }
 async function saveTTL() {
   await workspaceStore.updateTTL(ttlInput.value)
-  editingTTL.value = false
+  closeTTLEdit()
 }
 
 // 重命名
@@ -167,12 +256,43 @@ async function doDelete() {
 const liveTTL = ref(null)
 let ttlTimer = null
 
-const displayTTL = computed(() => {
-  if (keyValue.value?.ttl === -1) return t('keyEditor.permanent')
+const ttlChipClass = computed(() => {
   const ttl = liveTTL.value !== null ? liveTTL.value : keyValue.value?.ttl
-  if (ttl === null || ttl === undefined) return '—'
-  return ttl + 's'
+  return {
+    active: typeof ttl === 'number' && ttl >= 0,
+    permanent: ttl === -1,
+    missing: ttl === -2 || ttl === null || ttl === undefined,
+  }
 })
+
+function currentTTLValue() {
+  const ttl = liveTTL.value !== null ? liveTTL.value : keyValue.value?.ttl
+  if (ttl === null || ttl === undefined) return -2
+  return ttl
+}
+
+function updateTTLPopoverPosition() {
+  const rect = ttlTriggerRef.value?.getBoundingClientRect()
+  if (!rect) return
+  ttlPopoverStyle.value = {
+    top: `${rect.bottom + 8}px`,
+    left: `${rect.left}px`,
+  }
+}
+
+function handleTTLOutsidePointer(event) {
+  if (!editingTTL.value) return
+  const target = event.target
+  if (ttlTriggerRef.value?.contains(target)) return
+  if (ttlPopoverRef.value?.contains(target)) return
+  closeTTLEdit()
+}
+
+function handleTTLViewportChange() {
+  if (editingTTL.value) {
+    updateTTLPopoverPosition()
+  }
+}
 
 watch(() => keyValue.value?.ttl, (ttl) => {
   liveTTL.value = ttl ?? null
@@ -192,6 +312,18 @@ watch(() => keyValue.value?.ttl, (ttl) => {
 onBeforeUnmount(() => {
   if (ttlTimer) { clearInterval(ttlTimer); ttlTimer = null }
 })
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handleTTLOutsidePointer, true)
+  window.addEventListener('resize', handleTTLViewportChange)
+  window.addEventListener('scroll', handleTTLViewportChange, true)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', handleTTLOutsidePointer, true)
+  window.removeEventListener('resize', handleTTLViewportChange)
+  window.removeEventListener('scroll', handleTTLViewportChange, true)
+})
 </script>
 
 <style scoped>
@@ -199,7 +331,9 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: white;
+  background:
+    radial-gradient(circle at top right, rgba(219, 234, 254, 0.24), transparent 28%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.4), rgba(255, 255, 255, 0.94) 14%, #ffffff 40%);
 }
 .empty-state {
   flex: 1;
@@ -209,12 +343,14 @@ onBeforeUnmount(() => {
   justify-content: center;
   color: #9ca3af;
   font-size: 13px;
-  gap: 10px;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
 }
 .loading-state { color: #6b7280; }
 .spinner {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border: 3px solid #e5e7eb;
   border-top-color: #3b82f6;
   border-radius: 50%;
@@ -224,88 +360,244 @@ onBeforeUnmount(() => {
 .error-state { color: #991b1b; }
 .error-icon { font-size: 28px; }
 .error-text {
-  max-width: 400px;
+  max-width: 520px;
   text-align: center;
   font-size: 12px;
-  font-family: monospace;
-  background: #fff1f2;
-  padding: 8px 14px;
-  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  background: linear-gradient(180deg, rgba(255, 241, 242, 0.98), rgba(254, 226, 226, 0.98));
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(254, 202, 202, 0.9);
   word-break: break-all;
   color: #991b1b;
+  box-shadow: 0 10px 24px rgba(248, 113, 113, 0.08);
 }
 .btn-retry {
-  padding: 5px 16px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  min-height: 32px;
+  padding: 0 16px;
+  border: 1px solid rgba(191, 219, 254, 0.92);
+  border-radius: 10px;
   cursor: pointer;
   font-size: 12px;
-  background: white;
-  color: #374151;
-  transition: background 0.12s;
+  font-weight: 600;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  color: #2563eb;
+  box-shadow: 0 10px 20px rgba(191, 219, 254, 0.18);
+  transition: background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
-.btn-retry:hover { background: #f3f4f6; }
+.btn-retry:hover {
+  background: linear-gradient(180deg, #f8fbff, #eff6ff);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(191, 219, 254, 0.24);
+}
 .key-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
+  gap: 7px 10px;
+  padding: 9px 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.92));
   flex-shrink: 0;
+  backdrop-filter: blur(10px);
 }
-.key-meta { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 420px; flex-wrap: wrap; }
+.key-meta { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1 1 420px; flex-wrap: wrap; }
 .key-name {
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 13px;
   font-weight: 600;
-  color: #1d4ed8;
+  color: #1e40af;
   max-width: min(100%, 720px);
   white-space: normal;
   word-break: break-all;
   overflow-wrap: anywhere;
   line-height: 1.45;
   cursor: pointer;
-  border-radius: 4px;
-  padding: 2px 6px;
-  transition: background 0.15s, color 0.15s;
+  border-radius: 8px;
+  padding: 3px 9px;
+  background: rgba(239, 246, 255, 0.75);
+  box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.82);
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
-.key-name:hover { background: #dbeafe; }
-.key-name.copied { background: #dcfce7; color: #16a34a; }
+.key-name:hover {
+  background: rgba(219, 234, 254, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.9);
+}
+.key-name.copied {
+  background: rgba(220, 252, 231, 0.95);
+  color: #15803d;
+  box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.92);
+}
 .type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  height: 22px;
   font-size: 10px;
-  padding: 2px 7px;
-  border-radius: 4px;
+  padding: 0 8px;
+  border-radius: 999px;
   font-weight: 600;
   flex-shrink: 0;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  box-sizing: border-box;
 }
-.ttl-info { font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 4px; }
-.ttl-val { color: #d97706; cursor: pointer; text-decoration: underline dotted; font-weight: 500; }
-.ttl-input { width: 70px; padding: 2px 6px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 12px; outline: none; }
-.key-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.ttl-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  background: rgba(255, 255, 255, 0.88);
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+.ttl-chip.active {
+  color: #c2410c;
+  background: rgba(255, 247, 237, 0.96);
+  border-color: rgba(253, 186, 116, 0.92);
+}
+.ttl-chip.permanent {
+  color: #94a3b8;
+}
+.ttl-chip.missing {
+  color: #b91c1c;
+  background: rgba(255, 241, 242, 0.9);
+  border-color: rgba(254, 202, 202, 0.9);
+}
+.ttl-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(148, 163, 184, 0.96);
+}
+.ttl-popover {
+  position: fixed;
+  z-index: 10020;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 164px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 36px rgba(148, 163, 184, 0.22);
+  backdrop-filter: blur(10px);
+}
+.ttl-popover-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+.ttl-popover-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ttl-input {
+  width: 76px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid #60a5fa;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.95);
+}
+.ttl-popover-btn {
+  min-width: 28px;
+  padding: 0;
+}
+.key-actions {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.btn-tiny,
 .btn-sm {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
-  padding: 4px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  min-height: 30px;
+  height: 30px;
+  width: 56px;
+  min-width: 56px;
+  padding: 0;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  border-radius: 8px;
   cursor: pointer;
   font-size: 12px;
   line-height: 1;
-  background: white;
-  color: #374151;
-  font-weight: 500;
+  background: rgba(255, 255, 255, 0.96);
+  color: #475569;
+  font-weight: 600;
   box-sizing: border-box;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
 }
-.btn-sm:hover { background: #f3f4f6; border-color: #9ca3af; }
-.btn-sm.danger { color: #dc2626; border-color: #fca5a5; }
-.btn-sm.danger:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
+.icon-btn {
+  font-size: 0;
+}
+.key-actions .top-action-btn,
+:deep(.key-actions .header-action-delete),
+:deep(.key-actions .header-action-delete > .btn-tiny) {
+  width: 32px;
+  min-width: 32px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: 10px;
+  flex: 0 0 32px;
+}
+.key-actions .top-action-btn,
+:deep(.key-actions .header-action-delete > .btn-tiny) {
+  border-color: rgba(203, 213, 225, 0.92);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+  color: #64748b;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.key-actions .top-action-btn:hover,
+:deep(.key-actions .header-action-delete > .btn-tiny:hover) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(241, 245, 249, 0.96));
+  border-color: rgba(148, 163, 184, 0.96);
+  color: #334155;
+  transform: translateY(-1px);
+}
+:deep(.key-actions .header-action-delete > .btn-tiny.danger-confirm) {
+  background: linear-gradient(180deg, #ef4444, #dc2626);
+  border-color: #dc2626;
+  color: #fff;
+}
+.key-actions .top-action-btn svg,
+:deep(.key-actions .header-action-delete > .btn-tiny.icon-only svg) {
+  width: 15px;
+  height: 15px;
+  display: block;
+  overflow: visible;
+}
+.btn-tiny:hover,
+.btn-sm:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #1e293b;
+  transform: translateY(-1px);
+}
+.btn-sm.danger,
+.btn-tiny.danger { color: #dc2626; border-color: #fca5a5; }
+.btn-sm.danger:hover,
+.btn-tiny.danger:hover { background: #dc2626; color: #fff; border-color: #dc2626; }
 .btn-confirm-yes {
   color: #16a34a;
   border-color: #16a34a;
@@ -320,46 +612,56 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 24px;
-  padding: 2px 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  min-height: 26px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  border-radius: 8px;
   cursor: pointer;
   font-size: 11px;
   line-height: 1;
-  background: white;
-  color: #374151;
+  background: rgba(255, 255, 255, 0.96);
+  color: #475569;
   box-sizing: border-box;
-  transition: background 0.12s;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
-.btn-xs:hover { background: #f3f4f6; }
+.btn-xs:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+}
 .rename-bar {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  background: #fffbeb;
-  border-bottom: 1px solid #fde68a;
+  padding: 10px 18px;
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.96), rgba(254, 249, 195, 0.72));
+  border-bottom: 1px solid rgba(253, 230, 138, 0.96);
   flex-shrink: 0;
 }
 .rename-bar input {
   flex: 1;
   max-width: 300px;
-  padding: 4px 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 5px;
+  padding: 6px 10px;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  border-radius: 8px;
   font-size: 12px;
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   outline: none;
+  background: rgba(255, 255, 255, 0.95);
 }
-.rename-bar input:focus { border-color: #3b82f6; }
+.rename-bar input:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.14);
+}
 .rename-msg { font-size: 12px; color: #991b1b; }
 .key-header,
 .key-meta,
 .key-actions,
 .type-badge,
-.ttl-info,
-.ttl-val,
+.ttl-chip,
+.ttl-popover-title,
+.btn-tiny,
 .btn-sm,
 .btn-xs,
 .btn-retry,
@@ -373,7 +675,7 @@ onBeforeUnmount(() => {
 .editor-body {
   flex: 1;
   overflow: hidden;
-  padding: 12px 10px 0;
+  padding: 14px 12px 0;
   display: flex;
   flex-direction: column;
 }

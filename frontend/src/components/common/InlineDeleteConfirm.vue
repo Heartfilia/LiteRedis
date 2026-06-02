@@ -1,28 +1,61 @@
 <template>
-  <div ref="rootEl" class="delete-wrap">
-    <button class="btn-tiny danger" :class="{ 'danger-confirm': open }" @click.stop="toggleOpen">
-      {{ label }}
+  <div ref="rootEl" class="delete-wrap" :class="{ open }">
+    <button
+      type="button"
+      class="btn-tiny danger"
+      :class="[{ 'danger-confirm': open }, { 'icon-only': iconOnly }]"
+      @click.stop="toggleOpen"
+    >
+      <svg v-if="iconOnly" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+        <path
+          d="M6.7 6.7l10.6 10.6M17.3 6.7L6.7 17.3"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.9"
+          stroke-linecap="round"
+        />
+      </svg>
+      <template v-else>{{ label }}</template>
     </button>
-    <div v-if="open" ref="popoverEl" class="delete-popover" :class="popoverPlacementClass">
-      <div class="delete-popover-arrow" :class="popoverPlacementClass"></div>
-      <div class="delete-popover-content">
-        <span class="delete-popover-text">{{ confirmText }}</span>
-        <div class="delete-popover-btns">
-          <button class="btn-tiny btn-confirm-yes" @click.stop="confirmDelete">✓</button>
-          <button class="btn-tiny btn-confirm-no" @click.stop="open = false">✕</button>
+    <Teleport to="body">
+      <div
+        v-if="open"
+        ref="popoverEl"
+        class="delete-popover"
+        :class="popoverPlacementClass"
+        :style="popoverStyle"
+        @pointerdown.stop
+        @click.stop
+      >
+        <div class="delete-popover-arrow" :class="popoverPlacementClass"></div>
+        <div class="delete-popover-content">
+          <span class="delete-popover-text">{{ confirmText }}</span>
+          <div class="delete-popover-btns">
+            <button
+              type="button"
+              class="btn-tiny btn-confirm-yes"
+              @pointerdown.prevent.stop="confirmDelete"
+            >✓</button>
+            <button
+              type="button"
+              class="btn-tiny btn-confirm-no"
+              @pointerdown.prevent.stop="close"
+            >✕</button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Teleport, computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   label: { type: String, default: 'Delete' },
   confirmText: { type: String, default: 'Confirm delete?' },
   resetToken: { type: [String, Number, Boolean], default: '' },
+  iconOnly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['confirm'])
@@ -33,6 +66,7 @@ const open = ref(false)
 const rootEl = ref(null)
 const popoverEl = ref(null)
 const popoverPlacement = ref('bottom')
+const popoverStyle = ref({})
 
 const popoverPlacementClass = computed(() => ({
   top: popoverPlacement.value === 'top',
@@ -69,7 +103,9 @@ function close() {
 
 function handleDocumentPointerDown(event) {
   if (!open.value || !rootEl.value) return
-  if (!rootEl.value.contains(event.target)) {
+  const path = typeof event.composedPath === 'function' ? event.composedPath() : []
+  const isInside = rootEl.value.contains(event.target) || path.includes(rootEl.value) || (popoverEl.value && path.includes(popoverEl.value))
+  if (!isInside) {
     close()
   }
 }
@@ -85,12 +121,23 @@ function updatePlacement() {
   const rootRect = rootEl.value.getBoundingClientRect()
   const popoverRect = popoverEl.value.getBoundingClientRect()
   const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0
   const spaceBelow = viewportHeight - rootRect.bottom
   const spaceAbove = rootRect.top
   if (spaceBelow < popoverRect.height + 8 && spaceAbove > spaceBelow) {
     popoverPlacement.value = 'top'
   } else {
     popoverPlacement.value = 'bottom'
+  }
+
+  const left = Math.max(8, Math.min(rootRect.right - popoverRect.width, viewportWidth - popoverRect.width - 8))
+  const top = popoverPlacement.value === 'top'
+    ? Math.max(8, rootRect.top - popoverRect.height - 6)
+    : Math.min(viewportHeight - popoverRect.height - 8, rootRect.bottom + 6)
+
+  popoverStyle.value = {
+    left: `${left}px`,
+    top: `${top}px`,
   }
 }
 
@@ -104,14 +151,14 @@ watch(() => props.resetToken, () => {
 })
 
 onMounted(() => {
-  document.addEventListener('pointerdown', handleDocumentPointerDown, true)
+  document.addEventListener('pointerdown', handleDocumentPointerDown)
   window.addEventListener('resize', handleWindowChange)
   window.addEventListener('scroll', handleWindowChange, true)
 })
 
 onBeforeUnmount(() => {
   close()
-  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
+  document.removeEventListener('pointerdown', handleDocumentPointerDown)
   window.removeEventListener('resize', handleWindowChange)
   window.removeEventListener('scroll', handleWindowChange, true)
 })
@@ -121,6 +168,14 @@ onBeforeUnmount(() => {
 .delete-wrap {
   position: relative;
   display: inline-flex;
+}
+
+.delete-wrap.open {
+  z-index: 10030;
+}
+
+.btn-tiny.icon-only {
+  padding: 0;
 }
 
 .btn-tiny.danger-confirm {
@@ -135,24 +190,25 @@ onBeforeUnmount(() => {
 }
 
 .delete-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 100;
+  position: fixed;
+  z-index: 20050;
+  isolation: isolate;
   background: #fff;
+  background-color: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   padding: 8px 10px;
   white-space: nowrap;
+  opacity: 1;
+  backdrop-filter: none;
+  pointer-events: auto;
 }
 .delete-popover.top {
-  top: auto;
-  bottom: calc(100% + 6px);
+  transform-origin: bottom right;
 }
 .delete-popover.bottom {
-  top: calc(100% + 6px);
-  bottom: auto;
+  transform-origin: top right;
 }
 
 .delete-popover-arrow {
@@ -162,6 +218,7 @@ onBeforeUnmount(() => {
   width: 10px;
   height: 10px;
   background: #fff;
+  background-color: #fff;
   border-left: 1px solid #e5e7eb;
   border-top: 1px solid #e5e7eb;
   transform: rotate(45deg);
@@ -181,6 +238,10 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  position: relative;
+  z-index: 1;
+  background: #fff;
+  background-color: #fff;
 }
 
 .delete-popover-text {
@@ -192,6 +253,35 @@ onBeforeUnmount(() => {
 .delete-popover-btns {
   display: flex;
   gap: 4px;
+}
+
+.delete-popover .btn-tiny {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  cursor: pointer;
+  background: #fff;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
+  box-sizing: border-box;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.14s ease;
+}
+
+.delete-popover .btn-tiny:hover {
+  transform: translateY(-1px);
+}
+
+.delete-popover .btn-tiny:active {
+  transform: translateY(0);
 }
 
 .btn-confirm-yes {

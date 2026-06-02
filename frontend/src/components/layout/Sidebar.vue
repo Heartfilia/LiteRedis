@@ -17,7 +17,9 @@
               {{ connInitial(conn) }}
             </div>
           </div>
-          <button class="btn-expand-bottom" :title="t('sidebar.expand')" @click="sidebarCollapsed = false">▶</button>
+          <button class="btn-expand-bottom" :title="t('sidebar.expand')" @click="sidebarCollapsed = false">
+            <span class="btn-expand-glyph" aria-hidden="true">▶</span>
+          </button>
         </div>
       </div>
 
@@ -72,17 +74,18 @@
           <div class="conn-actions">
             <button
               v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
-              class="btn-tiny btn-disconnect"
+              class="btn-tiny btn-conn-action btn-disconnect"
               :title="t('sidebar.disconnect')"
               @click.stop="disconnectConn(conn.id)"
             >⊘</button>
             <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
-            <button class="btn-tiny" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
+            <button class="btn-tiny btn-conn-action" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
             <InlineDeleteConfirm
               class="sidebar-delete-confirm"
               label="✕"
               :confirm-text="t('sidebar.confirmDelete')"
               :reset-token="`${conn.id}:${activeConnID || ''}`"
+              :icon-only="true"
               @confirm="removeConnection(conn.id)"
             />
           </div>
@@ -144,17 +147,18 @@
               <div class="conn-actions">
                 <button
                   v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
-                  class="btn-tiny btn-disconnect"
+                  class="btn-tiny btn-conn-action btn-disconnect"
                   :title="t('sidebar.disconnect')"
                   @click.stop="disconnectConn(conn.id)"
                 >⊘</button>
                 <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
-                <button class="btn-tiny" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
+                <button class="btn-tiny btn-conn-action" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
                 <InlineDeleteConfirm
                   class="sidebar-delete-confirm"
                   label="✕"
                   :confirm-text="t('sidebar.confirmDelete')"
                   :reset-token="`${conn.id}:${activeConnID || ''}`"
+                  :icon-only="true"
                   @confirm="removeConnection(conn.id)"
                 />
               </div>
@@ -184,7 +188,12 @@
         <div class="footer-actions">
           <button class="btn-icon" :title="t('sidebar.manageConn')" @click="openConnManager()"><span class="btn-icon-glyph" aria-hidden="true">＋</span></button>
           <button class="btn-icon btn-settings" :title="t('sidebar.settings')" @click="openSettings()"><span class="btn-icon-glyph" aria-hidden="true">⚙</span></button>
-          <button class="btn-icon btn-collapse" :title="t('sidebar.collapse')" @click="sidebarCollapsed = true"><span class="btn-icon-glyph" aria-hidden="true">◀</span></button>
+          <button
+            class="btn-icon btn-collapse"
+            :title="t('sidebar.collapse')"
+            :disabled="!hasConnections"
+            @click="hasConnections && (sidebarCollapsed = true)"
+          ><span class="btn-icon-glyph" aria-hidden="true">◀</span></button>
         </div>
       </div>
       </div>
@@ -211,7 +220,7 @@
 </template>
 
 <script setup>
-import { computed, ref, inject, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, inject, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useI18n } from '../../i18n/index.js'
@@ -241,6 +250,7 @@ const namedGroups = computed(() => {
 const connectedConnections = computed(() =>
   connectionsStore.connections.filter(c => connectionsStore.isConnected(c.id))
 )
+const hasConnections = computed(() => connectionsStore.connections.length > 0)
 
 function connectionStateClass(id) {
   if (connectionsStore.isConnecting(id)) return 'connecting'
@@ -274,6 +284,12 @@ const toastMsg = ref('')
 const toastOk = ref(false)
 let toastTimer = null
 let dragExpandTimer = null
+
+watch(hasConnections, (value) => {
+  if (!value) {
+    sidebarCollapsed.value = false
+  }
+}, { immediate: true })
 
 // 右键菜单
 const ctxMenu = ref({ visible: false, x: 0, y: 0, conn: null })
@@ -462,11 +478,19 @@ async function disconnectConn(id) {
 .sidebar {
   width: 200px;
   min-width: 200px;
-  background: #1e2a3a;
-  color: #c9d1d9;
+  margin: 10px 0 10px 10px;
+  border-radius: 15px;
+  border: 1px solid rgba(214, 224, 236, 0.92);
+  background:
+    radial-gradient(circle at top left, rgba(191, 219, 254, 0.58), transparent 34%),
+    radial-gradient(circle at right 22%, rgba(220, 252, 231, 0.34), transparent 26%),
+    linear-gradient(180deg, rgba(248, 251, 255, 0.94) 0%, rgba(239, 245, 251, 0.96) 100%);
+  box-shadow: 0 18px 38px rgba(148, 163, 184, 0.16);
+  backdrop-filter: blur(14px);
+  color: #475569;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100vh - 20px);
   overflow: hidden;
   position: relative;
   transition: width 0.2s ease, min-width 0.2s ease;
@@ -540,24 +564,39 @@ async function disconnectConn(id) {
 .collapsed-conn-icon:hover { opacity: 1; }
 .collapsed-conn-icon.active {
   opacity: 1;
-  box-shadow: 0 0 0 2px #1e2a3a, 0 0 0 3.5px rgba(255,255,255,0.55);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.96), 0 0 0 4px rgba(96, 165, 250, 0.32);
 }
 .btn-expand-bottom {
-  background: #4a5568;
-  color: #a0aec0;
-  border: none;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #64748b;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  border-radius: 8px;
   width: 28px;
-  height: 24px;
-  font-size: 10px;
+  height: 28px;
+  font-size: 11px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   margin-top: 6px;
+  box-shadow: 0 8px 16px rgba(148, 163, 184, 0.14);
 }
-.btn-expand-bottom:hover { background: #718096; color: white; }
+.btn-expand-glyph {
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 10px;
+  transform: translateX(0.5px);
+}
+.btn-expand-bottom:hover {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #93c5fd;
+}
 
 /* ===== 展开状态 footer ===== */
 .sidebar-footer {
@@ -566,10 +605,11 @@ async function disconnectConn(id) {
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  min-height: 34px;
+  min-height: 36px;
   padding: 4px 12px;
-  border-top: 1px solid #2d3748;
+  border-top: 1px solid rgba(214, 224, 236, 0.92);
   box-sizing: border-box;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.65), rgba(241, 245, 249, 0.94));
 }
 .sidebar-links {
   display: flex;
@@ -577,7 +617,7 @@ async function disconnectConn(id) {
   gap: 6px;
 }
 .sidebar-link-icon {
-  color: #718096;
+  color: #64748b;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -586,7 +626,7 @@ async function disconnectConn(id) {
   height: 22px;
   min-width: 22px;
   min-height: 22px;
-  border-radius: 4px;
+  border-radius: 6px;
   transition: color 0.15s, background 0.15s;
   text-decoration: none;
   box-sizing: border-box;
@@ -609,8 +649,8 @@ async function disconnectConn(id) {
   height: 16px;
 }
 .sidebar-link-icon:hover {
-  color: #dbe7f5;
-  background: rgba(160, 174, 192, 0.14);
+  color: #2563eb;
+  background: rgba(219, 234, 254, 0.76);
 }
 .sidebar-link-icon:hover .sidebar-link-glyph {
   transform: scale(1.08);
@@ -618,7 +658,7 @@ async function disconnectConn(id) {
 .sidebar-link-icon:focus,
 .sidebar-link-icon:focus-visible,
 .sidebar-link-icon:active {
-  color: #718096;
+  color: #64748b;
   background: transparent;
   outline: none;
   box-shadow: none;
@@ -626,8 +666,8 @@ async function disconnectConn(id) {
 .sidebar-link-icon:hover:focus,
 .sidebar-link-icon:hover:focus-visible,
 .sidebar-link-icon:hover:active {
-  color: #dbe7f5;
-  background: rgba(160, 174, 192, 0.14);
+  color: #2563eb;
+  background: rgba(219, 234, 254, 0.76);
 }
 .sidebar-link-json {
   font-size: 12px;
@@ -641,10 +681,10 @@ async function disconnectConn(id) {
   gap: 4px;
 }
 .btn-icon {
-  background: #4e9af1;
-  color: white;
-  border: none;
-  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.94));
+  color: #64748b;
+  border: 1px solid rgba(203, 213, 225, 0.94);
+  border-radius: 8px;
   width: 24px; height: 24px;
   min-width: 24px; min-height: 24px;
   font-size: 14px; line-height: 1;
@@ -652,9 +692,15 @@ async function disconnectConn(id) {
   display: flex; align-items: center; justify-content: center;
   box-sizing: border-box;
   overflow: hidden;
-  transition: background 0.15s;
+  box-shadow: 0 6px 14px rgba(148, 163, 184, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.btn-icon:hover { background: #3a85e0; }
+.btn-icon:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(239, 246, 255, 0.96));
+  color: #2563eb;
+  border-color: rgba(147, 197, 253, 0.92);
+  box-shadow: 0 8px 18px rgba(191, 219, 254, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
 .btn-icon-glyph {
   width: 14px;
   height: 14px;
@@ -668,11 +714,40 @@ async function disconnectConn(id) {
 .btn-icon:hover .btn-icon-glyph {
   transform: scale(1.08);
 }
-.btn-settings { background: #4a5568; }
-.btn-settings:hover { background: #718096; }
-.btn-collapse { background: #718096; }
+.btn-settings {
+  background: linear-gradient(180deg, rgba(250, 252, 255, 0.98), rgba(241, 245, 249, 0.94));
+  color: #5b6b82;
+}
+.btn-settings:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(238, 246, 255, 0.98));
+  color: #2563eb;
+}
+.btn-collapse {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.92));
+  color: #64748b;
+}
 .btn-collapse .btn-icon-glyph { font-size: 10px; }
-.btn-collapse:hover { background: #a0aec0; }
+.btn-collapse:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(241, 245, 249, 0.96));
+  color: #334155;
+}
+.btn-icon:disabled {
+  cursor: default;
+  opacity: 0.46;
+  color: #a8b4c5;
+  border-color: rgba(226, 232, 240, 0.9);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.82), rgba(241, 245, 249, 0.78));
+  box-shadow: none;
+}
+.btn-icon:disabled .btn-icon-glyph {
+  transform: none !important;
+}
+.btn-icon:disabled:hover {
+  color: #a8b4c5;
+  border-color: rgba(226, 232, 240, 0.9);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.82), rgba(241, 245, 249, 0.78));
+  box-shadow: none;
+}
 
 /* ===== 连接列表 ===== */
 .conn-list {
@@ -687,10 +762,12 @@ async function disconnectConn(id) {
   align-items: center;
   padding: 5px 10px;
   cursor: pointer;
-  border-radius: 4px;
-  margin: 1px 6px;
+  border-radius: 8px;
+  margin: 2px 8px;
   position: relative;
   overflow: visible;
+  border: 1px solid transparent;
+  transition: background 0.14s, border-color 0.14s, box-shadow 0.14s;
 }
 .conn-item.drop-before,
 .conn-item.drop-after {
@@ -750,8 +827,16 @@ async function disconnectConn(id) {
 .drop-indicator.after { bottom: -1px; }
 .drop-indicator.after::after { top: -3px; }
 .conn-item.grouped { margin-left: 14px; margin-right: 6px; }
-.conn-item:hover { background: #2d3748; }
-.conn-item.active { background: #2d4a6e; }
+.conn-item:hover {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(147, 197, 253, 0.32);
+  box-shadow: 0 10px 18px rgba(191, 219, 254, 0.18);
+}
+.conn-item.active {
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.96), rgba(219, 234, 254, 0.92));
+  border-color: rgba(96, 165, 250, 0.38);
+  box-shadow: 0 10px 22px rgba(147, 197, 253, 0.22);
+}
 .conn-item.connecting::before {
   content: '';
   position: absolute;
@@ -796,16 +881,34 @@ async function disconnectConn(id) {
   animation: dotPulse 1.2s ease-out infinite;
 }
 .conn-dot.disconnected { background: #9e9e9e; }
-.conn-name { font-size: 13px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.conn-name { font-size: 13px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 .connecting-inline {
   margin-left: 6px;
   font-size: 10px;
-  color: #93c5fd;
+  color: #3b82f6;
   font-weight: 500;
 }
 .conn-actions { display: none; gap: 2px; }
 .conn-item:hover .conn-actions { display: flex; }
 .conn-item.connecting .conn-actions { display: flex; }
+.btn-conn-action,
+:deep(.sidebar-delete-confirm),
+:deep(.sidebar-delete-confirm > .btn-tiny) {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
+  line-height: 1;
+}
+.btn-conn-action {
+  font-size: 11px;
+}
 .connecting-spinner {
   width: 12px;
   height: 12px;
@@ -816,25 +919,35 @@ async function disconnectConn(id) {
   flex-shrink: 0;
 }
 .btn-tiny {
-  background: transparent;
-  border: 1px solid #4a5568;
-  color: #a0aec0;
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  color: #64748b;
+  border-radius: 6px;
   padding: 1px 5px;
   font-size: 11px;
   cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
-.btn-tiny:hover { background: #4a5568; }
+.btn-tiny:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #2563eb;
+}
 .btn-tiny.danger:hover { background: #e53e3e; border-color: #e53e3e; color: white; }
 :deep(.sidebar-delete-confirm .btn-tiny.danger) {
-  border-color: #475569;
-  color: #cbd5e1;
-  background: rgba(15, 23, 42, 0.18);
+  border-color: rgba(203, 213, 225, 0.96);
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.82);
+}
+:deep(.sidebar-delete-confirm > .btn-tiny.icon-only svg) {
+  width: 11px;
+  height: 11px;
+  display: block;
 }
 :deep(.sidebar-delete-confirm .btn-tiny.danger:hover) {
-  background: rgba(239, 68, 68, 0.18);
+  background: rgba(254, 226, 226, 0.86);
   border-color: #f87171;
-  color: #fecaca;
+  color: #dc2626;
 }
 :deep(.sidebar-delete-confirm .btn-tiny.danger-confirm) {
   background: #b91c1c;
@@ -876,7 +989,7 @@ async function disconnectConn(id) {
 .btn-confirm-yes:hover { background: #16a34a; color: white; }
 .btn-confirm-no { color: #dc2626; border-color: #dc2626; }
 .btn-confirm-no:hover { background: #dc2626; color: white; }
-.empty-hint { text-align: center; color: #4a5568; font-size: 12px; padding: 20px; }
+.empty-hint { text-align: center; color: #94a3b8; font-size: 12px; padding: 20px; }
 
 /* 未分组拖拽区域 */
 .ungrouped-zone {
@@ -885,8 +998,8 @@ async function disconnectConn(id) {
   transition: background 0.15s;
   padding: 1px 0;
 }
-.ungrouped-zone.drag-over { background: #2d4a6e; }
-.ungrouped-zone.cross-group-preview.drag-over { background: rgba(18, 74, 61, 0.72); }
+.ungrouped-zone.drag-over { background: rgba(219, 234, 254, 0.68); }
+.ungrouped-zone.cross-group-preview.drag-over { background: rgba(209, 250, 229, 0.74); }
 .drop-group-hint,
 .group-drop-hint {
   margin-left: auto;
@@ -916,17 +1029,21 @@ async function disconnectConn(id) {
   gap: 5px;
   padding: 4px 12px;
   cursor: pointer;
-  color: #a0aec0;
+  color: #64748b;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-radius: 3px;
-  margin: 0 6px;
+  border-radius: 8px;
+  margin: 1px 8px;
   user-select: none;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s;
+  border: 1px solid transparent;
 }
-.group-header:hover { background: #2d3748; }
+.group-header:hover {
+  background: rgba(255, 255, 255, 0.74);
+  border-color: rgba(147, 197, 253, 0.24);
+}
 
 @keyframes spin {
   to { transform: rotate(360deg); }
@@ -942,20 +1059,21 @@ async function disconnectConn(id) {
   from { transform: translateY(0); }
   to { transform: translateY(-1px); }
 }
-.group-header.drag-over { background: #2d4a6e; border: 1px dashed #4e9af1; }
+.group-header.drag-over { background: rgba(219, 234, 254, 0.72); border: 1px dashed #60a5fa; }
 .group-header.cross-group-preview.drag-over {
-  background: rgba(18, 74, 61, 0.72);
+  background: rgba(209, 250, 229, 0.8);
   border-color: #34d399;
 }
 .group-arrow { font-size: 9px; flex-shrink: 0; }
 .group-name { flex: 1; }
 .group-count {
-  background: #2d3748;
-  color: #718096;
+  background: rgba(255, 255, 255, 0.86);
+  color: #64748b;
   font-size: 10px;
   padding: 0 5px;
   border-radius: 10px;
   font-weight: 400;
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.92);
 }
 
 /* ===== 右键菜单 ===== */

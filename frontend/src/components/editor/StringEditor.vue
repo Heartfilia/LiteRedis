@@ -87,12 +87,12 @@ async function save() {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   height: 100%;
   min-height: 0;
 }
 textarea {
-  flex: 1; resize: none; padding: 10px 12px;
+  flex: 1; resize: none; padding: 9px 11px;
   border: 1px solid #d1d5db; border-radius: 6px;
   font-family: monospace; font-size: 13px; outline: none;
   line-height: 1.6; color: #1f2937;
@@ -103,13 +103,18 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1
 .editor-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 6px;
-  padding: 0 0 8px;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0;
+  border-top: 1px solid #e8e8e8;
+  margin-top: -1px;
   flex-shrink: 0;
 }
 .btn-action {
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 5px 13px;
+  min-height: 24px;
+  padding: 0 9px;
   background: #fff;
   color: #374151;
   border: 1px solid #d1d5db;
@@ -127,7 +132,8 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1
 }
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 5px 16px;
+  min-height: 24px;
+  padding: 0 10px;
   background: #3b82f6;
   color: #fff;
   border: none;

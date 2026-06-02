@@ -18,7 +18,10 @@ defineEmits(['close'])
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(0, 0, 0, 0.55);
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.16), transparent 30%),
+    rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -30,8 +33,10 @@ defineEmits(['close'])
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  border-radius: 12px;
-  background: white;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.26);
+  backdrop-filter: blur(18px);
 }
 </style>

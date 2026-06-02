@@ -80,12 +80,16 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
   --ui-font-body: 12px;
   --ui-font-caption: 11px;
   --ui-font-badge: 10px;
+  position: relative;
   display: flex;
   height: 100vh;
   min-width: 1220px;
   min-height: 720px;
   overflow: hidden;
-  background: #fff;
+  background:
+    radial-gradient(circle at top left, rgba(226, 239, 255, 0.72), transparent 34%),
+    radial-gradient(circle at right 18%, rgba(215, 244, 236, 0.55), transparent 28%),
+    linear-gradient(180deg, #f7fafc 0%, #eef3f9 100%);
 }
 .app-layout.font-medium {
   --ui-font-title: 14px;
@@ -184,5 +188,8 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
 .app-toast-leave-to {
   opacity: 0;
   transform: translateX(-50%) translateY(-12px);
+}
+body {
+  background: #edf3f9;
 }
 </style>

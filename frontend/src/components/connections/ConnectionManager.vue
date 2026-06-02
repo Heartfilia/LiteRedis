@@ -427,7 +427,10 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(0, 0, 0, 0.5);
+  background:
+    radial-gradient(circle at top, rgba(255,255,255,0.16), transparent 28%),
+    rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -436,9 +439,11 @@ onBeforeUnmount(() => {
   width: 800px;
   max-width: 96vw;
   max-height: 88vh;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  border-radius: 24px;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.26);
+  backdrop-filter: blur(18px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -447,9 +452,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
+  padding: 18px 22px 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.78);
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(247,250,252,0.82));
   flex-shrink: 0;
 }
 .cm-title {
@@ -464,7 +469,7 @@ onBeforeUnmount(() => {
   background: #3b82f6;
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
@@ -473,11 +478,13 @@ onBeforeUnmount(() => {
 .btn-new:hover { background: #2563eb; }
 .btn-close {
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 4px 10px;
-  background: transparent;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: rgba(255,255,255,0.74);
   color: #9ca3af;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border: 1px solid rgba(226,232,240,0.92);
+  border-radius: 999px;
   cursor: pointer;
   font-size: 14px;
   transition: color 0.12s, border-color 0.12s;

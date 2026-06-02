@@ -29,7 +29,7 @@ import { useSettingsStore } from '../../stores/settings.js'
 const MIN_WIDTH = 220
 const MAX_WIDTH = 600
 const DEFAULT_WIDTH = 320
-const RESIZER_WIDTH = 5
+const RESIZER_WIDTH = 2
 const MIN_EDITOR_WIDTH = 700
 
 const panelWidth = ref(DEFAULT_WIDTH)
@@ -108,6 +108,8 @@ function startResize(e) {
   overflow: hidden;
   height: 100vh;
   min-width: 0;
+  padding: 10px 10px 10px 2px;
+  gap: 0;
 }
 .main-content.is-resizing,
 .main-content.is-resizing * {
@@ -131,17 +133,22 @@ function startResize(e) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-right: 1px solid #e0e0e0;
   flex: 0 1 auto;
   user-select: none;
   -webkit-user-select: none;
+  border: 1px solid rgba(214, 224, 236, 0.9);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 14px 30px rgba(148, 163, 184, 0.16);
+  backdrop-filter: blur(14px);
 }
 .resizer {
-  width: 5px;
+  width: 2px;
   cursor: col-resize;
-  background: linear-gradient(90deg, #eef2f7 0, #dbe4ef 50%, #eef2f7 100%);
-  border-left: 1px solid #d7dee8;
-  border-right: 1px solid #d7dee8;
+  margin: 8px 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(203, 213, 225, 0.08), rgba(148, 163, 184, 0.34), rgba(203, 213, 225, 0.08));
+  border: none;
   flex-shrink: 0;
   transition: background 0.15s, border-color 0.15s;
   z-index: 10;
@@ -149,8 +156,7 @@ function startResize(e) {
 }
 .resizer:hover,
 .resizer:active {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: linear-gradient(180deg, rgba(96, 165, 250, 0.08), #60a5fa, rgba(96, 165, 250, 0.08));
 }
 .key-editor-panel {
   flex: 1;
@@ -159,6 +165,11 @@ function startResize(e) {
   display: flex;
   flex-direction: column;
   position: relative;
+  border: 1px solid rgba(214, 224, 236, 0.9);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 36px rgba(148, 163, 184, 0.14);
+  backdrop-filter: blur(14px);
 }
 .editor-watermark-layer {
   position: absolute;

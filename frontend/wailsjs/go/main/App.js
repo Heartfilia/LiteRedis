@@ -74,6 +74,10 @@ export function ListConnections() {
   return window['go']['main']['App']['ListConnections']();
 }
 
+export function PingConnection(arg1) {
+  return window['go']['main']['App']['PingConnection'](arg1);
+}
+
 export function RPush(arg1, arg2, arg3) {
   return window['go']['main']['App']['RPush'](arg1, arg2, arg3);
 }

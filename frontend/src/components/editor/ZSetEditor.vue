@@ -2,7 +2,7 @@
   <div class="zset-editor">
     <FloatingMessage :message="msg" :success="ok" />
     <div class="toolbar">
-      <button class="btn-add" @click="showAdd = !showAdd">+ {{ t('keyEditor.addMember') }}</button>
+      <button class="btn-add" :title="t('keyEditor.addMember')" @click="showAdd = !showAdd">+</button>
       <div class="search-bar">
         <input
           v-model="searchQuery"
@@ -481,7 +481,26 @@ async function copyMember(member) {
 
 <style scoped>
 .zset-editor { position: relative; display: flex; flex-direction: column; height: 100%; gap: 8px; }
-.toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.toolbar { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.btn-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  cursor: pointer;
+  background: #fff;
+  color: #374151;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  box-sizing: border-box;
+}
+.btn-add:hover { background: #f3f4f6; }
 .search-bar { display: flex; align-items: center; min-height: 28px; }
 .search-input {
   width: 130px; height: 28px; min-height: 28px; padding: 0 8px;
@@ -504,6 +523,13 @@ async function copyMember(member) {
 .num-col { width: 36px; text-align: center; }
 .num-cell { width: 36px; text-align: center; color: #d1d5db; font-size: 11px; }
 .zset-table thead,
+.toolbar,
+.search-bar,
+.btn-add,
+.btn-search,
+.btn-clear-search,
+.count,
+.add-row button,
 .num-col,
 .num-cell,
 .score-th,

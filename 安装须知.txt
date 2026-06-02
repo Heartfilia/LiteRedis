@@ -3,3 +3,7 @@
 
 如果 LiteRedis 被拦截，
 请在该页面底部点击“仍要打开”
+
+或者安装好后，在终端里面执行如下命令即可（推荐）
+attr -dr com.apple.quarantine /Applications/LiteRedis.app
+

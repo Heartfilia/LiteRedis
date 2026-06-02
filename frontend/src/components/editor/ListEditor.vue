@@ -2,7 +2,7 @@
   <div class="list-editor">
     <FloatingMessage :message="msg" :success="ok" />
     <div class="toolbar">
-      <button class="btn-add" @click="showAdd = !showAdd">+ {{ t('keyEditor.addElement') }}</button>
+      <button class="btn-add" :title="t('keyEditor.addElement')" @click="showAdd = !showAdd">+</button>
       <div class="search-bar">
         <input
           v-model="searchQuery"
@@ -405,7 +405,26 @@ async function addItem() {
 
 <style scoped>
 .list-editor { position: relative; display: flex; flex-direction: column; height: 100%; gap: 8px; }
-.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.toolbar { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.btn-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  cursor: pointer;
+  background: #fff;
+  color: #374151;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  box-sizing: border-box;
+}
+.btn-add:hover { background: #f3f4f6; }
 .search-bar { display: flex; align-items: center; min-height: 28px; }
 .search-input {
   width: 130px; height: 28px; min-height: 28px; padding: 0 8px;
@@ -431,6 +450,13 @@ async function addItem() {
 .list-item:hover { background: #f9fafb; }
 .idx-badge { background: #eff6ff; color: #1d4ed8; padding: 1px 6px; border-radius: 4px; font-size: 11px; flex-shrink: 0; min-width: 28px; text-align: center; font-weight: 500; }
 .list-header,
+.toolbar,
+.search-bar,
+.btn-add,
+.btn-search,
+.btn-clear-search,
+.count,
+.add-row button,
 .idx-badge,
 .item-actions {
   user-select: none;
