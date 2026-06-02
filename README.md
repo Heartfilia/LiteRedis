@@ -64,6 +64,13 @@ wails dev
 
 首次打开从 GitHub Release 下载的 `.app` / `.dmg` 时，macOS 可能会提示“无法验证开发者”或“已阻止打开”。如果遇到这类提示，可按下面方式处理：
 
+方法一(推荐)：
+打开终端，输入下面的命令并执行即可
+
+`xattr -dr com.apple.quarantine /Applications/LiteRedis.app`
+
+方法二：
+
 1. 在 Finder 中找到 `LiteRedis.app`
 2. 右键应用，选择“打开”
 3. 在系统弹窗中再次点击“打开”
