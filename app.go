@@ -234,6 +234,32 @@ func (a *App) DBSize(connID string) int64 {
 	return size
 }
 
+// GetConnectionOverview 获取当前连接概览信息
+func (a *App) GetConnectionOverview(connID string) (config.RedisConnectionOverview, error) {
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return config.RedisConnectionOverview{}, err
+	}
+	cfg, currentDB, err := a.manager.GetConnectionState(connID)
+	if err != nil {
+		return config.RedisConnectionOverview{}, err
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, 8*time.Second)
+	defer cancel()
+	return redisbackend.GetConnectionOverview(ctx, client, cfg, currentDB)
+}
+
+// ExecuteRedisCommand 在当前连接上执行 Redis 命令
+func (a *App) ExecuteRedisCommand(connID, command string) (config.RedisConsoleResult, error) {
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return config.RedisConsoleResult{}, err
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+	defer cancel()
+	return redisbackend.ExecuteRedisCommandWithState(ctx, client, command, connID, a.manager), nil
+}
+
 // ============================================================
 // Value CRUD
 // ============================================================

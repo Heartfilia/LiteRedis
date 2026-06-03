@@ -17,7 +17,11 @@ export function DeleteKey(arg1:string,arg2:string):Promise<config.OperationResul
 
 export function Disconnect(arg1:string):Promise<config.OperationResult>;
 
+export function ExecuteRedisCommand(arg1:string,arg2:string):Promise<config.RedisConsoleResult>;
+
 export function GetAppVersion():Promise<string>;
+
+export function GetConnectionOverview(arg1:string):Promise<config.RedisConnectionOverview>;
 
 export function GetKeyInfo(arg1:string,arg2:string):Promise<config.RedisKey>;
 

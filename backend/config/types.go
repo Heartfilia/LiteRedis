@@ -160,3 +160,31 @@ type OperationResult struct {
 	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
 }
+
+// RedisConnectionOverview 当前连接概览信息
+type RedisConnectionOverview struct {
+	ConnID            string `json:"conn_id"`
+	ConnName          string `json:"conn_name"`
+	Host              string `json:"host"`
+	Port              int    `json:"port"`
+	CurrentDB         int    `json:"current_db"`
+	IsCluster         bool   `json:"is_cluster"`
+	RedisVersion      string `json:"redis_version"`
+	Role              string `json:"role"`
+	ConnectedClients  int64  `json:"connected_clients"`
+	InstantOpsPerSec  int64  `json:"instant_ops_per_sec"`
+	TotalKeys         int64  `json:"total_keys"`
+	UsedMemory        string `json:"used_memory"`
+	UsedMemoryBytes   int64  `json:"used_memory_bytes"`
+	UptimeDays        int64  `json:"uptime_days"`
+	UptimeHuman       string `json:"uptime_human"`
+}
+
+// RedisConsoleResult Redis Console 执行结果
+type RedisConsoleResult struct {
+	Success   bool   `json:"success"`
+	Command   string `json:"command"`
+	Output    string `json:"output,omitempty"`
+	Error     string `json:"error,omitempty"`
+	ElapsedMs int64  `json:"elapsed_ms"`
+}

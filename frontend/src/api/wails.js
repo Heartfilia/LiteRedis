@@ -18,6 +18,8 @@ export const disconnect = (id) => callGo('Disconnect', id)
 export const isConnected = (id) => callGo('IsConnected', id)
 export const pingConnection = (id) => callGo('PingConnection', id)
 export const selectDB = (id, db) => callGo('SelectDB', id, db)
+export const getConnectionOverview = (id) => callGo('GetConnectionOverview', id)
+export const executeRedisCommand = (id, command) => callGo('ExecuteRedisCommand', id, command)
 
 // ===== Key 操作 =====
 export const scanKeys = (connID, pattern, count, cursor) => callGo('ScanKeys', connID, pattern, count, cursor)

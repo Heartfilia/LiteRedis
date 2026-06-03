@@ -268,6 +268,66 @@ export namespace config {
 	        this.message = source["message"];
 	    }
 	}
+	export class RedisConnectionOverview {
+	    conn_id: string;
+	    conn_name: string;
+	    host: string;
+	    port: number;
+	    current_db: number;
+	    is_cluster: boolean;
+	    redis_version: string;
+	    role: string;
+	    connected_clients: number;
+	    instant_ops_per_sec: number;
+	    total_keys: number;
+	    used_memory: string;
+	    used_memory_bytes: number;
+	    uptime_days: number;
+	    uptime_human: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RedisConnectionOverview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.conn_id = source["conn_id"];
+	        this.conn_name = source["conn_name"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.current_db = source["current_db"];
+	        this.is_cluster = source["is_cluster"];
+	        this.redis_version = source["redis_version"];
+	        this.role = source["role"];
+	        this.connected_clients = source["connected_clients"];
+	        this.instant_ops_per_sec = source["instant_ops_per_sec"];
+	        this.total_keys = source["total_keys"];
+	        this.used_memory = source["used_memory"];
+	        this.used_memory_bytes = source["used_memory_bytes"];
+	        this.uptime_days = source["uptime_days"];
+	        this.uptime_human = source["uptime_human"];
+	    }
+	}
+	export class RedisConsoleResult {
+	    success: boolean;
+	    command: string;
+	    output?: string;
+	    error?: string;
+	    elapsed_ms: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RedisConsoleResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.command = source["command"];
+	        this.output = source["output"];
+	        this.error = source["error"];
+	        this.elapsed_ms = source["elapsed_ms"];
+	    }
+	}
 	export class RedisKey {
 	    name: string;
 	    type: string;

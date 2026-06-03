@@ -532,10 +532,27 @@ export const useWorkspaceStore = defineStore('workspace', {
       if (this.activeSessionId === id) {
         this.activeSessionId = this.searchSessions.at(-1)?.id ?? null
       }
+      if (!this.searchSessions.length) {
+        this.selectedKey = null
+        this.keyValue = null
+        this.keyValueError = null
+        this.keyValueLoading = false
+        this._loadingKey = null
+      }
     },
 
     removeSession(sessionId) {
       this.searchSessions = this.searchSessions.filter(s => s.id !== sessionId)
+      if (this.activeSessionId === sessionId) {
+        this.activeSessionId = this.searchSessions.at(-1)?.id ?? null
+      }
+      if (!this.searchSessions.length) {
+        this.selectedKey = null
+        this.keyValue = null
+        this.keyValueError = null
+        this.keyValueLoading = false
+        this._loadingKey = null
+      }
     },
 
     /**

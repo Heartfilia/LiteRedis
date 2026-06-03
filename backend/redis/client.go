@@ -179,6 +179,30 @@ func (m *ClientManager) GetClient(id string) (redis.UniversalClient, error) {
 	return conn.client, nil
 }
 
+func (m *ClientManager) GetConnectionState(id string) (config.ConnectionConfig, int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	conn, ok := m.clients[id]
+	if !ok {
+		return config.ConnectionConfig{}, 0, fmt.Errorf("connection %s not found or not connected", id)
+	}
+	return conn.cfg, conn.currentDB, nil
+}
+
+func (m *ClientManager) SetCurrentDB(id string, db int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	conn, ok := m.clients[id]
+	if !ok {
+		return fmt.Errorf("connection %s not found or not connected", id)
+	}
+	conn.currentDB = db
+	conn.cfg.DB = db
+	return nil
+}
+
 // IsConnected 检查连接是否存在
 func (m *ClientManager) IsConnected(id string) bool {
 	m.mu.RLock()

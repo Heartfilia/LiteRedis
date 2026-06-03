@@ -30,8 +30,16 @@ export function Disconnect(arg1) {
   return window['go']['main']['App']['Disconnect'](arg1);
 }
 
+export function ExecuteRedisCommand(arg1, arg2) {
+  return window['go']['main']['App']['ExecuteRedisCommand'](arg1, arg2);
+}
+
 export function GetAppVersion() {
   return window['go']['main']['App']['GetAppVersion']();
+}
+
+export function GetConnectionOverview(arg1) {
+  return window['go']['main']['App']['GetConnectionOverview'](arg1);
 }
 
 export function GetKeyInfo(arg1, arg2) {

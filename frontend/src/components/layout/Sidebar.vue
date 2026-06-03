@@ -78,6 +78,12 @@
               :title="t('sidebar.disconnect')"
               @click.stop="disconnectConn(conn.id)"
             >⊘</button>
+            <button
+              v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id) && !conn.is_cluster"
+              class="btn-tiny btn-conn-action btn-overview"
+              :title="t('sidebar.connectionOverview')"
+              @click.stop="openOverview(conn)"
+            >⌘</button>
             <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
             <button class="btn-tiny btn-conn-action" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
             <InlineDeleteConfirm
@@ -151,6 +157,12 @@
                   :title="t('sidebar.disconnect')"
                   @click.stop="disconnectConn(conn.id)"
                 >⊘</button>
+                <button
+                  v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id) && !conn.is_cluster"
+                  class="btn-tiny btn-conn-action btn-overview"
+                  :title="t('sidebar.connectionOverview')"
+                  @click.stop="openOverview(conn)"
+                >⌘</button>
                 <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
                 <button class="btn-tiny btn-conn-action" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
                 <InlineDeleteConfirm
@@ -216,6 +228,13 @@
         <div v-if="toastMsg" class="sidebar-toast" :class="toastOk ? 'ok' : 'err'">{{ toastMsg }}</div>
       </Transition>
     </Teleport>
+
+    <ConnectionOverviewModal
+      v-if="overviewConn"
+      :conn-id="overviewConn.id"
+      :connection-name="overviewConn.name || t('sidebar.unnamed')"
+      @close="overviewConn = null"
+    />
   </div>
 </template>
 
@@ -226,6 +245,7 @@ import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useI18n } from '../../i18n/index.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
+import ConnectionOverviewModal from '../connections/ConnectionOverviewModal.vue'
 import { formatDebugMessage } from '../../utils/debug.js'
 
 const { t } = useI18n()
@@ -251,6 +271,7 @@ const connectedConnections = computed(() =>
   connectionsStore.connections.filter(c => connectionsStore.isConnected(c.id))
 )
 const hasConnections = computed(() => connectionsStore.connections.length > 0)
+const overviewConn = ref(null)
 
 function connectionStateClass(id) {
   if (connectionsStore.isConnecting(id)) return 'connecting'
@@ -307,6 +328,10 @@ onBeforeUnmount(() => {
 // 编辑连接（打开 ConnectionManager）
 function openEdit(conn) {
   openConnManager(conn)
+}
+
+function openOverview(conn) {
+  overviewConn.value = conn
 }
 
 function openGitHub() {
@@ -985,6 +1010,15 @@ async function disconnectConn(id) {
 }
 .btn-disconnect { color: #f59e0b; border-color: #f59e0b; }
 .btn-disconnect:hover { background: rgba(245,158,11,0.2); color: #d97706; }
+.btn-overview {
+  color: #0f766e;
+  border-color: rgba(94, 234, 212, 0.92);
+}
+.btn-overview:hover {
+  background: rgba(204, 251, 241, 0.84);
+  color: #0f766e;
+  border-color: rgba(45, 212, 191, 0.96);
+}
 .btn-confirm-yes { color: #16a34a; border-color: #16a34a; }
 .btn-confirm-yes:hover { background: #16a34a; color: white; }
 .btn-confirm-no { color: #dc2626; border-color: #dc2626; }
