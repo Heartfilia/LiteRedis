@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="overview-backdrop">
+    <div class="overview-backdrop" @mousedown="queueConsoleRefocus">
       <div class="overview-card">
         <div class="overview-header">
           <div class="overview-title-wrap">
@@ -134,6 +134,7 @@ const running = ref(false)
 const consoleOutputRef = ref(null)
 const consoleInputRef = ref(null)
 let refreshTimer = null
+let refocusTimer = null
 
 const REDIS_COMMAND_HINTS = {
   append: ['key', 'value'],
@@ -252,6 +253,27 @@ function focusConsoleInput() {
   consoleInputRef.value?.focus()
 }
 
+function queueConsoleRefocus(event) {
+  const target = event.target
+  if (!(target instanceof HTMLElement)) return
+  if (
+    target.closest('.overview-close') ||
+    target.closest('.console-entry') ||
+    target.closest('.console-result') ||
+    target.closest('.console-command-line') ||
+    target.closest('.console-meta')
+  ) {
+    return
+  }
+
+  if (refocusTimer) {
+    clearTimeout(refocusTimer)
+  }
+  refocusTimer = window.setTimeout(() => {
+    focusConsoleInput()
+  }, 0)
+}
+
 function handleConsoleMouseDown(event) {
   const target = event.target
   if (!(target instanceof HTMLElement)) return
@@ -315,11 +337,21 @@ function formatConsoleMeta(result) {
   return `(${duration})`
 }
 
+function parseSelectTargetDB(text) {
+  const trimmed = String(text || '').trim()
+  if (!/^select\s+/i.test(trimmed)) return null
+  const parts = trimmed.split(/\s+/)
+  if (parts.length < 2) return null
+  const db = Number.parseInt(parts[1], 10)
+  return Number.isInteger(db) ? db : null
+}
+
 async function runCommand() {
   const text = command.value.trim()
   if (!text || running.value) return
 
   const promptBeforeRun = consolePrompt.value
+  const selectTargetDB = parseSelectTargetDB(text)
   rememberCommand(text)
   running.value = true
 
@@ -333,6 +365,17 @@ async function runCommand() {
       output: result.success ? (result.output || '(nil)') : `ERR ${result.error || t('keyEditor.failed')}`,
     })
     command.value = ''
+    if (result.success && selectTargetDB !== null) {
+      if (overview.value) {
+        overview.value = {
+          ...overview.value,
+          current_db: selectTargetDB,
+        }
+      }
+      if (isActiveConnection.value) {
+        workspaceStore.currentDB = selectTargetDB
+      }
+    }
     await refreshOverview()
     if (isActiveConnection.value) {
       workspaceStore.currentDB = overview.value?.current_db ?? workspaceStore.currentDB
@@ -389,6 +432,10 @@ onBeforeUnmount(() => {
   if (refreshTimer) {
     clearInterval(refreshTimer)
     refreshTimer = null
+  }
+  if (refocusTimer) {
+    clearTimeout(refocusTimer)
+    refocusTimer = null
   }
 })
 </script>

@@ -14,7 +14,7 @@ import (
 )
 
 type ConsoleStateUpdater interface {
-	SetCurrentDB(id string, db int) error
+	SelectDB(id string, db int) error
 }
 
 func GetConnectionOverview(ctx context.Context, client redis.UniversalClient, cfg config.ConnectionConfig, currentDB int) (config.RedisConnectionOverview, error) {
@@ -93,30 +93,70 @@ func ExecuteRedisCommand(ctx context.Context, client redis.UniversalClient, comm
 }
 
 func ExecuteRedisCommandWithState(ctx context.Context, client redis.UniversalClient, command string, connID string, state ConsoleStateUpdater) config.RedisConsoleResult {
-	result := ExecuteRedisCommand(ctx, client, command)
-	if !result.Success || state == nil {
-		return result
-	}
-
 	args, err := splitCommand(command)
-	if err != nil || len(args) < 2 {
-		return result
+	if err != nil {
+		return config.RedisConsoleResult{
+			Success:   false,
+			Command:   command,
+			Error:     err.Error(),
+			ElapsedMs: 0,
+		}
+	}
+	if len(args) == 0 {
+		return config.RedisConsoleResult{
+			Success:   false,
+			Command:   command,
+			Error:     "empty command",
+			ElapsedMs: 0,
+		}
 	}
 
 	cmdName, ok := args[0].(string)
-	if !ok || !strings.EqualFold(strings.TrimSpace(cmdName), "select") {
-		return result
+	if ok && strings.EqualFold(strings.TrimSpace(cmdName), "select") && state != nil {
+		start := time.Now()
+		if len(args) < 2 {
+			return config.RedisConsoleResult{
+				Success:   false,
+				Command:   command,
+				Error:     "ERR wrong number of arguments for 'select' command",
+				ElapsedMs: time.Since(start).Milliseconds(),
+			}
+		}
+		dbText, ok := args[1].(string)
+		if !ok {
+			return config.RedisConsoleResult{
+				Success:   false,
+				Command:   command,
+				Error:     "ERR invalid DB index",
+				ElapsedMs: time.Since(start).Milliseconds(),
+			}
+		}
+		db, err := strconv.Atoi(strings.TrimSpace(dbText))
+		if err != nil {
+			return config.RedisConsoleResult{
+				Success:   false,
+				Command:   command,
+				Error:     "ERR invalid DB index",
+				ElapsedMs: time.Since(start).Milliseconds(),
+			}
+		}
+		if err := state.SelectDB(connID, db); err != nil {
+			return config.RedisConsoleResult{
+				Success:   false,
+				Command:   command,
+				Error:     err.Error(),
+				ElapsedMs: time.Since(start).Milliseconds(),
+			}
+		}
+		return config.RedisConsoleResult{
+			Success:   true,
+			Command:   command,
+			Output:    "OK",
+			ElapsedMs: time.Since(start).Milliseconds(),
+		}
 	}
-	dbText, ok := args[1].(string)
-	if !ok {
-		return result
-	}
-	db, err := strconv.Atoi(strings.TrimSpace(dbText))
-	if err != nil {
-		return result
-	}
-	_ = state.SetCurrentDB(connID, db)
-	return result
+
+	return ExecuteRedisCommand(ctx, client, command)
 }
 
 func parseInfoText(info string) map[string]string {
