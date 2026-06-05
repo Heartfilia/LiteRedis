@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="overview-backdrop" @mousedown="queueConsoleRefocus">
+    <div class="overview-backdrop" :class="`theme-${settingsStore.themeMode || 'light'}`" @mousedown="queueConsoleRefocus">
       <div class="overview-card">
         <div class="overview-header">
           <div class="overview-title-wrap">
@@ -110,6 +110,7 @@
 import { Teleport, computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { executeRedisCommand, getConnectionOverview } from '../../api/wails.js'
 import { useI18n } from '../../i18n/index.js'
+import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 
 const props = defineProps({
@@ -120,6 +121,7 @@ const props = defineProps({
 defineEmits(['close'])
 
 const { t } = useI18n()
+const settingsStore = useSettingsStore()
 const workspaceStore = useWorkspaceStore()
 
 const overview = ref(null)
@@ -459,9 +461,14 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   border-radius: 20px;
-  border: 1px solid rgba(214, 224, 236, 0.94);
+  border: 1px solid rgba(214, 224, 236, 0.84);
   background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 32px 84px rgba(15, 23, 42, 0.22), 0 10px 24px rgba(148, 163, 184, 0.08);
+}
+:global(body[data-theme='dark']) .overview-card {
+  border-color: rgba(51, 65, 85, 0.82);
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 34px 86px rgba(2, 6, 23, 0.54), 0 12px 28px rgba(2, 6, 23, 0.22);
 }
 
 .overview-header {
@@ -472,17 +479,31 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid rgba(226, 232, 240, 0.96);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.94));
 }
+:global(body[data-theme='dark']) .overview-header {
+  border-bottom-color: rgba(51, 65, 85, 0.94);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.94));
+}
 
 .overview-title {
   font-size: 15px;
   font-weight: 700;
   color: #1e293b;
 }
+:global(body[data-theme='dark']) .overview-title {
+  color: #e2e8f0;
+}
 
 .overview-subtitle {
   margin-top: 3px;
   font-size: 12px;
   color: #64748b;
+}
+:global(body[data-theme='dark']) .overview-subtitle,
+:global(body[data-theme='dark']) .metric-label,
+:global(body[data-theme='dark']) .console-tip,
+:global(body[data-theme='dark']) .console-placeholder,
+:global(body[data-theme='dark']) .console-meta {
+  color: #94a3b8;
 }
 
 .overview-close {
@@ -494,6 +515,23 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.96);
   color: #64748b;
   cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.14s ease;
+}
+.overview-close:hover {
+  background: rgba(248, 250, 252, 0.98);
+  border-color: rgba(148, 163, 184, 0.96);
+  color: #334155;
+  transform: translateY(-1px);
+}
+:global(body[data-theme='dark']) .overview-close {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(15, 23, 42, 0.94);
+  color: #94a3b8;
+}
+:global(body[data-theme='dark']) .overview-close:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(96, 165, 250, 0.28);
+  color: #e2e8f0;
 }
 
 .overview-body {
@@ -509,6 +547,10 @@ onBeforeUnmount(() => {
   border-radius: 14px;
   background: rgba(248, 250, 252, 0.92);
   color: #64748b;
+}
+:global(body[data-theme='dark']) .overview-state {
+  background: rgba(30, 41, 59, 0.9);
+  color: #cbd5e1;
 }
 
 .overview-state.error {
@@ -528,8 +570,14 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 12px;
   border-radius: 16px;
-  border: 1px solid rgba(226, 232, 240, 0.96);
+  border: 1px solid rgba(226, 232, 240, 0.84);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.94));
+  box-shadow: 0 10px 20px rgba(148, 163, 184, 0.05);
+}
+:global(body[data-theme='dark']) .metric-card {
+  border-color: rgba(51, 65, 85, 0.82);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.92));
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.18);
 }
 
 .metric-label {
@@ -542,6 +590,11 @@ onBeforeUnmount(() => {
   font-weight: 700;
   color: #0f172a;
 }
+:global(body[data-theme='dark']) .metric-value,
+:global(body[data-theme='dark']) .console-title,
+:global(body[data-theme='dark']) .console-command-text {
+  color: #e2e8f0;
+}
 
 .console-panel {
   display: flex;
@@ -549,8 +602,14 @@ onBeforeUnmount(() => {
   gap: 10px;
   padding: 14px;
   border-radius: 18px;
-  border: 1px solid rgba(226, 232, 240, 0.96);
+  border: 1px solid rgba(226, 232, 240, 0.84);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.96));
+  box-shadow: 0 12px 24px rgba(148, 163, 184, 0.06);
+}
+:global(body[data-theme='dark']) .console-panel {
+  border-color: rgba(51, 65, 85, 0.82);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.96));
+  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.2);
 }
 
 .console-head {
@@ -702,5 +761,59 @@ onBeforeUnmount(() => {
   .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+.overview-backdrop.theme-dark .overview-card {
+  border-color: rgba(51, 65, 85, 0.82);
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 34px 86px rgba(2, 6, 23, 0.54), 0 12px 28px rgba(2, 6, 23, 0.22);
+}
+
+.overview-backdrop.theme-dark .overview-header {
+  border-bottom-color: rgba(51, 65, 85, 0.94);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.94));
+}
+
+.overview-backdrop.theme-dark .overview-title,
+.overview-backdrop.theme-dark .metric-value,
+.overview-backdrop.theme-dark .console-title,
+.overview-backdrop.theme-dark .console-command-text {
+  color: #e2e8f0;
+}
+
+.overview-backdrop.theme-dark .overview-subtitle,
+.overview-backdrop.theme-dark .metric-label,
+.overview-backdrop.theme-dark .console-tip,
+.overview-backdrop.theme-dark .console-placeholder,
+.overview-backdrop.theme-dark .console-meta {
+  color: #94a3b8;
+}
+
+.overview-backdrop.theme-dark .overview-close {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(15, 23, 42, 0.94);
+  color: #94a3b8;
+}
+
+.overview-backdrop.theme-dark .overview-close:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(96, 165, 250, 0.28);
+  color: #e2e8f0;
+}
+
+.overview-backdrop.theme-dark .overview-state {
+  background: rgba(30, 41, 59, 0.9);
+  color: #cbd5e1;
+}
+
+.overview-backdrop.theme-dark .metric-card {
+  border-color: rgba(51, 65, 85, 0.82);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.92));
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.18);
+}
+
+.overview-backdrop.theme-dark .console-panel {
+  border-color: rgba(51, 65, 85, 0.82);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.96));
+  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.2);
 }
 </style>

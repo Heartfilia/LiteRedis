@@ -1,5 +1,5 @@
 <template>
-  <div class="key-editor">
+  <div class="key-editor" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <!-- 未选中 key -->
     <div v-if="!selectedKey" class="empty-state">
       {{ t('keyEditor.selectKeyHint') }}
@@ -115,6 +115,7 @@
           v-if="editingTTL"
           ref="ttlPopoverRef"
           class="ttl-popover"
+          :class="`theme-${settingsStore.themeMode || 'light'}`"
           :style="ttlPopoverStyle"
         >
           <div class="ttl-popover-title">TTL</div>
@@ -162,6 +163,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick, Teleport } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
+import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { getTypeColor } from '../../utils/typeColors.js'
@@ -178,6 +180,7 @@ const { t } = useI18n()
 
 const workspaceStore = useWorkspaceStore()
 const connectionsStore = useConnectionsStore()
+const settingsStore = useSettingsStore()
 const selectedKey = computed(() => workspaceStore.selectedKey)
 const keyValue = computed(() => workspaceStore.keyValue)
 const keyValueLoading = computed(() => workspaceStore.keyValueLoading)
@@ -335,6 +338,11 @@ onBeforeUnmount(() => {
     radial-gradient(circle at top right, rgba(219, 234, 254, 0.24), transparent 28%),
     linear-gradient(180deg, rgba(248, 250, 252, 0.4), rgba(255, 255, 255, 0.94) 14%, #ffffff 40%);
 }
+:global(.app-layout.theme-dark) .key-editor {
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 18%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.99), rgba(11, 18, 32, 0.995) 26%, rgba(2, 6, 23, 0.995) 52%);
+}
 .empty-state {
   flex: 1;
   display: flex;
@@ -348,6 +356,9 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 .loading-state { color: #6b7280; }
+:global(.app-layout.theme-dark) .loading-state {
+  color: #94a3b8;
+}
 .spinner {
   width: 28px;
   height: 28px;
@@ -358,6 +369,9 @@ onBeforeUnmount(() => {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .error-state { color: #991b1b; }
+:global(.app-layout.theme-dark) .error-state {
+  color: #fca5a5;
+}
 .error-icon { font-size: 28px; }
 .error-text {
   max-width: 520px;
@@ -390,6 +404,22 @@ onBeforeUnmount(() => {
   transform: translateY(-1px);
   box-shadow: 0 12px 22px rgba(191, 219, 254, 0.24);
 }
+:global(.app-layout.theme-dark) .error-text {
+  background: linear-gradient(180deg, rgba(127, 29, 29, 0.34), rgba(69, 10, 10, 0.28));
+  border-color: rgba(248, 113, 113, 0.24);
+  color: #fecaca;
+  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.18);
+}
+:global(.app-layout.theme-dark) .btn-retry {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
+  color: #93c5fd;
+  box-shadow: 0 10px 20px rgba(2, 6, 23, 0.26);
+}
+:global(.app-layout.theme-dark) .btn-retry:hover {
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.18), rgba(30, 41, 59, 0.98));
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.34);
+}
 .key-header {
   display: flex;
   align-items: center;
@@ -401,6 +431,11 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.92));
   flex-shrink: 0;
   backdrop-filter: blur(10px);
+}
+:global(.app-layout.theme-dark) .key-header {
+  border-bottom-color: rgba(51, 65, 85, 0.95);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.99), rgba(11, 18, 32, 0.995));
+  backdrop-filter: none;
 }
 .key-meta { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1 1 420px; flex-wrap: wrap; }
 .key-name {
@@ -418,11 +453,32 @@ onBeforeUnmount(() => {
   padding: 3px 9px;
   background: rgba(239, 246, 255, 0.75);
   box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.82);
-  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+}
+:global(.app-layout.theme-dark) .key-name {
+  color: #93c5fd;
+  background: rgba(30, 41, 59, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.28);
 }
 .key-name:hover {
   background: rgba(219, 234, 254, 0.92);
   box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.9);
+}
+:global(.app-layout.theme-dark) .key-name:hover {
+  background: rgba(30, 64, 175, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.5);
+}
+.key-name.copied {
+  background: rgba(191, 219, 254, 0.96);
+  color: #1d4ed8;
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.96), 0 0 0 1px rgba(191, 219, 254, 0.52);
+  transform: translateY(-1px);
+  animation: keyCopyPulse 0.26s ease;
+}
+:global(.app-layout.theme-dark) .key-name.copied {
+  background: rgba(30, 64, 175, 0.34);
+  color: #dbeafe;
+  box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.72), 0 0 14px rgba(59, 130, 246, 0.22);
 }
 .key-name.copied {
   background: rgba(220, 252, 231, 0.95);
@@ -462,6 +518,11 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
+:global(.app-layout.theme-dark) .ttl-chip {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(11, 18, 32, 0.98);
+  color: #94a3b8;
+}
 .ttl-chip.active {
   color: #c2410c;
   background: rgba(255, 247, 237, 0.96);
@@ -479,6 +540,16 @@ onBeforeUnmount(() => {
   transform: translateY(-1px);
   border-color: rgba(148, 163, 184, 0.96);
 }
+:global(.app-layout.theme-dark) .ttl-chip.active {
+  color: #fdba74;
+  background: rgba(124, 45, 18, 0.28);
+  border-color: rgba(251, 146, 60, 0.34);
+}
+:global(.app-layout.theme-dark) .ttl-chip.missing {
+  color: #fda4af;
+  background: rgba(127, 29, 29, 0.24);
+  border-color: rgba(248, 113, 113, 0.28);
+}
 .ttl-popover {
   position: fixed;
   z-index: 10020;
@@ -493,11 +564,19 @@ onBeforeUnmount(() => {
   box-shadow: 0 18px 36px rgba(148, 163, 184, 0.22);
   backdrop-filter: blur(10px);
 }
+:global(.app-layout.theme-dark) .ttl-popover {
+  border-color: rgba(51, 65, 85, 0.96);
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.42);
+}
 .ttl-popover-title {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #64748b;
+}
+:global(.app-layout.theme-dark) .ttl-popover-title {
+  color: #94a3b8;
 }
 .ttl-popover-row {
   display: flex;
@@ -513,6 +592,11 @@ onBeforeUnmount(() => {
   font-size: 12px;
   outline: none;
   background: rgba(255, 255, 255, 0.95);
+}
+:global(.app-layout.theme-dark) .ttl-input {
+  background: rgba(15, 23, 42, 0.94);
+  color: #e2e8f0;
+  border-color: rgba(59, 130, 246, 0.82);
 }
 .ttl-popover-btn {
   min-width: 28px;
@@ -547,6 +631,20 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
 }
+:global(.app-layout.theme-dark) .btn-tiny,
+:global(.app-layout.theme-dark) .btn-sm,
+:global(.app-layout.theme-dark) .btn-xs {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(11, 18, 32, 0.98);
+  color: #cbd5e1;
+}
+:global(.app-layout.theme-dark) .btn-tiny:hover,
+:global(.app-layout.theme-dark) .btn-sm:hover,
+:global(.app-layout.theme-dark) .btn-xs:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(96, 165, 250, 0.34);
+  color: #e2e8f0;
+}
 .icon-btn {
   font-size: 0;
 }
@@ -574,6 +672,19 @@ onBeforeUnmount(() => {
   border-color: rgba(148, 163, 184, 0.96);
   color: #334155;
   transform: translateY(-1px);
+}
+:global(.app-layout.theme-dark) .key-actions .top-action-btn,
+:global(.app-layout.theme-dark) :deep(.key-actions .header-action-delete > .btn-tiny) {
+  border-color: rgba(71, 85, 105, 0.92);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.96));
+  color: #cbd5e1;
+  box-shadow: 0 6px 14px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(148, 163, 184, 0.04);
+}
+:global(.app-layout.theme-dark) .key-actions .top-action-btn:hover,
+:global(.app-layout.theme-dark) :deep(.key-actions .header-action-delete > .btn-tiny:hover) {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(30, 64, 175, 0.16));
+  border-color: rgba(96, 165, 250, 0.32);
+  color: #f8fafc;
 }
 :deep(.key-actions .header-action-delete > .btn-tiny.danger-confirm) {
   background: linear-gradient(180deg, #ef4444, #dc2626);
@@ -639,6 +750,10 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid rgba(253, 230, 138, 0.96);
   flex-shrink: 0;
 }
+:global(.app-layout.theme-dark) .rename-bar {
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.99), rgba(11, 18, 32, 0.995));
+  border-bottom-color: rgba(71, 85, 105, 0.96);
+}
 .rename-bar input {
   flex: 1;
   max-width: 300px;
@@ -650,11 +765,19 @@ onBeforeUnmount(() => {
   outline: none;
   background: rgba(255, 255, 255, 0.95);
 }
+:global(.app-layout.theme-dark) .rename-bar input {
+  background: rgba(15, 23, 42, 0.94);
+  color: #e2e8f0;
+  border-color: rgba(71, 85, 105, 0.96);
+}
 .rename-bar input:focus {
   border-color: #60a5fa;
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.14);
 }
 .rename-msg { font-size: 12px; color: #991b1b; }
+:global(.app-layout.theme-dark) .rename-msg {
+  color: #fca5a5;
+}
 .key-header,
 .key-meta,
 .key-actions,
@@ -678,5 +801,173 @@ onBeforeUnmount(() => {
   padding: 14px 12px 0;
   display: flex;
   flex-direction: column;
+}
+.key-editor.theme-dark {
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 18%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.99), rgba(11, 18, 32, 0.995) 26%, rgba(2, 6, 23, 0.995) 52%);
+}
+
+.key-editor.theme-dark .loading-state {
+  color: #94a3b8;
+}
+
+.key-editor.theme-dark .error-state {
+  color: #fca5a5;
+}
+
+.key-editor.theme-dark .error-text {
+  background: linear-gradient(180deg, rgba(127, 29, 29, 0.34), rgba(69, 10, 10, 0.28));
+  border-color: rgba(248, 113, 113, 0.24);
+  color: #fecaca;
+  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.18);
+}
+
+.key-editor.theme-dark .btn-retry {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
+  color: #93c5fd;
+  box-shadow: 0 10px 20px rgba(2, 6, 23, 0.26);
+}
+
+.key-editor.theme-dark .btn-retry:hover {
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.18), rgba(30, 41, 59, 0.98));
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.34);
+}
+
+.key-editor.theme-dark .key-header {
+  border-bottom-color: rgba(51, 65, 85, 0.95);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.99), rgba(11, 18, 32, 0.995));
+  backdrop-filter: none;
+}
+
+.key-editor.theme-dark .key-name {
+  color: #93c5fd;
+  background: rgba(30, 41, 59, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.28);
+}
+
+.key-editor.theme-dark .key-name:hover {
+  background: rgba(30, 64, 175, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.5);
+}
+
+.key-editor.theme-dark .key-name.copied {
+  background: rgba(30, 64, 175, 0.34);
+  color: #dbeafe;
+  box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.72), 0 0 14px rgba(59, 130, 246, 0.22);
+}
+
+@keyframes keyCopyPulse {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-1px) scale(1.012);
+  }
+  100% {
+    transform: translateY(-1px) scale(1);
+  }
+}
+
+.key-editor.theme-dark .ttl-chip {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(11, 18, 32, 0.98);
+  color: #94a3b8;
+}
+
+.key-editor.theme-dark .ttl-chip.active {
+  color: #fdba74;
+  background: rgba(124, 45, 18, 0.28);
+  border-color: rgba(251, 146, 60, 0.34);
+}
+
+.key-editor.theme-dark .ttl-chip.missing {
+  color: #fda4af;
+  background: rgba(127, 29, 29, 0.24);
+  border-color: rgba(248, 113, 113, 0.28);
+}
+
+.key-editor.theme-dark .ttl-popover {
+  border-color: rgba(51, 65, 85, 0.96);
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.42);
+}
+
+.ttl-popover.theme-dark {
+  border-color: rgba(51, 65, 85, 0.96);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.985), rgba(11, 18, 32, 0.995));
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.42);
+  backdrop-filter: none;
+}
+
+.key-editor.theme-dark .ttl-popover-title,
+.key-editor.theme-dark .rename-msg {
+  color: #94a3b8;
+}
+
+.ttl-popover.theme-dark .ttl-popover-title {
+  color: #94a3b8;
+}
+
+.key-editor.theme-dark .ttl-input,
+.key-editor.theme-dark .rename-bar input {
+  background: rgba(15, 23, 42, 0.94);
+  color: #e2e8f0;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+
+.ttl-popover.theme-dark .ttl-input {
+  background: rgba(11, 18, 32, 0.98);
+  color: #e2e8f0;
+  border-color: rgba(59, 130, 246, 0.82);
+}
+
+.key-editor.theme-dark .btn-tiny,
+.key-editor.theme-dark .btn-sm,
+.key-editor.theme-dark .btn-xs {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(11, 18, 32, 0.98);
+  color: #cbd5e1;
+}
+
+.key-editor.theme-dark .btn-tiny:hover,
+.key-editor.theme-dark .btn-sm:hover,
+.key-editor.theme-dark .btn-xs:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(96, 165, 250, 0.34);
+  color: #e2e8f0;
+}
+
+.ttl-popover.theme-dark .btn-xs {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(11, 18, 32, 0.98);
+  color: #cbd5e1;
+}
+
+.ttl-popover.theme-dark .btn-xs:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(96, 165, 250, 0.34);
+  color: #e2e8f0;
+}
+
+.key-editor.theme-dark .key-actions .top-action-btn,
+.key-editor.theme-dark :deep(.key-actions .header-action-delete > .btn-tiny) {
+  border-color: rgba(71, 85, 105, 0.92);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.96));
+  color: #cbd5e1;
+  box-shadow: 0 6px 14px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(148, 163, 184, 0.04);
+}
+
+.key-editor.theme-dark .key-actions .top-action-btn:hover,
+.key-editor.theme-dark :deep(.key-actions .header-action-delete > .btn-tiny:hover) {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(30, 64, 175, 0.16));
+  border-color: rgba(96, 165, 250, 0.32);
+  color: #f8fafc;
+}
+
+.key-editor.theme-dark .rename-bar {
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.99), rgba(11, 18, 32, 0.995));
+  border-bottom-color: rgba(71, 85, 105, 0.96);
 }
 </style>

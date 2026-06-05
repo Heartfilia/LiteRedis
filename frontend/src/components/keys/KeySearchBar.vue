@@ -1,5 +1,5 @@
 <template>
-  <div class="key-search-bar">
+  <div class="key-search-bar" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <div class="search-input-row" ref="inputRowRef">
       <div class="search-input-shell" ref="shellRef">
         <input
@@ -40,6 +40,7 @@
       <div
         v-if="showHistory && filteredHistoryItems.length"
         class="history-dropdown"
+        :class="`theme-${settingsStore.themeMode || 'light'}`"
         :style="dropdownStyle"
       >
         <template v-if="filteredPinnedHistory.length">
@@ -259,10 +260,15 @@ async function doSearch() {
   if (loading.value) return
   loading.value = true
   try {
+    let searchSucceeded = false
     const p = pattern.value.trim()
     if (isCluster.value) {
       if (!p) return
       await workspaceStore.searchExact(p)
+      searchSucceeded = true
+      if (searchSucceeded) {
+        await workspaceStore.fetchTotalKeys()
+      }
       return
     }
     const normalized = p || '*'
@@ -271,6 +277,10 @@ async function doSearch() {
     } else {
       await workspaceStore.search(normalized)
     }
+    searchSucceeded = true
+    if (searchSucceeded) {
+      await workspaceStore.fetchTotalKeys()
+    }
   } finally {
     loading.value = false
   }
@@ -278,11 +288,46 @@ async function doSearch() {
 </script>
 
 <style scoped>
+:global(.app-layout.theme-dark) .key-search-bar {
+  color: #e2e8f0;
+}
+:global(.app-layout.theme-dark) .key-search-bar input {
+  background: rgba(15, 23, 42, 0.94);
+  color: #e2e8f0;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+:global(.app-layout.theme-dark) .key-search-bar .btn-search {
+  background: rgba(15, 23, 42, 0.94);
+  color: #93c5fd;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+:global(.app-layout.theme-dark) .key-search-bar .keep-label,
+:global(.app-layout.theme-dark) .key-search-bar .cluster-hint {
+  color: #94a3b8;
+}
+:global(.app-layout.theme-dark) .key-search-bar .history-dropdown {
+  background: rgba(15, 23, 42, 0.98);
+  border-color: rgba(51, 65, 85, 0.96);
+  box-shadow: 0 14px 32px rgba(2, 6, 23, 0.42);
+}
+:global(.app-layout.theme-dark) .key-search-bar .history-section-title,
+:global(.app-layout.theme-dark) .key-search-bar .history-item-text {
+  color: #cbd5e1;
+}
+:global(.app-layout.theme-dark) .key-search-bar .history-item.active,
+:global(.app-layout.theme-dark) .key-search-bar .history-item:hover {
+  background: rgba(30, 64, 175, 0.24);
+}
 .key-search-bar {
   padding: 10px 10px 8px;
   border-bottom: 1px solid rgba(226, 232, 240, 0.95);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.9));
   backdrop-filter: blur(10px);
+}
+:global(.app-layout.theme-dark) .key-search-bar {
+  border-bottom-color: rgba(51, 65, 85, 0.94);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.985), rgba(11, 18, 32, 0.995));
+  backdrop-filter: none;
 }
 .search-input-row {
   display: flex;
@@ -304,6 +349,11 @@ async function doSearch() {
   overflow: hidden;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 8px 16px rgba(148, 163, 184, 0.07);
   transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+:global(.app-layout.theme-dark) .search-input-shell {
+  border-color: rgba(51, 65, 85, 0.96);
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.04);
 }
 .search-input-shell input {
   flex: 1;
@@ -350,6 +400,16 @@ async function doSearch() {
   border-color: #bfdbfe;
 }
 .btn-search:disabled { color: #93c5fd; cursor: not-allowed; }
+:global(.app-layout.theme-dark) .btn-search {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
+  color: #93c5fd;
+  border-left-color: rgba(51, 65, 85, 0.96);
+}
+:global(.app-layout.theme-dark) .btn-search:hover:not(:disabled) {
+  color: #dbeafe;
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.18), rgba(30, 41, 59, 0.98));
+  border-color: rgba(96, 165, 250, 0.32);
+}
 .search-loading {
   font-size: 11px;
   letter-spacing: 0.5px;
@@ -400,6 +460,104 @@ async function doSearch() {
   height: 1px;
   margin: 4px 6px;
   background: rgba(226, 232, 240, 0.96);
+}
+.key-search-bar.theme-dark {
+  color: #e2e8f0;
+  border-bottom-color: rgba(51, 65, 85, 0.94);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.985), rgba(11, 18, 32, 0.995));
+  backdrop-filter: none;
+}
+
+.key-search-bar.theme-dark .search-input-shell {
+  border-color: rgba(51, 65, 85, 0.96);
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.04);
+}
+
+.key-search-bar.theme-dark .btn-search {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
+  color: #93c5fd;
+  border-left-color: rgba(51, 65, 85, 0.96);
+}
+
+.key-search-bar.theme-dark .btn-search:hover:not(:disabled) {
+  color: #dbeafe;
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.18), rgba(30, 41, 59, 0.98));
+  border-color: rgba(96, 165, 250, 0.32);
+}
+
+.key-search-bar.theme-dark .keep-label,
+.key-search-bar.theme-dark .cluster-hint {
+  color: #94a3b8;
+}
+
+.key-search-bar.theme-dark .history-dropdown {
+  background: rgba(15, 23, 42, 0.985);
+  border-color: rgba(51, 65, 85, 0.96);
+  box-shadow: 0 14px 32px rgba(2, 6, 23, 0.42);
+  backdrop-filter: none;
+}
+
+.history-dropdown.theme-dark {
+  background: rgba(15, 23, 42, 0.985);
+  border-color: rgba(51, 65, 85, 0.96);
+  box-shadow: 0 14px 32px rgba(2, 6, 23, 0.42);
+  backdrop-filter: none;
+}
+
+.history-dropdown.theme-dark .history-item {
+  color: #cbd5e1;
+}
+
+.key-search-bar.theme-dark .history-section-title,
+.key-search-bar.theme-dark .history-item-text {
+  color: #cbd5e1;
+}
+
+.history-dropdown.theme-dark .history-section-title,
+.history-dropdown.theme-dark .history-item-text {
+  color: #cbd5e1;
+}
+
+.key-search-bar.theme-dark .history-item.active,
+.key-search-bar.theme-dark .history-item:hover {
+  background: rgba(30, 64, 175, 0.24);
+}
+
+.history-dropdown.theme-dark .history-item.active,
+.history-dropdown.theme-dark .history-item:hover {
+  background: rgba(30, 64, 175, 0.24);
+}
+
+.history-dropdown.theme-dark .history-pin-btn {
+  color: #94a3b8;
+}
+
+.history-dropdown.theme-dark .history-pin-btn svg {
+  color: currentColor;
+}
+
+.history-dropdown.theme-dark .history-pin-btn:hover,
+.history-dropdown.theme-dark .history-pin-btn.pinned {
+  color: #93c5fd;
+}
+
+.history-dropdown.theme-dark .history-pin-btn:hover {
+  background: rgba(30, 41, 59, 0.94);
+}
+
+.history-dropdown.theme-dark .history-item:hover .history-pin-btn,
+.history-dropdown.theme-dark .history-item.active .history-pin-btn {
+  color: #cbd5e1;
+}
+
+.history-dropdown.theme-dark .history-item:hover .history-pin-btn.pinned,
+.history-dropdown.theme-dark .history-item.active .history-pin-btn.pinned {
+  color: #93c5fd;
+}
+
+.history-dropdown.theme-dark .history-section-divider {
+  background: rgba(51, 65, 85, 0.88);
 }
 .history-item {
   display: flex;

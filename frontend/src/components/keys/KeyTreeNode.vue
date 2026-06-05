@@ -136,4 +136,71 @@ function selectKey(fullPath) {
   margin-left: 9px;
   border-left: 1px dashed rgba(203, 213, 225, 0.72);
 }
+:global(.app-layout.theme-dark) .tree-node .node-row {
+  color: #cbd5e1;
+}
+:global(.app-layout.theme-dark) .tree-node .node-row:hover {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.94));
+  color: #e2e8f0;
+}
+:global(.app-layout.theme-dark) .tree-node .node-row.selected {
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.26), rgba(30, 64, 175, 0.18));
+  color: #93c5fd;
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.34);
+}
+:global(.app-layout.theme-dark) .tree-node .dir-row,
+:global(.app-layout.theme-dark) .tree-node .node-count,
+:global(.app-layout.theme-dark) .tree-node .expand-icon {
+  color: #94a3b8;
+}
+:global(.app-layout.theme-dark) .tree-node .type-dot {
+  box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.92);
+}
+:global(.app-layout.theme-dark) .tree-node .ttl-badge {
+  background: rgba(120, 53, 15, 0.42);
+  color: #fdba74;
+}
+:global(.app-layout.theme-dark) .tree-node .children {
+  border-left-color: rgba(71, 85, 105, 0.72);
+}
+
+.tree-node {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.key-tree.theme-dark .tree-node .node-row {
+  color: #dbe7f5;
+}
+
+.key-tree.theme-dark .tree-node .node-row:hover {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(10, 17, 30, 0.98));
+  color: #f8fbff;
+}
+
+.key-tree.theme-dark .tree-node .node-row.selected {
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.32), rgba(30, 64, 175, 0.2));
+  color: #bfdbfe;
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.42);
+}
+
+.key-tree.theme-dark .tree-node .dir-row,
+.key-tree.theme-dark .tree-node .node-count,
+.key-tree.theme-dark .tree-node .expand-icon {
+  color: #9fb1c8;
+}
+
+.key-tree.theme-dark .tree-node .type-dot {
+  box-shadow: 0 0 0 4px rgba(8, 15, 29, 0.98);
+}
+
+.key-tree.theme-dark .tree-node .ttl-badge {
+  background: rgba(120, 53, 15, 0.48);
+  color: #fdba74;
+}
+
+.key-tree.theme-dark .tree-node .children {
+  border-left-color: rgba(71, 85, 105, 0.72);
+}
 </style>

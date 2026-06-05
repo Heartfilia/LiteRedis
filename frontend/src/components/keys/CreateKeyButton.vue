@@ -1,11 +1,16 @@
 <template>
-  <div ref="wrapRef" class="create-key-wrap">
+  <div ref="wrapRef" class="create-key-wrap" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <button class="create-key-btn" :title="t('keyTree.createKey')" @click="toggleOpen">
       <span>+</span>
     </button>
 
     <Teleport to="body">
-      <div v-if="open" class="create-key-popover" :style="popoverStyle">
+      <div
+        v-if="open"
+        class="create-key-popover"
+        :class="`theme-${settingsStore.themeMode || 'light'}`"
+        :style="popoverStyle"
+      >
         <div class="popover-header">
           <span>{{ t('keyTree.createKey') }}</span>
           <button class="popover-close" @click="close">✕</button>
@@ -82,10 +87,12 @@
 
 <script setup>
 import { reactive, ref, nextTick } from 'vue'
+import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useI18n } from '../../i18n/index.js'
 
 const workspaceStore = useWorkspaceStore()
+const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
 const open = ref(false)
@@ -209,16 +216,33 @@ async function submit() {
   box-shadow: 0 10px 18px rgba(191, 219, 254, 0.22);
   transform: translateY(-1px);
 }
+:global(body[data-theme='dark']) .create-key-btn {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.96));
+  color: #93c5fd;
+  box-shadow: 0 10px 18px rgba(2, 6, 23, 0.3);
+}
+:global(body[data-theme='dark']) .create-key-btn:hover {
+  color: #dbeafe;
+  border-color: rgba(96, 165, 250, 0.44);
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.24), rgba(30, 41, 59, 0.98));
+  box-shadow: 0 12px 22px rgba(2, 6, 23, 0.36);
+}
 .create-key-popover {
   position: fixed;
   z-index: 10000;
   width: 300px;
   padding: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid rgba(226, 232, 240, 0.84);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.16), 0 8px 18px rgba(148, 163, 184, 0.08);
   backdrop-filter: blur(8px);
+}
+:global(body[data-theme='dark']) .create-key-popover {
+  border-color: rgba(51, 65, 85, 0.82);
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 26px 52px rgba(2, 6, 23, 0.46), 0 8px 18px rgba(2, 6, 23, 0.18);
 }
 .popover-header {
   display: flex;
@@ -228,6 +252,9 @@ async function submit() {
   font-size: 13px;
   font-weight: 600;
   color: #1f2937;
+}
+:global(body[data-theme='dark']) .popover-header {
+  color: #e2e8f0;
 }
 .popover-close {
   display: inline-flex;
@@ -241,6 +268,17 @@ async function submit() {
   cursor: pointer;
   font-size: 12px;
   line-height: 1;
+  transition: color 0.14s ease, transform 0.14s ease;
+}
+.popover-close:hover {
+  color: #475569;
+  transform: translateY(-1px);
+}
+:global(body[data-theme='dark']) .popover-close {
+  color: #94a3b8;
+}
+:global(body[data-theme='dark']) .popover-close:hover {
+  color: #e2e8f0;
 }
 .form-grid,
 .default-value-box {
@@ -257,6 +295,10 @@ async function submit() {
   font-size: 12px;
   color: #6b7280;
 }
+:global(body[data-theme='dark']) .form-grid label,
+:global(body[data-theme='dark']) .default-value-box label {
+  color: #94a3b8;
+}
 .form-grid input,
 .form-grid select,
 .default-value-box input,
@@ -269,6 +311,14 @@ async function submit() {
   outline: none;
   color: #1f2937;
   box-sizing: border-box;
+}
+:global(body[data-theme='dark']) .form-grid input,
+:global(body[data-theme='dark']) .form-grid select,
+:global(body[data-theme='dark']) .default-value-box input,
+:global(body[data-theme='dark']) .default-value-box textarea {
+  background: rgba(15, 23, 42, 0.94);
+  color: #e2e8f0;
+  border-color: rgba(71, 85, 105, 0.96);
 }
 .default-value-box textarea {
   resize: vertical;
@@ -302,6 +352,11 @@ async function submit() {
   background: #fff;
   color: #4b5563;
 }
+:global(body[data-theme='dark']) .btn-cancel {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(15, 23, 42, 0.94);
+  color: #cbd5e1;
+}
 .btn-create {
   border: none;
   background: #2563eb;
@@ -324,5 +379,144 @@ async function submit() {
 .create-msg.err {
   background: #fff1f2;
   color: #991b1b;
+}
+:global(body[data-theme='dark']) .create-msg.ok {
+  background: rgba(6, 78, 59, 0.94);
+  color: #d1fae5;
+}
+:global(body[data-theme='dark']) .create-msg.err {
+  background: rgba(127, 29, 29, 0.94);
+  color: #fee2e2;
+}
+.create-key-wrap.theme-dark .create-key-btn {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.96));
+  color: #93c5fd;
+  box-shadow: 0 10px 18px rgba(2, 6, 23, 0.3);
+}
+
+.create-key-wrap.theme-dark .create-key-btn:hover {
+  color: #dbeafe;
+  border-color: rgba(96, 165, 250, 0.44);
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.24), rgba(30, 41, 59, 0.98));
+  box-shadow: 0 12px 22px rgba(2, 6, 23, 0.36);
+}
+
+.create-key-wrap.theme-dark .create-key-popover {
+  border-color: rgba(51, 65, 85, 0.82);
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 26px 52px rgba(2, 6, 23, 0.46), 0 8px 18px rgba(2, 6, 23, 0.18);
+  backdrop-filter: none;
+}
+
+.create-key-popover.theme-dark {
+  border-color: rgba(51, 65, 85, 0.82);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.985), rgba(11, 18, 32, 0.995));
+  box-shadow: 0 26px 52px rgba(2, 6, 23, 0.46), 0 8px 18px rgba(2, 6, 23, 0.18);
+  backdrop-filter: none;
+}
+
+.create-key-wrap.theme-dark .popover-header {
+  color: #e2e8f0;
+}
+
+.create-key-popover.theme-dark .popover-header {
+  color: #e2e8f0;
+}
+
+.create-key-wrap.theme-dark .popover-close {
+  color: #94a3b8;
+}
+
+.create-key-popover.theme-dark .popover-close {
+  color: #94a3b8;
+}
+
+.create-key-wrap.theme-dark .popover-close:hover {
+  color: #e2e8f0;
+}
+
+.create-key-popover.theme-dark .popover-close:hover {
+  color: #e2e8f0;
+}
+
+.create-key-wrap.theme-dark .form-grid label,
+.create-key-wrap.theme-dark .default-value-box label {
+  color: #94a3b8;
+}
+
+.create-key-popover.theme-dark .form-grid label,
+.create-key-popover.theme-dark .default-value-box label {
+  color: #94a3b8;
+}
+
+.create-key-wrap.theme-dark .form-grid input,
+.create-key-wrap.theme-dark .form-grid select,
+.create-key-wrap.theme-dark .default-value-box input,
+.create-key-wrap.theme-dark .default-value-box textarea {
+  background: rgba(15, 23, 42, 0.94);
+  color: #e2e8f0;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+
+.create-key-popover.theme-dark .form-grid input,
+.create-key-popover.theme-dark .form-grid select,
+.create-key-popover.theme-dark .default-value-box input,
+.create-key-popover.theme-dark .default-value-box textarea {
+  background: rgba(11, 18, 32, 0.98);
+  color: #e2e8f0;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+
+.create-key-popover.theme-dark .form-grid select option {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.create-key-wrap.theme-dark .btn-cancel {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(15, 23, 42, 0.94);
+  color: #cbd5e1;
+}
+
+.create-key-popover.theme-dark .btn-cancel {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(11, 18, 32, 0.98);
+  color: #cbd5e1;
+}
+
+.create-key-popover.theme-dark .btn-cancel:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(96, 165, 250, 0.34);
+  color: #e2e8f0;
+}
+
+.create-key-popover.theme-dark .btn-create {
+  box-shadow: 0 10px 20px rgba(30, 64, 175, 0.22);
+}
+
+.create-key-popover.theme-dark .btn-create:hover:not(:disabled) {
+  background: #1d4ed8;
+  box-shadow: 0 12px 24px rgba(30, 64, 175, 0.28);
+}
+
+.create-key-wrap.theme-dark .create-msg.ok {
+  background: rgba(6, 78, 59, 0.94);
+  color: #d1fae5;
+}
+
+.create-key-popover.theme-dark .create-msg.ok {
+  background: rgba(6, 78, 59, 0.94);
+  color: #d1fae5;
+}
+
+.create-key-wrap.theme-dark .create-msg.err {
+  background: rgba(127, 29, 29, 0.94);
+  color: #fee2e2;
+}
+
+.create-key-popover.theme-dark .create-msg.err {
+  background: rgba(127, 29, 29, 0.94);
+  color: #fee2e2;
 }
 </style>

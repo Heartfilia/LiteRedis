@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout" :class="fontSizeClass">
+  <div class="app-layout" :class="[fontSizeClass, `theme-${settingsStore.themeMode || 'light'}`]">
     <Sidebar />
     <MainContent />
     <ConnectionManager
@@ -13,7 +13,7 @@
         <div
           v-if="connectionsStore.globalToast"
           class="app-toast"
-          :class="connectionsStore.globalToastOk ? 'ok' : 'err'"
+          :class="[connectionsStore.globalToastOk ? 'ok' : 'err', `theme-${settingsStore.themeMode || 'light'}`]"
         >
           {{ connectionsStore.globalToast }}
         </div>
@@ -80,6 +80,11 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
   --ui-font-body: 12px;
   --ui-font-caption: 11px;
   --ui-font-badge: 10px;
+  --app-text: #0f172a;
+  --app-muted: #64748b;
+  --app-panel-border: rgba(214, 224, 236, 0.9);
+  --app-panel-bg: rgba(255, 255, 255, 0.92);
+  --app-sidebar-bg: linear-gradient(180deg, rgba(244, 248, 252, 0.98), rgba(236, 242, 249, 0.98));
   position: relative;
   display: flex;
   height: 100vh;
@@ -90,6 +95,20 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
     radial-gradient(circle at top left, rgba(226, 239, 255, 0.72), transparent 34%),
     radial-gradient(circle at right 18%, rgba(215, 244, 236, 0.55), transparent 28%),
     linear-gradient(180deg, #f7fafc 0%, #eef3f9 100%);
+  color: var(--app-text);
+}
+.app-layout.theme-dark {
+  --app-text: #e2e8f0;
+  --app-muted: #a8b6c9;
+  --app-panel-border: rgba(51, 65, 85, 0.92);
+  --app-panel-bg: rgba(15, 23, 42, 0.985);
+  --app-sidebar-bg:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.1), transparent 26%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.995), rgba(11, 18, 32, 0.995));
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.18), transparent 28%),
+    radial-gradient(circle at right 18%, rgba(20, 184, 166, 0.12), transparent 24%),
+    linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
 }
 .app-layout.font-medium {
   --ui-font-title: 14px;
@@ -163,33 +182,71 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
   transform: translateX(-50%);
   z-index: 6000;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: 11px;
   font-size: 12px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(14px);
   border: 1px solid transparent;
   max-width: min(520px, calc(100vw - 24px));
   word-break: break-word;
+  transform-origin: top center;
 }
 .app-toast.ok {
-  background: #f0fdf4;
+  background: linear-gradient(135deg, rgba(240, 253, 244, 0.98), rgba(220, 252, 231, 0.96));
   color: #166534;
-  border-color: #bbf7d0;
+  border-color: rgba(110, 231, 183, 0.92);
+  box-shadow: 0 14px 28px rgba(34, 197, 94, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+  animation: appToastSuccessPulse 0.42s ease-out;
 }
 .app-toast.err {
-  background: #fff1f2;
+  background: linear-gradient(135deg, rgba(255, 241, 242, 0.98), rgba(255, 228, 230, 0.96));
   color: #991b1b;
-  border-color: #fecaca;
+  border-color: rgba(253, 164, 175, 0.9);
+  box-shadow: 0 14px 28px rgba(239, 68, 68, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+}
+.app-toast.theme-dark.ok {
+  background: linear-gradient(135deg, rgba(9, 59, 44, 0.94), rgba(13, 78, 58, 0.92));
+  color: #d1fae5;
+  border-color: rgba(52, 211, 153, 0.5);
+  box-shadow: 0 16px 34px rgba(5, 150, 105, 0.22), 0 0 0 1px rgba(167, 243, 208, 0.08) inset;
+}
+.app-toast.theme-dark.err {
+  background: linear-gradient(135deg, rgba(76, 20, 27, 0.94), rgba(101, 26, 37, 0.92));
+  color: #fee2e2;
+  border-color: rgba(251, 113, 133, 0.42);
+  box-shadow: 0 16px 34px rgba(190, 24, 93, 0.18), 0 0 0 1px rgba(255, 228, 230, 0.06) inset;
 }
 .app-toast-enter-active,
 .app-toast-leave-active {
-  transition: opacity 0.25s, transform 0.25s;
+  transition: opacity 0.22s ease, transform 0.22s ease, filter 0.22s ease;
 }
 .app-toast-enter-from,
 .app-toast-leave-to {
   opacity: 0;
-  transform: translateX(-50%) translateY(-12px);
+  transform: translateX(-50%) translateY(-10px) scale(0.97);
+  filter: blur(3px);
+}
+
+@keyframes appToastSuccessPulse {
+  0% {
+    transform: translateX(-50%) translateY(-3px) scale(0.985);
+  }
+
+  58% {
+    transform: translateX(-50%) translateY(0) scale(1.018);
+  }
+
+  100% {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
 }
 body {
   background: #edf3f9;
+}
+body[data-theme='dark'] {
+  background: #0b1220;
+  color: #e2e8f0;
 }
 </style>

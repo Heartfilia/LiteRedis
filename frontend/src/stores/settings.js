@@ -7,6 +7,7 @@ export const useSettingsStore = defineStore('settings', {
   state: () => ({
     loaded: false,
     debugMode: false,
+    themeMode: 'light',
     keyScanCount: 20,
     hashLoadCount: 20,
     listLoadCount: 20,
@@ -26,12 +27,32 @@ export const useSettingsStore = defineStore('settings', {
   }),
 
   actions: {
+    applyTheme() {
+      if (typeof document === 'undefined') return
+      document.documentElement.setAttribute('data-theme', this.themeMode)
+      document.body.setAttribute('data-theme', this.themeMode)
+    },
+
+    toggleTheme() {
+      this.themeMode = this.themeMode === 'dark' ? 'light' : 'dark'
+      try {
+        localStorage.setItem('liteRedis_themeMode', this.themeMode)
+      } catch (e) {}
+      this.applyTheme()
+    },
+
     enableDebugMode() {
       this.debugMode = true
     },
 
     async load() {
       try {
+        try {
+          const savedThemeMode = localStorage.getItem('liteRedis_themeMode')
+          if (savedThemeMode === 'light' || savedThemeMode === 'dark') {
+            this.themeMode = savedThemeMode
+          }
+        } catch (e) {}
         const s = await getSettings()
         this.keyScanCount = s.key_scan_count || 20
         this.hashLoadCount = s.hash_load_count || 20
@@ -51,8 +72,10 @@ export const useSettingsStore = defineStore('settings', {
         this.language = s.language || 'zh'
         setLanguage(this.language)
         this.loaded = true
+        this.applyTheme()
       } catch (e) {
         console.error('load settings failed', e)
+        this.applyTheme()
       }
     },
 

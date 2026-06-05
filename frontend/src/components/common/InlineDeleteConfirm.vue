@@ -1,5 +1,5 @@
 <template>
-  <div ref="rootEl" class="delete-wrap" :class="{ open }">
+  <div ref="rootEl" class="delete-wrap" :class="[{ open }, `theme-${settingsStore.themeMode || 'light'}`]">
     <button
       type="button"
       class="btn-tiny danger"
@@ -22,7 +22,7 @@
         v-if="open"
         ref="popoverEl"
         class="delete-popover"
-        :class="popoverPlacementClass"
+        :class="[popoverPlacementClass, `theme-${settingsStore.themeMode || 'light'}`]"
         :style="popoverStyle"
         @pointerdown.stop
         @click.stop
@@ -50,6 +50,7 @@
 
 <script setup>
 import { Teleport, computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useSettingsStore } from '../../stores/settings.js'
 
 const props = defineProps({
   label: { type: String, default: 'Delete' },
@@ -59,6 +60,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['confirm'])
+const settingsStore = useSettingsStore()
 
 let activeCloser = null
 
@@ -189,20 +191,45 @@ onBeforeUnmount(() => {
   border-color: #b91c1c;
 }
 
+.delete-wrap.theme-dark > .btn-tiny {
+  background: rgba(15, 23, 42, 0.94);
+  color: #cbd5e1;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+
+.delete-wrap.theme-dark > .btn-tiny:hover {
+  background: rgba(30, 41, 59, 0.96);
+  color: #f8fafc;
+  border-color: rgba(96, 165, 250, 0.34);
+}
+
+.delete-wrap.theme-dark > .btn-tiny.danger-confirm,
+.delete-wrap.theme-dark > .btn-tiny.danger-confirm:hover {
+  color: #fff;
+  border-color: #dc2626;
+}
+
 .delete-popover {
   position: fixed;
   z-index: 20050;
   isolation: isolate;
   background: #fff;
   background-color: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid rgba(226, 232, 240, 0.84);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.16), 0 8px 18px rgba(148, 163, 184, 0.08);
   padding: 8px 10px;
   white-space: nowrap;
   opacity: 1;
   backdrop-filter: none;
   pointer-events: auto;
+}
+
+.delete-popover.theme-dark {
+  background: rgba(15, 23, 42, 0.98);
+  background-color: rgba(15, 23, 42, 0.98);
+  border-color: rgba(51, 65, 85, 0.82);
+  box-shadow: 0 20px 40px rgba(2, 6, 23, 0.46), 0 8px 18px rgba(2, 6, 23, 0.18);
 }
 .delete-popover.top {
   transform-origin: bottom right;
@@ -219,8 +246,8 @@ onBeforeUnmount(() => {
   height: 10px;
   background: #fff;
   background-color: #fff;
-  border-left: 1px solid #e5e7eb;
-  border-top: 1px solid #e5e7eb;
+  border-left: 1px solid rgba(226, 232, 240, 0.84);
+  border-top: 1px solid rgba(226, 232, 240, 0.84);
   transform: rotate(45deg);
 }
 .delete-popover-arrow.top {
@@ -234,6 +261,13 @@ onBeforeUnmount(() => {
   transform: rotate(45deg);
 }
 
+.delete-popover.theme-dark .delete-popover-arrow {
+  background: rgba(15, 23, 42, 0.98);
+  background-color: rgba(15, 23, 42, 0.98);
+  border-left-color: rgba(51, 65, 85, 0.82);
+  border-top-color: rgba(51, 65, 85, 0.82);
+}
+
 .delete-popover-content {
   display: flex;
   align-items: center;
@@ -244,10 +278,19 @@ onBeforeUnmount(() => {
   background-color: #fff;
 }
 
+.delete-popover.theme-dark .delete-popover-content {
+  background: rgba(15, 23, 42, 0.98);
+  background-color: rgba(15, 23, 42, 0.98);
+}
+
 .delete-popover-text {
   font-size: 12px;
   color: #dc2626;
   font-weight: 500;
+}
+
+.delete-popover.theme-dark .delete-popover-text {
+  color: #e2e8f0;
 }
 
 .delete-popover-btns {
@@ -284,6 +327,16 @@ onBeforeUnmount(() => {
   transform: translateY(0);
 }
 
+.delete-popover.theme-dark .btn-tiny {
+  background: rgba(30, 41, 59, 0.92);
+  color: #cbd5e1;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+
+.delete-popover.theme-dark .btn-tiny:hover {
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
 .btn-confirm-yes {
   color: #16a34a;
   border-color: #16a34a;
@@ -302,5 +355,32 @@ onBeforeUnmount(() => {
 .btn-confirm-no:hover {
   background: #dc2626;
   color: #fff;
+}
+
+:global(body[data-theme='dark']) .delete-popover {
+  background: rgba(15, 23, 42, 0.98);
+  background-color: rgba(15, 23, 42, 0.98);
+  border-color: rgba(51, 65, 85, 0.82);
+  box-shadow: 0 20px 40px rgba(2, 6, 23, 0.46), 0 8px 18px rgba(2, 6, 23, 0.18);
+}
+
+:global(body[data-theme='dark']) .delete-popover-arrow {
+  background: rgba(15, 23, 42, 0.98);
+  background-color: rgba(15, 23, 42, 0.98);
+  border-left-color: rgba(51, 65, 85, 0.82);
+  border-top-color: rgba(51, 65, 85, 0.82);
+}
+
+:global(body[data-theme='dark']) .delete-popover-text {
+  color: #e2e8f0;
+}
+
+:global(body[data-theme='dark']) .delete-popover .btn-tiny {
+  background: rgba(30, 41, 59, 0.92);
+  color: #cbd5e1;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+:global(body[data-theme='dark']) .delete-popover .btn-tiny:hover {
+  border-color: rgba(96, 165, 250, 0.3);
 }
 </style>

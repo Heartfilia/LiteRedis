@@ -1,5 +1,12 @@
 <template>
-  <div class="sidebar" :class="{ collapsed: sidebarCollapsed }">
+  <div
+    class="sidebar"
+    :class="{
+      collapsed: sidebarCollapsed,
+      'theme-dark': settingsStore.themeMode === 'dark',
+      'theme-light': settingsStore.themeMode !== 'dark',
+    }"
+  >
     <div class="sidebar-layers">
       <!-- 折叠状态：图标列表 + 底部展开按钮 -->
       <div class="sidebar-layer sidebar-collapsed-layer" :class="{ visible: sidebarCollapsed }">
@@ -198,6 +205,13 @@
           </a>
         </div>
         <div class="footer-actions">
+          <button
+            class="btn-icon btn-theme"
+            :title="settingsStore.themeMode === 'dark' ? '切换浅色主题' : '切换暗色主题'"
+            @click="settingsStore.toggleTheme()"
+          >
+            <span class="btn-icon-glyph" aria-hidden="true">{{ settingsStore.themeMode === 'dark' ? '☾' : '☀' }}</span>
+          </button>
           <button class="btn-icon" :title="t('sidebar.manageConn')" @click="openConnManager()"><span class="btn-icon-glyph" aria-hidden="true">＋</span></button>
           <button class="btn-icon btn-settings" :title="t('sidebar.settings')" @click="openSettings()"><span class="btn-icon-glyph" aria-hidden="true">⚙</span></button>
           <button
@@ -242,6 +256,7 @@
 import { computed, ref, inject, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
@@ -252,6 +267,7 @@ const { t } = useI18n()
 
 const connectionsStore = useConnectionsStore()
 const workspaceStore = useWorkspaceStore()
+const settingsStore = useSettingsStore()
 
 const openConnManager = inject('openConnManager')
 const openSettings = inject('openSettings')
@@ -505,20 +521,22 @@ async function disconnectConn(id) {
   min-width: 200px;
   margin: 10px 0 10px 10px;
   border-radius: 15px;
-  border: 1px solid rgba(214, 224, 236, 0.92);
-  background:
-    radial-gradient(circle at top left, rgba(191, 219, 254, 0.58), transparent 34%),
-    radial-gradient(circle at right 22%, rgba(220, 252, 231, 0.34), transparent 26%),
-    linear-gradient(180deg, rgba(248, 251, 255, 0.94) 0%, rgba(239, 245, 251, 0.96) 100%);
+  border: 1px solid var(--app-panel-border);
+  background: var(--app-sidebar-bg);
   box-shadow: 0 18px 38px rgba(148, 163, 184, 0.16);
   backdrop-filter: blur(14px);
-  color: #475569;
+  color: var(--app-muted);
   display: flex;
   flex-direction: column;
   height: calc(100vh - 20px);
   overflow: hidden;
   position: relative;
   transition: width 0.2s ease, min-width 0.2s ease;
+}
+:global(.app-layout.theme-dark) .sidebar,
+:global(body[data-theme='dark']) .sidebar {
+  backdrop-filter: none;
+  box-shadow: 0 22px 46px rgba(2, 6, 23, 0.36);
 }
 .sidebar.collapsed {
   width: 44px;
@@ -557,7 +575,7 @@ async function disconnectConn(id) {
   flex-direction: column;
   align-items: center;
   height: 100%;
-  padding: 8px 0 10px;
+  padding: 8px 0 8px;
 }
 .collapsed-icons {
   flex: 1;
@@ -591,6 +609,10 @@ async function disconnectConn(id) {
   opacity: 1;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.96), 0 0 0 4px rgba(96, 165, 250, 0.32);
 }
+:global(.app-layout.theme-dark) :deep(.collapsed-conn-icon.active),
+:global(body[data-theme='dark']) :deep(.collapsed-conn-icon.active) {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.98), 0 0 0 4px rgba(96, 165, 250, 0.34);
+}
 .btn-expand-bottom {
   background: rgba(255, 255, 255, 0.9);
   color: #64748b;
@@ -622,6 +644,19 @@ async function disconnectConn(id) {
   color: #2563eb;
   border-color: #93c5fd;
 }
+:global(.app-layout.theme-dark) :deep(.btn-expand-bottom),
+:global(body[data-theme='dark']) :deep(.btn-expand-bottom) {
+  background: rgba(15, 23, 42, 0.92);
+  color: #94a3b8;
+  border-color: rgba(71, 85, 105, 0.96);
+  box-shadow: 0 12px 22px rgba(2, 6, 23, 0.34);
+}
+:global(.app-layout.theme-dark) :deep(.btn-expand-bottom:hover),
+:global(body[data-theme='dark']) :deep(.btn-expand-bottom:hover) {
+  background: rgba(30, 41, 59, 0.96);
+  color: #e2e8f0;
+  border-color: rgba(96, 165, 250, 0.42);
+}
 
 /* ===== 展开状态 footer ===== */
 .sidebar-footer {
@@ -631,15 +666,25 @@ async function disconnectConn(id) {
   justify-content: space-between;
   gap: 4px;
   min-height: 36px;
-  padding: 4px 12px;
-  border-top: 1px solid rgba(214, 224, 236, 0.92);
+  padding: 4px 12px 2px;
+  border-top: 1px solid var(--app-panel-border);
   box-sizing: border-box;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.65), rgba(241, 245, 249, 0.94));
+}
+:global(.app-layout.theme-dark) :deep(.sidebar-footer),
+:global(body[data-theme='dark']) :deep(.sidebar-footer) {
+  background: #0b1220;
 }
 .sidebar-links {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+:global(.app-layout.theme-dark) :deep(.sidebar-links),
+:global(.app-layout.theme-dark) :deep(.footer-actions),
+:global(body[data-theme='dark']) :deep(.sidebar-links),
+:global(body[data-theme='dark']) :deep(.footer-actions) {
+  background: transparent;
 }
 .sidebar-link-icon {
   color: #64748b;
@@ -694,6 +739,24 @@ async function disconnectConn(id) {
   color: #2563eb;
   background: rgba(219, 234, 254, 0.76);
 }
+:global(.app-layout.theme-dark) :deep(.sidebar-link-icon),
+:global(body[data-theme='dark']) :deep(.sidebar-link-icon) {
+  color: #9fb0c7;
+  background: transparent;
+  border: 1px solid transparent;
+}
+:global(.app-layout.theme-dark) :deep(.sidebar-link-icon:hover),
+:global(.app-layout.theme-dark) :deep(.sidebar-link-icon:hover:focus),
+:global(.app-layout.theme-dark) :deep(.sidebar-link-icon:hover:focus-visible),
+:global(.app-layout.theme-dark) :deep(.sidebar-link-icon:hover:active),
+:global(body[data-theme='dark']) :deep(.sidebar-link-icon:hover),
+:global(body[data-theme='dark']) :deep(.sidebar-link-icon:hover:focus),
+:global(body[data-theme='dark']) :deep(.sidebar-link-icon:hover:focus-visible),
+:global(body[data-theme='dark']) :deep(.sidebar-link-icon:hover:active) {
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.98);
+  border-color: rgba(51, 65, 85, 0.96);
+}
 .sidebar-link-json {
   font-size: 12px;
   font-weight: 700;
@@ -747,6 +810,16 @@ async function disconnectConn(id) {
   background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(238, 246, 255, 0.98));
   color: #2563eb;
 }
+.btn-theme {
+  background: linear-gradient(180deg, rgba(255, 252, 240, 0.98), rgba(254, 249, 195, 0.92));
+  color: #ca8a04;
+  box-shadow: 0 8px 18px rgba(250, 204, 21, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.btn-theme:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(254, 240, 138, 0.98));
+  color: #a16207;
+  box-shadow: 0 10px 22px rgba(250, 204, 21, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
 .btn-collapse {
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.92));
   color: #64748b;
@@ -772,6 +845,52 @@ async function disconnectConn(id) {
   border-color: rgba(226, 232, 240, 0.9);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.82), rgba(241, 245, 249, 0.78));
   box-shadow: none;
+}
+:global(.app-layout.theme-dark) :deep(.btn-icon),
+:global(body[data-theme='dark']) :deep(.btn-icon) {
+  background: transparent;
+  color: #a8b6c9;
+  border-color: transparent;
+  box-shadow: none;
+}
+:global(.app-layout.theme-dark) :deep(.btn-icon:hover),
+:global(body[data-theme='dark']) :deep(.btn-icon:hover) {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-color: rgba(96, 165, 250, 0.38);
+  box-shadow: none;
+}
+:global(.app-layout.theme-dark) :deep(.btn-settings),
+:global(body[data-theme='dark']) :deep(.btn-settings) {
+  color: #cbd5e1;
+}
+:global(.app-layout.theme-dark) :deep(.btn-theme),
+:global(body[data-theme='dark']) :deep(.btn-theme) {
+  background: transparent;
+  color: #fbbf24;
+  box-shadow: none;
+}
+:global(.app-layout.theme-dark) :deep(.btn-theme:hover),
+:global(body[data-theme='dark']) :deep(.btn-theme:hover) {
+  background: #243047;
+  color: #fde68a;
+  box-shadow: none;
+}
+:global(.app-layout.theme-dark) :deep(.btn-theme .btn-icon-glyph),
+:global(body[data-theme='dark']) :deep(.btn-theme .btn-icon-glyph) {
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.22);
+}
+:global(.app-layout.theme-dark) :deep(.btn-collapse),
+:global(body[data-theme='dark']) :deep(.btn-collapse) {
+  color: #cbd5e1;
+}
+:global(.app-layout.theme-dark) :deep(.btn-icon:disabled),
+:global(.app-layout.theme-dark) :deep(.btn-icon:disabled:hover),
+:global(body[data-theme='dark']) :deep(.btn-icon:disabled),
+:global(body[data-theme='dark']) :deep(.btn-icon:disabled:hover) {
+  color: #475569;
+  border-color: transparent;
+  background: transparent;
 }
 
 /* ===== 连接列表 ===== */
@@ -862,6 +981,18 @@ async function disconnectConn(id) {
   border-color: rgba(96, 165, 250, 0.38);
   box-shadow: 0 10px 22px rgba(147, 197, 253, 0.22);
 }
+:global(.app-layout.theme-dark) :deep(.conn-item:hover),
+:global(body[data-theme='dark']) :deep(.conn-item:hover) {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(71, 85, 105, 0.9);
+  box-shadow: 0 12px 20px rgba(2, 6, 23, 0.24);
+}
+:global(.app-layout.theme-dark) :deep(.conn-item.active),
+:global(body[data-theme='dark']) :deep(.conn-item.active) {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(30, 64, 175, 0.14));
+  border-color: rgba(96, 165, 250, 0.34);
+  box-shadow: 0 14px 24px rgba(2, 6, 23, 0.3);
+}
 .conn-item.connecting::before {
   content: '';
   position: absolute;
@@ -907,6 +1038,28 @@ async function disconnectConn(id) {
 }
 .conn-dot.disconnected { background: #9e9e9e; }
 .conn-name { font-size: 13px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+:global(.app-layout.theme-dark) :deep(.conn-dot.disconnected),
+:global(body[data-theme='dark']) :deep(.conn-dot.disconnected) {
+  background: #475569;
+}
+:global(.app-layout.theme-dark) :deep(.conn-name),
+:global(body[data-theme='dark']) :deep(.conn-name) {
+  color: #edf4ff;
+}
+:global(.app-layout.theme-dark) :deep(.conn-item.active .conn-name),
+:global(body[data-theme='dark']) :deep(.conn-item.active .conn-name) {
+  color: #ffffff;
+}
+:global(.app-layout.theme-dark) :deep(.conn-host),
+:global(.app-layout.theme-dark) :deep(.group-header),
+:global(.app-layout.theme-dark) :deep(.group-count),
+:global(.app-layout.theme-dark) :deep(.empty-hint),
+:global(body[data-theme='dark']) :deep(.conn-host),
+:global(body[data-theme='dark']) :deep(.group-header),
+:global(body[data-theme='dark']) :deep(.group-count),
+:global(body[data-theme='dark']) :deep(.empty-hint) {
+  color: #a8b6c9;
+}
 .connecting-inline {
   margin-left: 6px;
   font-size: 10px;
@@ -957,6 +1110,16 @@ async function disconnectConn(id) {
   background: #eff6ff;
   border-color: #93c5fd;
   color: #2563eb;
+}
+:global(.app-layout.theme-dark) .btn-tiny {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(71, 85, 105, 0.96);
+  color: #94a3b8;
+}
+:global(.app-layout.theme-dark) .btn-tiny:hover {
+  background: rgba(30, 64, 175, 0.16);
+  border-color: rgba(96, 165, 250, 0.38);
+  color: #e2e8f0;
 }
 .btn-tiny.danger:hover { background: #e53e3e; border-color: #e53e3e; color: white; }
 :deep(.sidebar-delete-confirm .btn-tiny.danger) {
@@ -1024,6 +1187,9 @@ async function disconnectConn(id) {
 .btn-confirm-no { color: #dc2626; border-color: #dc2626; }
 .btn-confirm-no:hover { background: #dc2626; color: white; }
 .empty-hint { text-align: center; color: #94a3b8; font-size: 12px; padding: 20px; }
+:global(.app-layout.theme-dark) .empty-hint {
+  color: #64748b;
+}
 
 /* 未分组拖拽区域 */
 .ungrouped-zone {
@@ -1078,6 +1244,13 @@ async function disconnectConn(id) {
   background: rgba(255, 255, 255, 0.74);
   border-color: rgba(147, 197, 253, 0.24);
 }
+:global(.app-layout.theme-dark) .group-header {
+  color: #94a3b8;
+}
+:global(.app-layout.theme-dark) .group-header:hover {
+  background: rgba(30, 41, 59, 0.88);
+  border-color: rgba(71, 85, 105, 0.82);
+}
 
 @keyframes spin {
   to { transform: rotate(360deg); }
@@ -1109,6 +1282,11 @@ async function disconnectConn(id) {
   font-weight: 400;
   box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.92);
 }
+:global(.app-layout.theme-dark) .group-count {
+  background: rgba(30, 41, 59, 0.94);
+  color: #cbd5e1;
+  box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.9);
+}
 
 /* ===== 右键菜单 ===== */
 .ctx-menu {
@@ -1133,6 +1311,27 @@ async function disconnectConn(id) {
 .ctx-danger { color: #e53e3e; }
 .ctx-danger:hover { background: #fff5f5; color: #e53e3e; }
 .ctx-divider { height: 1px; background: #eee; margin: 3px 0; }
+:global(.app-layout.theme-dark) .ctx-menu {
+  background: rgba(15, 23, 42, 0.98);
+  border-color: rgba(71, 85, 105, 0.92);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.48);
+}
+:global(.app-layout.theme-dark) .ctx-item {
+  color: #e2e8f0;
+}
+:global(.app-layout.theme-dark) .ctx-item:hover {
+  background: rgba(30, 41, 59, 0.92);
+}
+:global(.app-layout.theme-dark) .ctx-danger {
+  color: #fca5a5;
+}
+:global(.app-layout.theme-dark) .ctx-danger:hover {
+  background: rgba(127, 29, 29, 0.56);
+  color: #fecaca;
+}
+:global(.app-layout.theme-dark) .ctx-divider {
+  background: rgba(51, 65, 85, 0.88);
+}
 
 .sidebar-toast {
   position: fixed;
@@ -1150,7 +1349,197 @@ async function disconnectConn(id) {
 }
 .sidebar-toast.ok { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
 .sidebar-toast.err { background: #fff1f2; color: #991b1b; border-color: #fecaca; }
+:global(.app-layout.theme-dark) .sidebar-toast.ok {
+  background: rgba(6, 78, 59, 0.96);
+  color: #d1fae5;
+  border-color: rgba(52, 211, 153, 0.34);
+}
+:global(.app-layout.theme-dark) .sidebar-toast.err {
+  background: rgba(127, 29, 29, 0.96);
+  color: #fee2e2;
+  border-color: rgba(248, 113, 113, 0.34);
+}
 .toast-enter-active, .toast-leave-active { transition: opacity 0.25s, transform 0.25s; }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+
+.sidebar.theme-dark {
+  background: #0b1220;
+  color: #a8b6c9;
+  backdrop-filter: none;
+  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.42);
+}
+
+.sidebar.theme-dark .collapsed-conn-icon.active {
+  box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.98), 0 0 0 3px rgba(96, 165, 250, 0.22), 0 0 12px rgba(59, 130, 246, 0.16);
+}
+
+.sidebar.theme-dark .sidebar-collapsed-bar,
+.sidebar.theme-dark .sidebar-expanded-layer,
+.sidebar.theme-dark .sidebar-footer,
+.sidebar.theme-dark .sidebar-links,
+.sidebar.theme-dark .footer-actions {
+  background: transparent;
+}
+
+.sidebar.theme-dark .sidebar-footer {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(11, 18, 32, 1));
+  border-top-color: rgba(51, 65, 85, 0.94);
+}
+
+.sidebar.theme-dark .sidebar-link-icon {
+  color: #d7e0ee;
+  background: #111827;
+  border: 1px solid rgba(51, 65, 85, 0.96);
+}
+
+.sidebar.theme-dark .sidebar-link-icon:hover,
+.sidebar.theme-dark .sidebar-link-icon:hover:focus,
+.sidebar.theme-dark .sidebar-link-icon:hover:focus-visible,
+.sidebar.theme-dark .sidebar-link-icon:hover:active {
+  color: #ffffff;
+  background: #1f2937;
+  border-color: rgba(96, 165, 250, 0.42);
+}
+
+.sidebar.theme-dark .btn-icon {
+  color: #d7e0ee;
+  background: #111827;
+  border: 1px solid rgba(51, 65, 85, 0.96);
+  box-shadow: none;
+}
+
+.sidebar.theme-dark .btn-icon:hover {
+  color: #ffffff;
+  background: #1f2937;
+  border-color: rgba(96, 165, 250, 0.42);
+  box-shadow: none;
+}
+
+.sidebar.theme-dark .btn-theme {
+  color: #fbbf24;
+  background: #172033;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+
+.sidebar.theme-dark .btn-theme:hover {
+  color: #fde68a;
+  background: #243047;
+  border-color: rgba(250, 204, 21, 0.28);
+}
+
+.sidebar.theme-dark .btn-icon:disabled,
+.sidebar.theme-dark .btn-icon:disabled:hover {
+  color: #475569;
+  background: #0f172a;
+  border-color: rgba(51, 65, 85, 0.72);
+}
+
+.sidebar.theme-dark .btn-expand-bottom {
+  background: #111827;
+  color: #cbd5e1;
+  border-color: rgba(51, 65, 85, 0.96);
+  box-shadow: 0 12px 22px rgba(2, 6, 23, 0.36);
+}
+
+.sidebar.theme-dark .btn-expand-bottom:hover {
+  background: #1f2937;
+  color: #ffffff;
+  border-color: rgba(96, 165, 250, 0.42);
+}
+
+.sidebar.theme-dark .conn-item:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(71, 85, 105, 0.88);
+  box-shadow: 0 12px 20px rgba(2, 6, 23, 0.24);
+}
+
+.sidebar.theme-dark .conn-item.active {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(30, 64, 175, 0.14));
+  border-color: rgba(96, 165, 250, 0.34);
+  box-shadow: 0 14px 24px rgba(2, 6, 23, 0.3);
+}
+
+.sidebar.theme-dark .conn-dot.disconnected {
+  background: #475569;
+}
+
+.sidebar.theme-dark .conn-name {
+  color: #f3f7ff;
+}
+
+.sidebar.theme-dark .conn-item.active .conn-name {
+  color: #ffffff;
+}
+
+.sidebar.theme-dark .conn-actions .btn-conn-action,
+.sidebar.theme-dark .conn-actions :deep(.sidebar-delete-confirm > .btn-tiny) {
+  background: rgba(15, 23, 42, 0.96);
+  border-color: rgba(51, 65, 85, 0.94);
+  color: #a8b6c9;
+  box-shadow: none;
+}
+
+.sidebar.theme-dark .conn-actions .btn-conn-action:hover,
+.sidebar.theme-dark .conn-actions :deep(.sidebar-delete-confirm > .btn-tiny:hover) {
+  background: rgba(30, 41, 59, 0.98);
+  border-color: rgba(96, 165, 250, 0.34);
+  color: #f8fbff;
+}
+
+.sidebar.theme-dark .conn-actions .btn-disconnect,
+.sidebar.theme-dark .conn-actions :deep(.sidebar-delete-confirm .btn-tiny.danger) {
+  background: rgba(15, 23, 42, 0.96);
+  color: #fbbf24;
+  border-color: rgba(120, 53, 15, 0.72);
+}
+
+.sidebar.theme-dark .conn-actions .btn-disconnect:hover {
+  background: rgba(120, 53, 15, 0.36);
+  color: #fde68a;
+  border-color: rgba(245, 158, 11, 0.62);
+}
+
+.sidebar.theme-dark .conn-actions .btn-overview {
+  background: rgba(15, 23, 42, 0.96);
+  color: #99f6e4;
+  border-color: rgba(13, 148, 136, 0.48);
+}
+
+.sidebar.theme-dark .conn-actions .btn-overview:hover {
+  background: rgba(15, 118, 110, 0.28);
+  color: #ccfbf1;
+  border-color: rgba(45, 212, 191, 0.54);
+}
+
+.sidebar.theme-dark .conn-actions :deep(.sidebar-delete-confirm .btn-tiny.danger:hover) {
+  background: rgba(127, 29, 29, 0.48);
+  border-color: rgba(248, 113, 113, 0.56);
+  color: #fecaca;
+}
+
+.sidebar.theme-dark .conn-actions :deep(.sidebar-delete-confirm .btn-tiny.danger-confirm) {
+  background: #b91c1c;
+  border-color: #ef4444;
+  color: #fff;
+}
+
+.sidebar.theme-dark .group-name,
+.sidebar.theme-dark .conn-host,
+.sidebar.theme-dark .group-header,
+.sidebar.theme-dark .group-count,
+.sidebar.theme-dark .empty-hint {
+  color: #b8c4d6;
+}
+
+.sidebar.theme-dark .group-header:hover {
+  background: rgba(30, 41, 59, 0.88);
+  border-color: rgba(71, 85, 105, 0.82);
+}
+
+.sidebar.theme-dark .group-count {
+  background: rgba(30, 41, 59, 0.94);
+  color: #d7e0ee;
+  box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.9);
+}
 
 </style>

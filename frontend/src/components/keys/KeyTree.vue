@@ -1,5 +1,5 @@
 <template>
-  <div class="key-tree">
+  <div class="key-tree" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <div v-if="!activeConnID" class="empty-state">
       {{ t('keyTree.selectConn') }}
     </div>
@@ -60,29 +60,33 @@
               :node="node"
               :depth="0"
             />
-            <div class="tree-load-more">
-              <button
-                v-if="session.hasMore"
-                class="btn-load-more"
-                :disabled="session.loading"
-                @click="workspaceStore.loadMoreKeys(session.id)"
-              >
-                {{ session.loading ? t('keyTree.loading') : t('keyTree.loadMore') }}
-              </button>
-            </div>
           </div>
         </template>
       </div>
 
       <!-- DB 选择 + Key 统计 -->
       <div class="db-bar">
-        <template v-if="!activeConn?.is_cluster">
-          <label class="db-label">{{ t('keyTree.db') }}</label>
-          <select :value="currentDB" @change="switchDB($event.target.value)" class="db-select">
-            <option v-for="i in 16" :key="i-1" :value="i-1">{{ i-1 }}</option>
-          </select>
-        </template>
-        <span class="key-count">{{ t('keyTree.totalKeys', { count: totalKeys }) }}</span>
+        <div class="db-bar-side db-bar-left">
+          <template v-if="!activeConn?.is_cluster">
+            <label class="db-label">{{ t('keyTree.db') }}</label>
+            <select :value="currentDB" @change="switchDB($event.target.value)" class="db-select">
+              <option v-for="i in 16" :key="i-1" :value="i-1">{{ i-1 }}</option>
+            </select>
+          </template>
+        </div>
+        <div class="db-bar-center">
+          <button
+            v-if="showBottomLoadMore"
+            class="btn-load-more"
+            :disabled="session?.loading"
+            @click="workspaceStore.loadMoreKeys(session.id)"
+          >
+            {{ session?.loading ? t('keyTree.loading') : t('keyTree.loadMore') }}
+          </button>
+        </div>
+        <div class="db-bar-side db-bar-right">
+          <span class="key-count">{{ t('keyTree.totalKeys', { count: totalKeys }) }}</span>
+        </div>
       </div>
     </template>
   </div>
@@ -114,6 +118,10 @@ const showClusterEmptyHint = computed(() =>
   !!activeConn.value?.is_cluster &&
   !session.value &&
   displaySessions.value.length === 0
+)
+const showBottomLoadMore = computed(() =>
+  !workspaceStore.keepPrevSearch &&
+  !!session.value?.hasMore
 )
 
 async function switchDB(db) {
@@ -148,8 +156,17 @@ function mapSessionForDisplay(source) {
   display: flex;
   flex-direction: column;
   height: 100%;
+  color: #0f172a;
   background:
     linear-gradient(180deg, rgba(248, 251, 255, 0.92), rgba(255, 255, 255, 0.98) 16%, #ffffff 42%);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+:global(.app-layout.theme-dark) .key-tree {
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.96) 20%, rgba(2, 6, 23, 0.98) 100%);
 }
 .tree-content {
   flex: 1;
@@ -176,6 +193,10 @@ function mapSessionForDisplay(source) {
   padding: 40px;
   text-align: center;
 }
+:global(.app-layout.theme-dark) .loading,
+:global(.app-layout.theme-dark) .empty-state {
+  color: #94a3b8;
+}
 .cluster-empty-state {
   gap: 10px;
   margin: 12px;
@@ -183,16 +204,26 @@ function mapSessionForDisplay(source) {
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(239, 246, 255, 0.88), rgba(248, 250, 252, 0.92));
 }
+:global(.app-layout.theme-dark) .cluster-empty-state {
+  border-color: rgba(59, 130, 246, 0.34);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.92));
+}
 .cluster-empty-title {
   font-size: 14px;
   font-weight: 600;
   color: #0f172a;
+}
+:global(.app-layout.theme-dark) .cluster-empty-title {
+  color: #e2e8f0;
 }
 .cluster-empty-text {
   font-size: 12px;
   color: #64748b;
   max-width: 320px;
   line-height: 1.7;
+}
+:global(.app-layout.theme-dark) .cluster-empty-text {
+  color: #94a3b8;
 }
 
 .search-section {
@@ -202,6 +233,11 @@ function mapSessionForDisplay(source) {
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 10px 18px rgba(148, 163, 184, 0.08);
   overflow: hidden;
+}
+:global(.app-layout.theme-dark) .search-section {
+  border-color: rgba(51, 65, 85, 0.94);
+  background: rgba(15, 23, 42, 0.84);
+  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.28);
 }
 .search-section-header {
   display: flex;
@@ -217,6 +253,11 @@ function mapSessionForDisplay(source) {
   top: 0;
   z-index: 2;
   backdrop-filter: blur(8px);
+}
+:global(.app-layout.theme-dark) .search-section-header {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.96));
+  color: #cbd5e1;
+  border-bottom-color: rgba(51, 65, 85, 0.94);
 }
 .section-pattern { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .section-status {
@@ -252,9 +293,11 @@ function mapSessionForDisplay(source) {
   color: #94a3b8;
   font-size: 12px;
 }
+:global(.app-layout.theme-dark) .section-tip {
+  color: #94a3b8;
+}
 
-.section-load-more,
-.tree-load-more {
+.section-load-more {
   display: flex;
   justify-content: center;
   padding: 12px 0 4px;
@@ -265,22 +308,22 @@ function mapSessionForDisplay(source) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 30px;
-  padding: 0 18px;
-  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  min-height: 28px;
+  padding: 0 14px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
   color: #2563eb;
-  border: 1px solid rgba(147, 197, 253, 0.9);
+  border: 1px solid rgba(191, 219, 254, 0.92);
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 8px 16px rgba(191, 219, 254, 0.26);
+  box-shadow: 0 4px 10px rgba(191, 219, 254, 0.18);
   transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 .btn-load-more:hover:not(:disabled) {
-  background: linear-gradient(180deg, #f8fbff, #eff6ff);
+  background: linear-gradient(180deg, #f8fbff, #f1f5f9);
   border-color: #60a5fa;
-  box-shadow: 0 12px 20px rgba(147, 197, 253, 0.28);
+  box-shadow: 0 6px 14px rgba(147, 197, 253, 0.2);
   transform: translateY(-1px);
 }
 .btn-load-more:disabled {
@@ -296,9 +339,9 @@ function mapSessionForDisplay(source) {
 }
 
 .db-bar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 6px;
   min-height: 36px;
   padding: 5px 14px;
   border-top: 1px solid rgba(226, 232, 240, 0.95);
@@ -307,11 +350,39 @@ function mapSessionForDisplay(source) {
   box-sizing: border-box;
   backdrop-filter: blur(8px);
 }
+:global(.app-layout.theme-dark) .db-bar {
+  border-top-color: rgba(51, 65, 85, 0.94);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(11, 18, 32, 0.995));
+  backdrop-filter: none;
+}
+.db-bar-side {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.db-bar-left {
+  gap: 6px;
+  justify-content: flex-start;
+}
+.db-bar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 10px;
+}
+.db-bar-right {
+  justify-content: flex-end;
+}
 .db-label {
   font-size: 11px;
   color: #64748b;
   font-weight: 600;
   white-space: nowrap;
+}
+:global(.app-layout.theme-dark) .db-label {
+  color: #94a3b8;
 }
 .db-select {
   min-height: 28px;
@@ -325,6 +396,11 @@ function mapSessionForDisplay(source) {
   cursor: pointer;
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
+:global(.app-layout.theme-dark) .db-select {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
+}
 .db-select:focus {
   border-color: #60a5fa;
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.14);
@@ -333,6 +409,96 @@ function mapSessionForDisplay(source) {
   font-size: 12px;
   color: #64748b;
   font-weight: 500;
-  margin-left: auto;
+  text-align: right;
+}
+:global(.app-layout.theme-dark) .key-count {
+  color: #94a3b8;
+}
+.key-tree.theme-dark {
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 22%),
+    linear-gradient(180deg, rgba(11, 18, 32, 0.995), rgba(12, 19, 33, 0.995) 24%, rgba(2, 6, 23, 1) 100%);
+  color: #e5edf8;
+}
+
+.key-tree.theme-dark .loading,
+.key-tree.theme-dark .empty-state,
+.key-tree.theme-dark .cluster-empty-text,
+.key-tree.theme-dark .section-tip,
+.key-tree.theme-dark .db-label,
+.key-tree.theme-dark .key-count {
+  color: #94a3b8;
+}
+
+.key-tree.theme-dark .cluster-empty-state {
+  border-color: rgba(59, 130, 246, 0.34);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.92));
+}
+
+.key-tree.theme-dark .cluster-empty-title {
+  color: #e2e8f0;
+}
+
+.key-tree.theme-dark .search-section {
+  border-color: rgba(51, 65, 85, 0.94);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.985), rgba(8, 15, 29, 0.995));
+  box-shadow: 0 16px 32px rgba(2, 6, 23, 0.34);
+}
+
+.key-tree.theme-dark .search-section-header {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
+  color: #dbe7f5;
+  border-bottom-color: rgba(51, 65, 85, 0.94);
+}
+
+.key-tree.theme-dark .db-bar {
+  border-top-color: rgba(51, 65, 85, 0.94);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.995), rgba(8, 15, 29, 1));
+  backdrop-filter: none;
+}
+
+.key-tree.theme-dark .db-select {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(10, 17, 30, 0.98);
+  color: #e5edf8;
+}
+
+.key-tree.theme-dark .btn-load-more {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(10, 17, 30, 0.98));
+  color: #cfe0ff;
+  border-color: rgba(71, 85, 105, 0.96);
+  box-shadow: 0 8px 18px rgba(2, 6, 23, 0.36);
+}
+
+.key-tree.theme-dark .btn-load-more:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.24), rgba(30, 41, 59, 0.98));
+  color: #f8fbff;
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.42);
+}
+
+.key-tree.theme-dark .btn-load-more:disabled {
+  background: rgba(15, 23, 42, 0.88);
+  color: #64748b;
+  border-color: rgba(51, 65, 85, 0.82);
+}
+
+.key-tree.theme-dark .section-status {
+  color: #aabbd2;
+}
+
+.key-tree.theme-dark .section-close {
+  background: rgba(15, 23, 42, 0.92);
+  color: #94a3b8;
+}
+
+.key-tree.theme-dark .section-close:hover {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.54);
+}
+
+.key-tree.theme-dark .tree-scroll,
+.key-tree.theme-dark .merged-scroll {
+  color: #e5edf8;
 }
 </style>

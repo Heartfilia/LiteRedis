@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-panel">
+  <div class="settings-panel" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <div class="settings-header">
       <span class="settings-title-trigger" @click="handleTitleClick">⚙️ {{ t('settings.title') }}</span>
       <button class="btn-close" @click="$emit('close')">✕</button>
@@ -201,7 +201,11 @@
     <!-- floating toast -->
     <Teleport to="body">
       <Transition name="toast">
-        <div v-if="msg" class="settings-toast" :class="ok ? 'ok' : 'err'">{{ msg }}</div>
+        <div
+          v-if="msg"
+          class="settings-toast"
+          :class="[ok ? 'ok' : 'err', `theme-${settingsStore.themeMode || 'light'}`]"
+        >{{ msg }}</div>
       </Transition>
     </Teleport>
 
@@ -228,7 +232,7 @@
       <div class="footer-actions">
         <button class="btn-cancel" @click="reset">{{ t('settings.reset') }}</button>
         <button class="btn-close-modal" @click="$emit('close')">{{ t('settings.close') }}</button>
-        <button class="btn-save" :disabled="saving" @click="doSave">{{ saving ? t('settings.applying') : t('settings.apply') }}</button>
+        <button class="btn-save" :class="{ 'success-flash': saveFlashing }" :disabled="saving" @click="doSave">{{ saving ? t('settings.applying') : t('settings.apply') }}</button>
       </div>
     </div>
   </div>
@@ -271,8 +275,10 @@ const appVersion = ref('dev')
 const hasUpdate = ref(false)
 const msg = ref('')
 const ok = ref(true)
+const saveFlashing = ref(false)
 const titleTapCount = ref(0)
 let titleTapTimer = null
+let saveFlashTimer = null
 
 onMounted(async () => {
   await settingsStore.load()
@@ -339,15 +345,25 @@ function handleTitleClick() {
   }
 }
 
+function triggerSaveFlash() {
+  if (saveFlashTimer) clearTimeout(saveFlashTimer)
+  saveFlashing.value = true
+  saveFlashTimer = setTimeout(() => {
+    saveFlashing.value = false
+    saveFlashTimer = null
+  }, 1100)
+}
+
 async function doSave() {
   saving.value = true
   msg.value = ''
   try {
     const result = await settingsStore.save({ ...form })
     ok.value = result.success
-    msg.value = result.success ? '✓ ' + t('settings.saveOk') : (result.message || t('settings.saveErr'))
+    msg.value = result.success ? t('settings.saveOk') : (result.message || t('settings.saveErr'))
     if (result.success) {
       setLanguage(form.language)
+      triggerSaveFlash()
       setTimeout(() => { msg.value = '' }, 3000)
     }
   } catch (e) {
@@ -404,6 +420,9 @@ function openRelease() {
   background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.94) 100%);
   overflow: hidden;
 }
+:global(body[data-theme='dark']) .settings-panel {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(15, 23, 42, 0.92) 100%);
+}
 .settings-header {
   display: flex;
   align-items: center;
@@ -414,6 +433,11 @@ function openRelease() {
   font-size: 14px;
   color: #111827;
   background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(247,250,252,0.88));
+}
+:global(body[data-theme='dark']) .settings-header {
+  border-bottom-color: rgba(51, 65, 85, 0.9);
+  color: #e2e8f0;
+  background: linear-gradient(180deg, rgba(30,41,59,0.96), rgba(15,23,42,0.92));
 }
 .settings-title-trigger {
   cursor: pointer;
@@ -434,6 +458,11 @@ function openRelease() {
   transition: color 0.12s, border-color 0.12s, background 0.12s, transform 0.12s;
 }
 .btn-close:hover { color: #dc2626; border-color: #fca5a5; background: #fff1f2; transform: translateY(-1px); }
+:global(body[data-theme='dark']) .btn-close {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(71, 85, 105, 0.96);
+  color: #94a3b8;
+}
 
 .settings-body {
   flex: 1;
@@ -457,6 +486,12 @@ function openRelease() {
   border: 1px solid rgba(226,232,240,0.86);
   box-shadow: 0 4px 12px rgba(148, 163, 184, 0.06);
 }
+:global(body[data-theme='dark']) .section-title {
+  color: #94a3b8;
+  background: rgba(30, 41, 59, 0.92);
+  border-color: rgba(51, 65, 85, 0.9);
+  box-shadow: none;
+}
 .section-title.mt { margin-top: 24px; }
 
 .setting-item {
@@ -471,6 +506,11 @@ function openRelease() {
   gap: 16px;
   margin-bottom: 10px;
 }
+:global(body[data-theme='dark']) .setting-item {
+  border-color: rgba(51, 65, 85, 0.88);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 8px 18px rgba(2, 6, 23, 0.18);
+}
 .setting-item label {
   flex: 1;
   min-width: 0;
@@ -481,12 +521,18 @@ function openRelease() {
   color: #0f172a;
   font-weight: 500;
 }
+:global(body[data-theme='dark']) .label-text {
+  color: #e2e8f0;
+}
 .label-hint {
   display: block;
   font-size: 11px;
   color: #94a3b8;
   margin-top: 3px;
   line-height: 1.45;
+}
+:global(body[data-theme='dark']) .label-hint {
+  color: #94a3b8;
 }
 .input-unit {
   display: flex;
@@ -504,6 +550,13 @@ function openRelease() {
   outline: none;
   background: rgba(255,255,255,0.94);
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+:global(body[data-theme='dark']) .input-unit input,
+:global(body[data-theme='dark']) .lang-select,
+:global(body[data-theme='dark']) .text-input {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(15, 23, 42, 0.94);
+  color: #e2e8f0;
 }
 .text-input {
   width: 220px !important;
@@ -523,6 +576,9 @@ function openRelease() {
   font-size: 12px;
   color: #6b7280;
   white-space: nowrap;
+}
+:global(body[data-theme='dark']) .unit {
+  color: #94a3b8;
 }
 .lang-select {
   padding: 7px 10px;
@@ -545,6 +601,10 @@ function openRelease() {
   border-top: 1px solid rgba(226, 232, 240, 0.82);
   background: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(246,249,252,0.96));
 }
+:global(body[data-theme='dark']) .settings-footer {
+  border-top-color: rgba(51, 65, 85, 0.88);
+  background: linear-gradient(180deg, rgba(30,41,59,0.96), rgba(15,23,42,0.98));
+}
 .footer-status {
   display: flex;
   align-items: center;
@@ -566,6 +626,12 @@ function openRelease() {
   border-radius: 999px;
   cursor: pointer;
   padding: 6px 10px;
+  transition: color 0.12s, background 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+:global(body[data-theme='dark']) .version-box {
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(71, 85, 105, 0.96);
 }
 .save-msg {
   flex: 1;
@@ -590,6 +656,17 @@ function openRelease() {
 }
 .btn-save:hover { background: #2563eb; }
 .btn-save:disabled { background: #93c5fd; cursor: not-allowed; }
+.btn-save.success-flash {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.96), rgba(22, 163, 74, 0.96));
+  color: #f0fdf4;
+  box-shadow: 0 10px 24px rgba(34, 197, 94, 0.2), 0 0 0 1px rgba(220, 252, 231, 0.22) inset;
+  animation: settingsSaveFlashPulse 0.42s ease;
+}
+:global(body[data-theme='dark']) .btn-save.success-flash {
+  background: linear-gradient(135deg, rgba(9, 59, 44, 0.98), rgba(13, 78, 58, 0.96));
+  color: #d1fae5;
+  box-shadow: 0 12px 26px rgba(5, 150, 105, 0.22), 0 0 0 1px rgba(167, 243, 208, 0.08) inset;
+}
 .btn-cancel {
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 32px;
@@ -606,6 +683,17 @@ function openRelease() {
   transition: background 0.12s, border-color 0.12s;
 }
 .btn-cancel:hover { background: #f3f4f6; border-color: #9ca3af; }
+:global(body[data-theme='dark']) .btn-cancel,
+:global(body[data-theme='dark']) .btn-close-modal {
+  background: rgba(15, 23, 42, 0.94);
+  color: #cbd5e1;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+:global(body[data-theme='dark']) .btn-cancel:hover,
+:global(body[data-theme='dark']) .btn-close-modal:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: #60a5fa;
+}
 .mini-icon {
   display: inline-flex;
   align-items: center;
@@ -622,6 +710,13 @@ function openRelease() {
   color: #111827;
   background: rgba(255, 255, 255, 0.6);
 }
+:global(body[data-theme='dark']) .mini-icon {
+  color: #94a3b8;
+}
+:global(body[data-theme='dark']) .mini-icon:hover {
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.9);
+}
 .mini-icon svg {
   width: 14px;
   height: 14px;
@@ -633,6 +728,15 @@ function openRelease() {
 }
 .version-box:hover {
   color: #374151;
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(203, 213, 225, 0.98);
+  box-shadow: 0 8px 18px rgba(148, 163, 184, 0.12);
+}
+:global(body[data-theme='dark']) .version-box:hover {
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(96, 165, 250, 0.4);
+  box-shadow: 0 10px 20px rgba(2, 6, 23, 0.28);
 }
 .version-box:disabled {
   opacity: 0.65;
@@ -656,19 +760,181 @@ function openRelease() {
 .btn-close-modal:hover { background: #f3f4f6; border-color: #9ca3af; }
 .settings-toast {
   position: fixed;
-  top: 20px;
+  top: 18px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 10px 14px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(14px);
+  border: 1px solid transparent;
+  max-width: min(520px, calc(100vw - 24px));
+  word-break: break-word;
   pointer-events: none;
+  transform-origin: top center;
 }
-.settings-toast.ok { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
-.settings-toast.err { background: #fff1f2; color: #991b1b; border: 1px solid #fecaca; }
-.toast-enter-active, .toast-leave-active { transition: opacity 0.25s, transform 0.25s; }
-.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+.settings-toast.ok {
+  background: linear-gradient(135deg, rgba(240, 253, 244, 0.98), rgba(220, 252, 231, 0.96));
+  color: #166534;
+  border-color: rgba(110, 231, 183, 0.92);
+  box-shadow: 0 14px 28px rgba(34, 197, 94, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+  animation: settingsToastSuccessPulse 0.42s ease-out;
+}
+.settings-toast.err {
+  background: linear-gradient(135deg, rgba(255, 241, 242, 0.98), rgba(255, 228, 230, 0.96));
+  color: #991b1b;
+  border-color: rgba(253, 164, 175, 0.9);
+  box-shadow: 0 14px 28px rgba(239, 68, 68, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+}
+.settings-toast.theme-dark.ok {
+  background: linear-gradient(135deg, rgba(9, 59, 44, 0.94), rgba(13, 78, 58, 0.92));
+  color: #d1fae5;
+  border-color: rgba(52, 211, 153, 0.5);
+  box-shadow: 0 16px 34px rgba(5, 150, 105, 0.22), 0 0 0 1px rgba(167, 243, 208, 0.08) inset;
+}
+.settings-toast.theme-dark.err {
+  background: linear-gradient(135deg, rgba(76, 20, 27, 0.94), rgba(101, 26, 37, 0.92));
+  color: #fee2e2;
+  border-color: rgba(251, 113, 133, 0.42);
+  box-shadow: 0 16px 34px rgba(190, 24, 93, 0.18), 0 0 0 1px rgba(255, 228, 230, 0.06) inset;
+}
+:global(body[data-theme='dark']) .settings-toast.ok {
+  background: linear-gradient(135deg, rgba(9, 59, 44, 0.94), rgba(13, 78, 58, 0.92));
+  color: #d1fae5;
+  border-color: rgba(52, 211, 153, 0.5);
+  box-shadow: 0 16px 34px rgba(5, 150, 105, 0.22), 0 0 0 1px rgba(167, 243, 208, 0.08) inset;
+}
+:global(body[data-theme='dark']) .settings-toast.err {
+  background: linear-gradient(135deg, rgba(76, 20, 27, 0.94), rgba(101, 26, 37, 0.92));
+  color: #fee2e2;
+  border-color: rgba(251, 113, 133, 0.42);
+  box-shadow: 0 16px 34px rgba(190, 24, 93, 0.18), 0 0 0 1px rgba(255, 228, 230, 0.06) inset;
+}
+.toast-enter-active,
+.toast-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease, filter 0.22s ease;
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-10px) scale(0.97);
+  filter: blur(3px);
+}
+
+@keyframes settingsToastSuccessPulse {
+  0% {
+    transform: translateX(-50%) translateY(-3px) scale(0.985);
+  }
+
+  58% {
+    transform: translateX(-50%) translateY(0) scale(1.018);
+  }
+
+  100% {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes settingsSaveFlashPulse {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+
+  48% {
+    transform: translateY(-1px) scale(1.02);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+.settings-panel.theme-dark {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.985) 0%, rgba(11, 18, 32, 0.995) 100%);
+}
+
+.settings-panel.theme-dark .settings-header {
+  border-bottom-color: rgba(51, 65, 85, 0.9);
+  color: #e2e8f0;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.92));
+}
+
+.settings-panel.theme-dark .btn-close {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(71, 85, 105, 0.96);
+  color: #94a3b8;
+}
+
+.settings-panel.theme-dark .section-title {
+  color: #94a3b8;
+  background: rgba(30, 41, 59, 0.92);
+  border-color: rgba(51, 65, 85, 0.9);
+  box-shadow: none;
+}
+
+.settings-panel.theme-dark .setting-item {
+  border-color: rgba(51, 65, 85, 0.88);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 8px 18px rgba(2, 6, 23, 0.18);
+}
+
+.settings-panel.theme-dark .label-text {
+  color: #e2e8f0;
+}
+
+.settings-panel.theme-dark .label-hint,
+.settings-panel.theme-dark .unit {
+  color: #94a3b8;
+}
+
+.settings-panel.theme-dark .input-unit input,
+.settings-panel.theme-dark .lang-select,
+.settings-panel.theme-dark .text-input {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(15, 23, 42, 0.94);
+  color: #e2e8f0;
+}
+
+.settings-panel.theme-dark .settings-footer {
+  border-top-color: rgba(51, 65, 85, 0.88);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.98));
+}
+
+.settings-panel.theme-dark .version-box {
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(71, 85, 105, 0.96);
+}
+
+.settings-panel.theme-dark .version-box:hover {
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(96, 165, 250, 0.4);
+  box-shadow: 0 10px 20px rgba(2, 6, 23, 0.28);
+}
+
+.settings-panel.theme-dark .btn-cancel,
+.settings-panel.theme-dark .btn-close-modal {
+  background: rgba(15, 23, 42, 0.94);
+  color: #cbd5e1;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+
+.settings-panel.theme-dark .btn-cancel:hover,
+.settings-panel.theme-dark .btn-close-modal:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: #60a5fa;
+}
+
+.settings-panel.theme-dark .mini-icon {
+  color: #94a3b8;
+}
+
+.settings-panel.theme-dark .mini-icon:hover {
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.9);
+}
 </style>

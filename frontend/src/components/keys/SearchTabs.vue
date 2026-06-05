@@ -1,5 +1,5 @@
 <template>
-  <div class="search-tabs" v-if="sessions.length > 0">
+  <div class="search-tabs" :class="`theme-${settingsStore.themeMode || 'light'}`" v-if="sessions.length > 0">
     <div class="tabs-bar">
       <div
         v-for="s in sessions"
@@ -16,9 +16,11 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 
 const workspaceStore = useWorkspaceStore()
+const settingsStore = useSettingsStore()
 const sessions = computed(() => workspaceStore.searchSessions)
 const activeSessionId = computed(() => workspaceStore.activeSessionId)
 </script>
@@ -63,4 +65,53 @@ const activeSessionId = computed(() => workspaceStore.activeSessionId)
   line-height: 1;
 }
 .tab-close:hover { color: #e53e3e; }
+:global(.app-layout.theme-dark) .search-tabs {
+  border-bottom-color: rgba(51, 65, 85, 0.92);
+  background: rgba(11, 18, 32, 0.995);
+}
+:global(.app-layout.theme-dark) .tab {
+  color: #94a3b8;
+  border-right-color: rgba(51, 65, 85, 0.92);
+}
+:global(.app-layout.theme-dark) .tab:hover {
+  background: rgba(30, 41, 59, 0.98);
+}
+:global(.app-layout.theme-dark) .tab.active {
+  background: rgba(17, 24, 39, 0.995);
+  color: #93c5fd;
+  border-bottom-color: #60a5fa;
+}
+:global(.app-layout.theme-dark) .tab-close {
+  color: #64748b;
+}
+:global(.app-layout.theme-dark) .tab-close:hover {
+  color: #fca5a5;
+}
+.search-tabs.theme-dark {
+  border-bottom-color: rgba(51, 65, 85, 0.92);
+  background: rgba(11, 18, 32, 0.995);
+}
+
+.search-tabs.theme-dark .tab {
+  color: #94a3b8;
+  border-right-color: rgba(51, 65, 85, 0.92);
+}
+
+.search-tabs.theme-dark .tab:hover {
+  background: rgba(30, 41, 59, 0.98);
+}
+
+.search-tabs.theme-dark .tab.active {
+  background: rgba(17, 24, 39, 0.995);
+  color: #93c5fd;
+  border-bottom-color: #60a5fa;
+}
+
+.search-tabs.theme-dark .tab-close {
+  color: #64748b;
+}
+
+.search-tabs.theme-dark .tab-close:hover {
+  color: #fca5a5;
+}
 </style>

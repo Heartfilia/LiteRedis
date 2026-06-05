@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="show" class="expand-overlay" @click.self="onClose">
+    <div v-if="show" class="expand-overlay" :class="themeClass" @click.self="onClose">
       <div class="expand-modal">
         <div class="expand-header">
           <span class="expand-title" :title="title">{{ title }}</span>
@@ -8,7 +8,7 @@
             <button v-if="editable && !saving" class="btn-save-modal" @click="onSave">
               💾 {{ t('keyEditor.save') }}
             </button>
-            <button class="btn-copy-modal" @click="copy">
+            <button class="btn-copy-modal" :class="{ copied }" @click="copy">
               {{ copied ? '✓ ' + t('keyEditor.copied') : '📋 ' + t('keyEditor.copy') }}
             </button>
             <button class="btn-close-modal" @click="onClose" :title="t('keyEditor.close')">✕</button>
@@ -29,11 +29,13 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from '../../i18n/index.js'
+import { useSettingsStore } from '../../stores/settings.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 
 const { t } = useI18n()
+const settingsStore = useSettingsStore()
 
 const props = defineProps({
   show:    { type: Boolean, default: false },
@@ -47,6 +49,7 @@ const emit = defineEmits(['close', 'save'])
 
 const localContent = ref(props.content)
 const copied = ref(false)
+const themeClass = computed(() => `theme-${settingsStore.themeMode || 'light'}`)
 
 watch(() => props.show, (v) => {
   if (v) localContent.value = props.content
@@ -91,7 +94,13 @@ async function copy() {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(226, 232, 240, 0.84);
+  box-shadow: 0 28px 56px rgba(15, 23, 42, 0.2), 0 10px 24px rgba(148, 163, 184, 0.08);
+}
+:global(body[data-theme='dark']) .expand-modal {
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(51, 65, 85, 0.82);
+  box-shadow: 0 30px 60px rgba(2, 6, 23, 0.5), 0 10px 24px rgba(2, 6, 23, 0.2);
 }
 .expand-header {
   display: flex;
@@ -103,6 +112,10 @@ async function copy() {
   border-radius: 10px 10px 0 0;
   flex-shrink: 0;
 }
+:global(body[data-theme='dark']) .expand-header {
+  border-bottom-color: rgba(51, 65, 85, 0.9);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.94));
+}
 .expand-title {
   font-family: monospace;
   font-size: 13px;
@@ -112,6 +125,9 @@ async function copy() {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 600px;
+}
+:global(body[data-theme='dark']) .expand-title {
+  color: #93c5fd;
 }
 .expand-header-actions {
   display: flex;
@@ -142,6 +158,29 @@ async function copy() {
 }
 .btn-save-modal:hover { background: #2563eb; }
 .btn-copy-modal:hover { background: #f3f4f6; border-color: #9ca3af; }
+.btn-copy-modal.copied {
+  background: rgba(191, 219, 254, 0.96);
+  color: #1d4ed8;
+  border-color: rgba(96, 165, 250, 0.92);
+  transform: translateY(-1px);
+  animation: copyPulse 0.26s ease;
+}
+:global(body[data-theme='dark']) .btn-copy-modal {
+  background: rgba(15, 23, 42, 0.94);
+  color: #cbd5e1;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+:global(body[data-theme='dark']) .btn-copy-modal.copied {
+  background: rgba(30, 64, 175, 0.34);
+  color: #dbeafe;
+  border-color: rgba(147, 197, 253, 0.72);
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.2);
+}
+:global(body[data-theme='dark']) .btn-copy-modal:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: #60a5fa;
+  color: #e2e8f0;
+}
 .btn-close-modal {
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 30px;
@@ -157,6 +196,15 @@ async function copy() {
   transition: color 0.12s, border-color 0.12s;
 }
 .btn-close-modal:hover { color: #dc2626; border-color: #fca5a5; background: #fff1f2; }
+:global(body[data-theme='dark']) .btn-close-modal {
+  border-color: rgba(71, 85, 105, 0.96);
+  color: #94a3b8;
+}
+:global(body[data-theme='dark']) .btn-close-modal:hover {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.42);
+  background: rgba(127, 29, 29, 0.56);
+}
 .expand-body {
   flex: 1;
   overflow-y: auto;
@@ -170,6 +218,9 @@ async function copy() {
   font-size: 13px;
   line-height: 1.7;
   color: #1f2937;
+}
+:global(body[data-theme='dark']) .expand-content {
+  color: #e2e8f0;
 }
 .expand-textarea {
   width: 100%;
@@ -186,6 +237,11 @@ async function copy() {
   outline: none;
   box-sizing: border-box;
 }
+:global(body[data-theme='dark']) .expand-textarea {
+  background: rgba(15, 23, 42, 0.94);
+  color: #e2e8f0;
+  border-color: rgba(71, 85, 105, 0.96);
+}
 .expand-textarea:focus {
   border-color: #3b82f6;
   box-shadow: 0 0 0 2px rgba(59,130,246,.15);
@@ -193,5 +249,73 @@ async function copy() {
 .expand-textarea:disabled {
   background: #f9fafb;
   color: #9ca3af;
+}
+:global(body[data-theme='dark']) .expand-textarea:disabled {
+  background: rgba(30, 41, 59, 0.9);
+  color: #64748b;
+}
+.expand-overlay.theme-dark .expand-modal {
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(51, 65, 85, 0.82);
+  box-shadow: 0 30px 60px rgba(2, 6, 23, 0.5), 0 10px 24px rgba(2, 6, 23, 0.2);
+}
+
+.expand-overlay.theme-dark .expand-header {
+  border-bottom-color: rgba(51, 65, 85, 0.9);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.94));
+}
+
+.expand-overlay.theme-dark .expand-title {
+  color: #93c5fd;
+}
+
+.expand-overlay.theme-dark .btn-copy-modal {
+  background: rgba(15, 23, 42, 0.94);
+  color: #cbd5e1;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+.expand-overlay.theme-dark .btn-copy-modal.copied {
+  background: rgba(30, 64, 175, 0.34);
+  color: #dbeafe;
+  border-color: rgba(147, 197, 253, 0.72);
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.2);
+}
+
+.expand-overlay.theme-dark .btn-copy-modal:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: #60a5fa;
+  color: #e2e8f0;
+}
+
+.expand-overlay.theme-dark .btn-close-modal {
+  border-color: rgba(71, 85, 105, 0.96);
+  color: #94a3b8;
+}
+
+.expand-overlay.theme-dark .btn-close-modal:hover {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.42);
+  background: rgba(127, 29, 29, 0.56);
+}
+
+.expand-overlay.theme-dark .expand-content {
+  color: #e2e8f0;
+}
+
+.expand-overlay.theme-dark .expand-textarea {
+  background: rgba(15, 23, 42, 0.94);
+  color: #e2e8f0;
+  border-color: rgba(71, 85, 105, 0.96);
+}
+
+.expand-overlay.theme-dark .expand-textarea:disabled {
+  background: rgba(30, 41, 59, 0.9);
+  color: #64748b;
+}
+
+@keyframes copyPulse {
+  0% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-1px) scale(1.012); }
+  100% { transform: translateY(-1px) scale(1); }
 }
 </style>

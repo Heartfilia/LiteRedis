@@ -1,5 +1,5 @@
 <template>
-  <div ref="mainContentRef" class="main-content">
+  <div ref="mainContentRef" class="main-content" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <div class="key-tree-panel" :style="{ width: panelWidth + 'px' }">
       <KeyTree />
     </div>
@@ -136,9 +136,9 @@ function startResize(e) {
   flex: 0 1 auto;
   user-select: none;
   -webkit-user-select: none;
-  border: 1px solid rgba(214, 224, 236, 0.9);
+  border: 1px solid var(--app-panel-border);
   border-radius: 15px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--app-panel-bg);
   box-shadow: 0 14px 30px rgba(148, 163, 184, 0.16);
   backdrop-filter: blur(14px);
 }
@@ -165,9 +165,9 @@ function startResize(e) {
   display: flex;
   flex-direction: column;
   position: relative;
-  border: 1px solid rgba(214, 224, 236, 0.9);
+  border: 1px solid var(--app-panel-border);
   border-radius: 15px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--app-panel-bg);
   box-shadow: 0 18px 36px rgba(148, 163, 184, 0.14);
   backdrop-filter: blur(14px);
 }
@@ -197,5 +197,25 @@ function startResize(e) {
 .key-editor-panel > :not(.editor-watermark-layer) {
   position: relative;
   z-index: 1;
+}
+:global(body[data-theme='dark']) .key-tree-panel,
+:global(body[data-theme='dark']) .key-editor-panel {
+  backdrop-filter: none;
+  box-shadow: 0 20px 42px rgba(2, 6, 23, 0.34);
+}
+.main-content.theme-dark .key-tree-panel,
+.main-content.theme-dark .key-editor-panel {
+  backdrop-filter: none;
+  box-shadow: 0 20px 42px rgba(2, 6, 23, 0.34);
+}
+
+.main-content.theme-dark .key-tree-panel {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.985), rgba(11, 18, 32, 0.995));
+  border-color: rgba(51, 65, 85, 0.92);
+}
+
+.main-content.theme-dark .key-editor-panel {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.99), rgba(2, 6, 23, 0.995));
+  border-color: rgba(51, 65, 85, 0.92);
 }
 </style>
