@@ -135,9 +135,9 @@
 
       <!-- 重命名输入 -->
       <div v-if="renamingKey" class="rename-bar">
-        <input v-model="newKeyName" :placeholder="t('keyEditor.renameInput')" @keydown.enter="doRename" @keydown.esc="renamingKey = false" />
-        <button class="btn-xs" @click="doRename">{{ t('keyEditor.renameConfirm') }}</button>
-        <button class="btn-xs" @click="renamingKey = false">{{ t('keyEditor.renameCancel') }}</button>
+        <input v-model="newKeyName" :placeholder="t('keyEditor.renameInput')" @keydown.enter="doRename" @keydown.esc="cancelRename" />
+        <button class="btn-xs" :disabled="!canConfirmRename" @click="doRename">{{ t('keyEditor.renameConfirm') }}</button>
+        <button class="btn-xs" @click="cancelRename">{{ t('keyEditor.renameCancel') }}</button>
         <span v-if="renameMsg" class="rename-msg">{{ renameMsg }}</span>
       </div>
 
@@ -227,16 +227,25 @@ async function saveTTL() {
 const renamingKey = ref(false)
 const newKeyName = ref('')
 const renameMsg = ref('')
+const canConfirmRename = computed(() => {
+  const next = newKeyName.value.trim()
+  return !!next && next !== (selectedKey.value || '')
+})
 function startRename() {
   newKeyName.value = selectedKey.value
   renamingKey.value = true
   renameMsg.value = ''
 }
+function cancelRename() {
+  renamingKey.value = false
+  newKeyName.value = ''
+  renameMsg.value = ''
+}
 async function doRename() {
-  if (!newKeyName.value.trim()) return
+  if (!canConfirmRename.value) return
   const result = await workspaceStore.renameCurrentKey(newKeyName.value.trim())
   if (result?.success) {
-    renamingKey.value = false
+    cancelRename()
   } else {
     renameMsg.value = result?.message || t('keyEditor.renameFailed')
   }
@@ -311,6 +320,10 @@ watch(() => keyValue.value?.ttl, (ttl) => {
     }, 1000)
   }
 }, { immediate: true })
+
+watch(selectedKey, () => {
+  cancelRename()
+})
 
 onBeforeUnmount(() => {
   if (ttlTimer) { clearInterval(ttlTimer); ttlTimer = null }

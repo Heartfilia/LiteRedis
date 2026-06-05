@@ -5,7 +5,7 @@
     <div class="editor-actions">
       <button class="btn-action" :class="{ copied }" @click="copyValue">{{ copied ? '✓ ' + t('keyEditor.copied') : t('keyEditor.copy') }}</button>
       <button
-        :class="[isDirty ? 'btn-primary' : 'btn-action', { 'success-flash': saveFlashing }]"
+        :class="[isDirty ? 'btn-primary' : 'btn-action', { 'success-flash': saveFlashing, 'error-flash': errorFlashing }]"
         @click="save"
         :disabled="saving || !isDirty"
       >
@@ -38,12 +38,19 @@ const msg = ref('')
 const ok = ref(true)
 const copied = ref(false)
 const saveFlashing = ref(false)
+const errorFlashing = ref(false)
 const originalVal = ref(props.keyValue?.string_val || '')
 const isDirty = computed(() => localVal.value !== originalVal.value)
 let saveFlashTimer = null
+let errorFlashTimer = null
 
 function triggerSaveFlash() {
   if (saveFlashTimer) clearTimeout(saveFlashTimer)
+  if (errorFlashTimer) {
+    clearTimeout(errorFlashTimer)
+    errorFlashTimer = null
+  }
+  errorFlashing.value = false
   saveFlashing.value = true
   saveFlashTimer = setTimeout(() => {
     saveFlashing.value = false
@@ -51,11 +58,26 @@ function triggerSaveFlash() {
   }, 1100)
 }
 
+function triggerErrorFlash() {
+  if (errorFlashTimer) clearTimeout(errorFlashTimer)
+  if (saveFlashTimer) {
+    clearTimeout(saveFlashTimer)
+    saveFlashTimer = null
+  }
+  saveFlashing.value = false
+  errorFlashing.value = true
+  errorFlashTimer = setTimeout(() => {
+    errorFlashing.value = false
+    errorFlashTimer = null
+  }, 1300)
+}
+
 async function handleConnectionFailure(error) {
   if (!isConnectionErrorMessage(error)) return false
   await connectionsStore.handleConnectionFailure(workspaceStore.activeConnID, error)
   ok.value = false
   msg.value = formatConnectionLostMessage(error)
+  triggerErrorFlash()
   return true
 }
 
@@ -84,11 +106,14 @@ async function save() {
     if (result.success) {
       originalVal.value = localVal.value
       triggerSaveFlash()
+    } else {
+      triggerErrorFlash()
     }
   } catch(e) {
     if (!(await handleConnectionFailure(e))) {
       ok.value = false
       msg.value = e.message || String(e)
+      triggerErrorFlash()
     }
   } finally {
     saving.value = false
@@ -204,6 +229,14 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1
   box-shadow: 0 0 0 1px rgba(187, 247, 208, 0.7) inset, 0 8px 18px rgba(34, 197, 94, 0.14);
   animation: successFlashPulse 0.42s ease;
 }
+.btn-primary.error-flash,
+.btn-action.error-flash {
+  background: rgba(255, 241, 242, 0.98);
+  color: #991b1b;
+  border-color: rgba(253, 164, 175, 0.9);
+  box-shadow: 0 0 0 1px rgba(254, 202, 202, 0.78) inset, 0 8px 18px rgba(239, 68, 68, 0.14);
+  animation: errorFlashPulse 0.48s ease;
+}
 :global(.app-layout.theme-dark) .string-editor .btn-primary {
   box-shadow: 0 8px 18px rgba(30, 64, 175, 0.22);
 }
@@ -213,6 +246,13 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1
   color: #d1fae5;
   border-color: rgba(52, 211, 153, 0.5);
   box-shadow: 0 0 0 1px rgba(167, 243, 208, 0.08) inset, 0 10px 22px rgba(5, 150, 105, 0.22);
+}
+:global(.app-layout.theme-dark) .string-editor .btn-primary.error-flash,
+:global(.app-layout.theme-dark) .string-editor .btn-action.error-flash {
+  background: rgba(76, 20, 27, 0.94);
+  color: #ffe4e6;
+  border-color: rgba(251, 113, 133, 0.42);
+  box-shadow: 0 0 0 1px rgba(255, 228, 230, 0.06) inset, 0 10px 22px rgba(190, 24, 93, 0.18);
 }
 :global(.app-layout.theme-dark) .string-editor .btn-primary:hover {
   background: #2563eb;
@@ -253,6 +293,24 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1
 
   48% {
     transform: translateY(-1px) scale(1.02);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes errorFlashPulse {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+
+  38% {
+    transform: translateY(-1px) scale(1.015);
+  }
+
+  72% {
+    transform: translateY(0) scale(0.995);
   }
 
   100% {

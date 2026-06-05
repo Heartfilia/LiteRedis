@@ -5,7 +5,7 @@
         <div class="expand-header">
           <span class="expand-title" :title="title">{{ title }}</span>
           <div class="expand-header-actions">
-            <button v-if="editable && !saving" class="btn-save-modal" @click="onSave">
+            <button v-if="editable && !saving" class="btn-save-modal" :class="{ 'success-flash': saveFlashing, 'error-flash': errorFlashing }" @click="onSave">
               💾 {{ t('keyEditor.save') }}
             </button>
             <button class="btn-copy-modal" :class="{ copied }" @click="copy">
@@ -49,15 +49,54 @@ const emit = defineEmits(['close', 'save'])
 
 const localContent = ref(props.content)
 const copied = ref(false)
+const saveFlashing = ref(false)
+const errorFlashing = ref(false)
 const themeClass = computed(() => `theme-${settingsStore.themeMode || 'light'}`)
+let saveFlashTimer = null
+let errorFlashTimer = null
 
 watch(() => props.show, (v) => {
   if (v) localContent.value = props.content
   copied.value = false
+  if (!v) {
+    saveFlashing.value = false
+    errorFlashing.value = false
+  }
 })
 
 watch(() => props.content, (v) => {
   if (props.show) localContent.value = v
+})
+
+watch(() => props.saving, (saving, previous) => {
+  if (previous && !saving && props.show) {
+    const success = localContent.value === props.content
+    if (success) {
+      if (saveFlashTimer) clearTimeout(saveFlashTimer)
+      if (errorFlashTimer) {
+        clearTimeout(errorFlashTimer)
+        errorFlashTimer = null
+      }
+      errorFlashing.value = false
+      saveFlashing.value = true
+      saveFlashTimer = setTimeout(() => {
+        saveFlashing.value = false
+        saveFlashTimer = null
+      }, 1100)
+    } else {
+      if (errorFlashTimer) clearTimeout(errorFlashTimer)
+      if (saveFlashTimer) {
+        clearTimeout(saveFlashTimer)
+        saveFlashTimer = null
+      }
+      saveFlashing.value = false
+      errorFlashing.value = true
+      errorFlashTimer = setTimeout(() => {
+        errorFlashing.value = false
+        errorFlashTimer = null
+      }, 1300)
+    }
+  }
 })
 
 function onClose() {
@@ -157,6 +196,20 @@ async function copy() {
   border-color: #3b82f6;
 }
 .btn-save-modal:hover { background: #2563eb; }
+.btn-save-modal.success-flash {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.96), rgba(22, 163, 74, 0.96));
+  color: #f0fdf4;
+  border-color: rgba(22, 163, 74, 0.98);
+  box-shadow: 0 10px 24px rgba(34, 197, 94, 0.2), 0 0 0 1px rgba(220, 252, 231, 0.22) inset;
+  animation: modalSaveFlashPulse 0.42s ease;
+}
+.btn-save-modal.error-flash {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.96), rgba(220, 38, 38, 0.96));
+  color: #fff7f7;
+  border-color: rgba(220, 38, 38, 0.98);
+  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.18), 0 0 0 1px rgba(254, 202, 202, 0.18) inset;
+  animation: modalErrorFlashPulse 0.48s ease;
+}
 .btn-copy-modal:hover { background: #f3f4f6; border-color: #9ca3af; }
 .btn-copy-modal.copied {
   background: rgba(191, 219, 254, 0.96);
@@ -287,6 +340,20 @@ async function copy() {
   color: #e2e8f0;
 }
 
+.expand-overlay.theme-dark .btn-save-modal.success-flash {
+  background: linear-gradient(135deg, rgba(9, 59, 44, 0.98), rgba(13, 78, 58, 0.96));
+  color: #d1fae5;
+  border-color: rgba(52, 211, 153, 0.44);
+  box-shadow: 0 12px 26px rgba(5, 150, 105, 0.22), 0 0 0 1px rgba(167, 243, 208, 0.08) inset;
+}
+
+.expand-overlay.theme-dark .btn-save-modal.error-flash {
+  background: linear-gradient(135deg, rgba(76, 20, 27, 0.98), rgba(127, 29, 29, 0.96));
+  color: #ffe4e6;
+  border-color: rgba(251, 113, 133, 0.42);
+  box-shadow: 0 12px 26px rgba(190, 24, 93, 0.18), 0 0 0 1px rgba(255, 228, 230, 0.06) inset;
+}
+
 .expand-overlay.theme-dark .btn-close-modal {
   border-color: rgba(71, 85, 105, 0.96);
   color: #94a3b8;
@@ -317,5 +384,18 @@ async function copy() {
   0% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-1px) scale(1.012); }
   100% { transform: translateY(-1px) scale(1); }
+}
+
+@keyframes modalSaveFlashPulse {
+  0% { transform: translateY(0) scale(1); }
+  48% { transform: translateY(-1px) scale(1.02); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes modalErrorFlashPulse {
+  0% { transform: translateY(0) scale(1); }
+  38% { transform: translateY(-1px) scale(1.015); }
+  72% { transform: translateY(0) scale(0.995); }
+  100% { transform: translateY(0) scale(1); }
 }
 </style>

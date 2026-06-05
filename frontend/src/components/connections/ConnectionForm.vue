@@ -177,10 +177,10 @@
 
     <div class="form-actions">
       <button class="btn-secondary" @click="$emit('cancel')">{{ t('connManager.cancel') }}</button>
-      <button class="btn-secondary" :disabled="testing" @click="handleTest">
+      <button class="btn-secondary" :class="{ 'error-flash': testErrorFlashing }" :disabled="testing" @click="handleTest">
         {{ testing ? t('connManager.testing') : t('connManager.testConn') }}
       </button>
-      <button class="btn-primary" :disabled="saving || !isDirty" :class="{ disabled: saving || !isDirty }" @click="handleSave">
+      <button class="btn-primary" :disabled="saving || !isDirty" :class="{ disabled: saving || !isDirty, 'success-flash': saveFlashing, 'error-flash': saveErrorFlashing }" @click="handleSave">
         {{ saving ? t('connManager.saving') : t('connManager.save') }}
       </button>
     </div>
@@ -331,6 +331,49 @@ const testMsg = ref('')
 const testOk = ref(false)
 const saveOkMsg = ref('')
 const saveMsg = ref('')
+const saveFlashing = ref(false)
+const saveErrorFlashing = ref(false)
+const testErrorFlashing = ref(false)
+let saveFlashTimer = null
+let saveErrorFlashTimer = null
+let testErrorFlashTimer = null
+
+function triggerSaveFlash() {
+  if (saveFlashTimer) clearTimeout(saveFlashTimer)
+  if (saveErrorFlashTimer) {
+    clearTimeout(saveErrorFlashTimer)
+    saveErrorFlashTimer = null
+  }
+  saveErrorFlashing.value = false
+  saveFlashing.value = true
+  saveFlashTimer = setTimeout(() => {
+    saveFlashing.value = false
+    saveFlashTimer = null
+  }, 1100)
+}
+
+function triggerSaveErrorFlash() {
+  if (saveErrorFlashTimer) clearTimeout(saveErrorFlashTimer)
+  if (saveFlashTimer) {
+    clearTimeout(saveFlashTimer)
+    saveFlashTimer = null
+  }
+  saveFlashing.value = false
+  saveErrorFlashing.value = true
+  saveErrorFlashTimer = setTimeout(() => {
+    saveErrorFlashing.value = false
+    saveErrorFlashTimer = null
+  }, 1300)
+}
+
+function triggerTestErrorFlash() {
+  if (testErrorFlashTimer) clearTimeout(testErrorFlashTimer)
+  testErrorFlashing.value = true
+  testErrorFlashTimer = setTimeout(() => {
+    testErrorFlashing.value = false
+    testErrorFlashTimer = null
+  }, 1300)
+}
 
 function buildCfg() {
   const cfg = {
@@ -377,9 +420,13 @@ async function handleTest() {
     testMsg.value = result.success
       ? '✓ ' + formatDebugMessage(result.message, t('connManager.testOk'))
       : '✗ ' + formatDebugMessage(result.message, t('connManager.testFailed'))
+    if (!result.success) {
+      triggerTestErrorFlash()
+    }
   } catch (e) {
     testOk.value = false
     testMsg.value = '✗ ' + formatDebugMessage(e.message || String(e), t('connManager.testFailed'))
+    triggerTestErrorFlash()
   } finally {
     testing.value = false
   }
@@ -397,13 +444,16 @@ async function handleSave() {
     const result = await connectionsStore.save(buildCfg())
     if (result.success) {
       saveOkMsg.value = t('connManager.saveOk')
+      triggerSaveFlash()
       initialSnapshot.value = snapshotValue()
       emit('saved')
     } else {
       saveMsg.value = formatDebugMessage(result.message, t('connManager.saveFailed'))
+      triggerSaveErrorFlash()
     }
   } catch (e) {
     saveMsg.value = formatDebugMessage(e.message || String(e), t('connManager.saveFailed'))
+    triggerSaveErrorFlash()
   } finally {
     saving.value = false
   }
@@ -639,6 +689,20 @@ textarea { resize: vertical; font-family: monospace; }
 .btn-primary:hover { background: #2563eb; }
 .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
 .btn-primary.disabled:hover { background: #93c5fd; }
+.btn-primary.success-flash {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.96), rgba(22, 163, 74, 0.96));
+  color: #f0fdf4;
+  box-shadow: 0 10px 24px rgba(34, 197, 94, 0.2), 0 0 0 1px rgba(220, 252, 231, 0.22) inset;
+  animation: formSaveFlashPulse 0.42s ease;
+}
+.btn-primary.error-flash,
+.btn-secondary.error-flash {
+  background: rgba(255, 241, 242, 0.98);
+  color: #991b1b;
+  border-color: rgba(253, 164, 175, 0.9);
+  box-shadow: 0 0 0 1px rgba(254, 202, 202, 0.78) inset, 0 8px 18px rgba(239, 68, 68, 0.14);
+  animation: formErrorFlashPulse 0.48s ease;
+}
 .btn-secondary {
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 32px;
@@ -744,5 +808,32 @@ textarea { resize: vertical; font-family: monospace; }
 .connection-form.theme-dark .btn-secondary:hover {
   background: rgba(30, 41, 59, 0.96);
   border-color: #60a5fa;
+}
+
+.connection-form.theme-dark .btn-primary.success-flash {
+  background: linear-gradient(135deg, rgba(9, 59, 44, 0.98), rgba(13, 78, 58, 0.96));
+  color: #d1fae5;
+  box-shadow: 0 12px 26px rgba(5, 150, 105, 0.22), 0 0 0 1px rgba(167, 243, 208, 0.08) inset;
+}
+
+.connection-form.theme-dark .btn-primary.error-flash,
+.connection-form.theme-dark .btn-secondary.error-flash {
+  background: rgba(76, 20, 27, 0.96);
+  color: #ffe4e6;
+  border-color: rgba(251, 113, 133, 0.42);
+  box-shadow: 0 0 0 1px rgba(255, 228, 230, 0.06) inset, 0 10px 22px rgba(190, 24, 93, 0.18);
+}
+
+@keyframes formSaveFlashPulse {
+  0% { transform: translateY(0) scale(1); }
+  48% { transform: translateY(-1px) scale(1.02); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes formErrorFlashPulse {
+  0% { transform: translateY(0) scale(1); }
+  38% { transform: translateY(-1px) scale(1.015); }
+  72% { transform: translateY(0) scale(0.995); }
+  100% { transform: translateY(0) scale(1); }
 }
 </style>

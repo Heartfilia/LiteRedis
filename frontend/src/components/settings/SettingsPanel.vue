@@ -232,7 +232,7 @@
       <div class="footer-actions">
         <button class="btn-cancel" @click="reset">{{ t('settings.reset') }}</button>
         <button class="btn-close-modal" @click="$emit('close')">{{ t('settings.close') }}</button>
-        <button class="btn-save" :class="{ 'success-flash': saveFlashing }" :disabled="saving" @click="doSave">{{ saving ? t('settings.applying') : t('settings.apply') }}</button>
+        <button class="btn-save" :class="{ 'success-flash': saveFlashing, 'error-flash': errorFlashing }" :disabled="saving" @click="doSave">{{ saving ? t('settings.applying') : t('settings.apply') }}</button>
       </div>
     </div>
   </div>
@@ -276,9 +276,11 @@ const hasUpdate = ref(false)
 const msg = ref('')
 const ok = ref(true)
 const saveFlashing = ref(false)
+const errorFlashing = ref(false)
 const titleTapCount = ref(0)
 let titleTapTimer = null
 let saveFlashTimer = null
+let errorFlashTimer = null
 
 onMounted(async () => {
   await settingsStore.load()
@@ -347,11 +349,30 @@ function handleTitleClick() {
 
 function triggerSaveFlash() {
   if (saveFlashTimer) clearTimeout(saveFlashTimer)
+  if (errorFlashTimer) {
+    clearTimeout(errorFlashTimer)
+    errorFlashTimer = null
+  }
+  errorFlashing.value = false
   saveFlashing.value = true
   saveFlashTimer = setTimeout(() => {
     saveFlashing.value = false
     saveFlashTimer = null
   }, 1100)
+}
+
+function triggerErrorFlash() {
+  if (errorFlashTimer) clearTimeout(errorFlashTimer)
+  if (saveFlashTimer) {
+    clearTimeout(saveFlashTimer)
+    saveFlashTimer = null
+  }
+  saveFlashing.value = false
+  errorFlashing.value = true
+  errorFlashTimer = setTimeout(() => {
+    errorFlashing.value = false
+    errorFlashTimer = null
+  }, 1300)
 }
 
 async function doSave() {
@@ -365,10 +386,13 @@ async function doSave() {
       setLanguage(form.language)
       triggerSaveFlash()
       setTimeout(() => { msg.value = '' }, 3000)
+    } else {
+      triggerErrorFlash()
     }
   } catch (e) {
     ok.value = false
     msg.value = e.message || String(e)
+    triggerErrorFlash()
   } finally {
     saving.value = false
   }
@@ -667,6 +691,22 @@ function openRelease() {
   color: #d1fae5;
   box-shadow: 0 12px 26px rgba(5, 150, 105, 0.22), 0 0 0 1px rgba(167, 243, 208, 0.08) inset;
 }
+.btn-save.error-flash {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.96), rgba(220, 38, 38, 0.96));
+  color: #fff7f7;
+  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.18), 0 0 0 1px rgba(254, 202, 202, 0.18) inset;
+  animation: settingsErrorFlashPulse 0.48s ease;
+}
+:global(body[data-theme='dark']) .btn-save.success-flash {
+  background: linear-gradient(135deg, rgba(9, 59, 44, 0.98), rgba(13, 78, 58, 0.96));
+  color: #d1fae5;
+  box-shadow: 0 12px 26px rgba(5, 150, 105, 0.22), 0 0 0 1px rgba(167, 243, 208, 0.08) inset;
+}
+:global(body[data-theme='dark']) .btn-save.error-flash {
+  background: linear-gradient(135deg, rgba(76, 20, 27, 0.98), rgba(127, 29, 29, 0.96));
+  color: #ffe4e6;
+  box-shadow: 0 12px 26px rgba(190, 24, 93, 0.18), 0 0 0 1px rgba(255, 228, 230, 0.06) inset;
+}
 .btn-cancel {
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 32px;
@@ -846,6 +886,24 @@ function openRelease() {
 
   48% {
     transform: translateY(-1px) scale(1.02);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes settingsErrorFlashPulse {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+
+  38% {
+    transform: translateY(-1px) scale(1.015);
+  }
+
+  72% {
+    transform: translateY(0) scale(0.995);
   }
 
   100% {

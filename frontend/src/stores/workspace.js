@@ -202,6 +202,27 @@ export const useWorkspaceStore = defineStore('workspace', {
       return inserted
     },
 
+    _updateKeyMetadata(keyName, patch) {
+      if (!keyName || !patch || typeof patch !== 'object') return false
+      let updated = false
+      this.searchSessions = this.searchSessions.map(session => {
+        let sessionUpdated = false
+        const nextKeys = session.keys.map(item => {
+          if (item?.name !== keyName) return item
+          updated = true
+          sessionUpdated = true
+          return { ...item, ...patch }
+        })
+        if (!sessionUpdated) return session
+        return {
+          ...session,
+          keys: nextKeys,
+          treeData: buildKeyTree(nextKeys),
+        }
+      })
+      return updated
+    },
+
     setActiveConn(id, name, initDB = 0) {
       // 保存当前连接的状态快照
       if (this.activeConnID) {
@@ -620,7 +641,8 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     async renameCurrentKey(newKey) {
       if (!this.selectedKey || !this.activeConnID) return
-      const result = await renameKey(this.activeConnID, this.selectedKey, newKey)
+      const oldKey = this.selectedKey
+      const result = await renameKey(this.activeConnID, oldKey, newKey)
       if (!result.success && isConnectionErrorMessage(result.message)) {
         return await this._handleConnectionFailure(result.message)
       }
@@ -642,6 +664,9 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
       if (result.success && this.keyValue) {
         this.keyValue.ttl = ttlSec
+        this._updateKeyMetadata(this.selectedKey, {
+          ttl: Number.isFinite(ttlSec) && ttlSec > 0 ? ttlSec : -1,
+        })
       }
       return result
     },
