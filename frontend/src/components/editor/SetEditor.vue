@@ -14,8 +14,9 @@
           {{ isSearching ? '…' : (searchResults !== null ? t('keyEditor.refresh') : t('keyTree.searchBtn')) }}
         </button>
         <button v-if="searchResults !== null" class="btn-clear-search" @click="clearSearch">✕</button>
-        <label class="fuzzy-check" title="模糊搜索需要内容自行带*">
-          <input v-model="fuzzySearch" type="checkbox" />
+        <label class="fuzzy-check" :class="{ active: fuzzySearch, disabled: !canToggleFuzzy }" title="模糊搜索需要内容自行带*">
+          <input v-model="fuzzySearch" type="checkbox" :disabled="!canToggleFuzzy" />
+          <span class="fuzzy-indicator" aria-hidden="true" />
           {{ t('keyEditor.fuzzy') }}
         </label>
       </div>
@@ -107,6 +108,19 @@ const searchQuery   = ref('')
 const searchResults = ref(null)
 const isSearching   = ref(false)
 const fuzzySearch   = ref(false)
+const canToggleFuzzy = computed(() => searchQuery.value.trim().length > 0)
+
+function appendWildcardIfNeeded() {
+  if (!searchQuery.value.includes('*')) {
+    searchQuery.value = `${searchQuery.value}*`
+  }
+}
+
+function removeAllWildcards() {
+  if (searchQuery.value.includes('*')) {
+    searchQuery.value = searchQuery.value.replaceAll('*', '')
+  }
+}
 
 // 排序状态
 const sortOrder = ref('none')
@@ -163,6 +177,20 @@ function persistSearchState(key = props.keyValue?.key || lastKey.value) {
 
 watch([searchQuery, fuzzySearch], () => {
   persistSearchState()
+})
+
+watch(fuzzySearch, (enabled) => {
+  if (enabled) {
+    appendWildcardIfNeeded()
+    return
+  }
+  removeAllWildcards()
+})
+
+watch(canToggleFuzzy, (enabled) => {
+  if (!enabled && fuzzySearch.value) {
+    fuzzySearch.value = false
+  }
 })
 
 onBeforeUnmount(() => {
@@ -398,8 +426,63 @@ async function removeMember(m) {
   line-height: 28px; box-sizing: border-box;
 }
 .search-input:focus { border-color: #3b82f6; }
-.fuzzy-check { display: flex; align-items: center; gap: 3px; font-size: 12px; color: #6b7280; cursor: pointer; margin-left: 4px; white-space: nowrap; }
-.fuzzy-check input { cursor: pointer; }
+.fuzzy-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  margin-left: 6px;
+  padding: 0 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #94a3b8;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+.fuzzy-check:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+}
+.fuzzy-check.active {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+  color: #2563eb;
+  box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.42);
+}
+.fuzzy-check.disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  background: #f8fafc;
+  color: #cbd5e1;
+  border-color: #e5e7eb;
+  box-shadow: none;
+}
+.fuzzy-check input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.fuzzy-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #d4dbe5;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+}
+.fuzzy-check.active .fuzzy-indicator {
+  background: #3b82f6;
+  transform: scale(1.08);
+}
+.fuzzy-check.disabled .fuzzy-indicator {
+  background: #e2e8f0;
+  transform: none;
+}
 .count { font-size: 12px; color: #9ca3af; margin-left: auto; white-space: nowrap; }
 .add-row { display: flex; gap: 6px; padding: 6px; background: #f9fafb; border-radius: 6px; border: 1px solid #e5e7eb; }
 .add-row input { flex: 1; padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 5px; font-size: 12px; outline: none; }
@@ -454,11 +537,11 @@ async function removeMember(m) {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
-  padding: 4px 12px;
-  margin: -8px -10px 0;
-  border-top: 1px solid #e8e8e8;
-  background: #fafafa;
+  min-height: 36px;
+  padding: 5px 14px;
+  margin: -7px -10px 0;
+  border-top: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95));
   flex-shrink: 0;
   box-sizing: border-box;
 }

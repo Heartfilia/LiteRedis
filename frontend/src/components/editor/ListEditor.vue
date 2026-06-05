@@ -488,11 +488,11 @@ async function addItem() {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
-  padding: 4px 12px;
-  margin: -8px -10px 0;
-  border-top: 1px solid #e8e8e8;
-  background: #fafafa;
+  min-height: 36px;
+  padding: 5px 14px;
+  margin: -7px -10px 0;
+  border-top: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95));
   flex-shrink: 0;
   box-sizing: border-box;
 }
