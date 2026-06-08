@@ -355,6 +355,13 @@ async function doSearch() {
   background: rgba(15, 23, 42, 0.98);
   box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.04);
 }
+:global(.app-layout.theme-dark) .search-input-shell input {
+  color: #e2e8f0;
+  caret-color: #93c5fd;
+}
+:global(.app-layout.theme-dark) .search-input-shell input::placeholder {
+  color: #64748b;
+}
 .search-input-shell input {
   flex: 1;
   min-width: 0;
@@ -472,6 +479,15 @@ async function doSearch() {
   border-color: rgba(51, 65, 85, 0.96);
   background: rgba(15, 23, 42, 0.98);
   box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.04);
+}
+
+.key-search-bar.theme-dark .search-input-shell input {
+  color: #e2e8f0;
+  caret-color: #93c5fd;
+}
+
+.key-search-bar.theme-dark .search-input-shell input::placeholder {
+  color: #64748b;
 }
 
 .key-search-bar.theme-dark .btn-search {
