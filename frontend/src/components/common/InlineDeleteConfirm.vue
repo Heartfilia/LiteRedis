@@ -357,30 +357,4 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-:global(body[data-theme='dark']) .delete-popover {
-  background: rgba(15, 23, 42, 0.98);
-  background-color: rgba(15, 23, 42, 0.98);
-  border-color: rgba(51, 65, 85, 0.82);
-  box-shadow: 0 20px 40px rgba(2, 6, 23, 0.46), 0 8px 18px rgba(2, 6, 23, 0.18);
-}
-
-:global(body[data-theme='dark']) .delete-popover-arrow {
-  background: rgba(15, 23, 42, 0.98);
-  background-color: rgba(15, 23, 42, 0.98);
-  border-left-color: rgba(51, 65, 85, 0.82);
-  border-top-color: rgba(51, 65, 85, 0.82);
-}
-
-:global(body[data-theme='dark']) .delete-popover-text {
-  color: #e2e8f0;
-}
-
-:global(body[data-theme='dark']) .delete-popover .btn-tiny {
-  background: rgba(30, 41, 59, 0.92);
-  color: #cbd5e1;
-  border-color: rgba(71, 85, 105, 0.96);
-}
-:global(body[data-theme='dark']) .delete-popover .btn-tiny:hover {
-  border-color: rgba(96, 165, 250, 0.3);
-}
 </style>

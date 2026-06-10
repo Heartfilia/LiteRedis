@@ -108,7 +108,7 @@ function startResize(e) {
   overflow: hidden;
   height: 100vh;
   min-width: 0;
-  padding: 10px 10px 10px 2px;
+  padding: var(--app-shell-gap) var(--app-shell-gap) var(--app-shell-gap) var(--app-shell-inner-gap);
   gap: 0;
 }
 .main-content.is-resizing,
@@ -137,7 +137,7 @@ function startResize(e) {
   user-select: none;
   -webkit-user-select: none;
   border: 1px solid var(--app-panel-border);
-  border-radius: 15px;
+  border-radius: var(--app-panel-radius);
   background: var(--app-panel-bg);
   box-shadow: 0 14px 30px rgba(148, 163, 184, 0.16);
   backdrop-filter: blur(14px);
@@ -166,7 +166,7 @@ function startResize(e) {
   flex-direction: column;
   position: relative;
   border: 1px solid var(--app-panel-border);
-  border-radius: 15px;
+  border-radius: var(--app-panel-radius);
   background: var(--app-panel-bg);
   box-shadow: 0 18px 36px rgba(148, 163, 184, 0.14);
   backdrop-filter: blur(14px);
@@ -198,15 +198,10 @@ function startResize(e) {
   position: relative;
   z-index: 1;
 }
-:global(body[data-theme='dark']) .key-tree-panel,
-:global(body[data-theme='dark']) .key-editor-panel {
-  backdrop-filter: none;
-  box-shadow: 0 20px 42px rgba(2, 6, 23, 0.34);
-}
 .main-content.theme-dark .key-tree-panel,
 .main-content.theme-dark .key-editor-panel {
   backdrop-filter: none;
-  box-shadow: 0 20px 42px rgba(2, 6, 23, 0.34);
+  box-shadow: 0 14px 30px rgba(2, 6, 23, 0.28);
 }
 
 .main-content.theme-dark .key-tree-panel {

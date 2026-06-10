@@ -1,6 +1,6 @@
 <template>
   <div class="app-layout" :class="[fontSizeClass, `theme-${settingsStore.themeMode || 'light'}`]">
-    <Sidebar />
+    <Sidebar :theme-mode="settingsStore.themeMode || 'light'" />
     <MainContent />
     <ConnectionManager
       v-if="showConnManager"
@@ -80,6 +80,9 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
   --ui-font-body: 12px;
   --ui-font-caption: 11px;
   --ui-font-badge: 10px;
+  --app-shell-gap: 6px;
+  --app-shell-inner-gap: 2px;
+  --app-panel-radius: 12px;
   --app-text: #0f172a;
   --app-muted: #64748b;
   --app-panel-border: rgba(214, 224, 236, 0.9);

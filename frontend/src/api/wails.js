@@ -31,7 +31,8 @@ export const dbSize = (connID) => callGo('DBSize', connID)
 
 // ===== Value CRUD =====
 export const getValue = (connID, key, cursor, offset, zsetSort = '') => callGo('GetValue', connID, key, cursor, offset, zsetSort)
-export const searchValue = (connID, key, keyType, pattern, exact = false) => callGo('SearchValue', connID, key, keyType, pattern, exact)
+export const searchValue = (connID, key, keyType, pattern, exact = false, cursor = 0) =>
+  callGo('SearchValue', connID, key, keyType, pattern, exact, cursor)
 export const setString = (connID, key, value, ttl) => callGo('SetString', connID, key, value, ttl)
 export const createKey = (connID, req) => callGo('CreateKey', connID, req)
 export const hSet = (connID, key, field, value) => callGo('HSet', connID, key, field, value)

@@ -25,6 +25,7 @@ import { copyToClipboard } from '../../utils/clipboard.js'
 import { setString } from '../../api/wails.js'
 import FloatingMessage from '../common/FloatingMessage.vue'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
+import './editorShared.css'
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
@@ -126,58 +127,65 @@ async function save() {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
   height: 100%;
   min-height: 0;
+  background: transparent;
 }
-:global(.app-layout.theme-dark) .string-editor {
+.string-editor.theme-dark {
   color: #e2e8f0;
 }
 textarea {
-  flex: 1; resize: none; padding: 9px 11px;
-  border: 1px solid #d1d5db; border-radius: 6px;
+  flex: 1; resize: none; padding: 10px 12px;
+  border: 1px solid rgba(203, 213, 225, 0.96); border-radius: 8px;
   font-family: monospace; font-size: 13px; outline: none;
   line-height: 1.6; color: #1f2937;
-  transition: border-color 0.15s;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
   min-height: 0;
 }
-:global(.app-layout.theme-dark) .string-editor textarea {
-  background: rgba(11, 18, 32, 0.985);
+.string-editor.theme-dark textarea {
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.985), rgba(11, 18, 32, 0.995));
   color: #e2e8f0;
   border-color: rgba(71, 85, 105, 0.96);
   box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.04);
 }
-textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
+textarea:focus { border-color: rgba(96, 165, 250, 0.92); box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.32); background: #fff; }
+.string-editor.theme-dark textarea:focus {
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.99), rgba(11, 18, 32, 1));
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.2);
+}
 .editor-actions {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 5px;
-  min-height: 36px;
+  gap: 6px;
+  min-height: var(--editor-footer-height);
   padding: 0 12px;
-  border-top: 1px solid #e8e8e8;
+  border-top: 1px solid rgba(226, 232, 240, 0.95);
   margin: -1px -12px 0;
   flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.98));
 }
-:global(.app-layout.theme-dark) .string-editor .editor-actions {
+.string-editor.theme-dark .editor-actions {
   border-top-color: rgba(51, 65, 85, 0.92);
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.99), rgba(11, 18, 32, 0.995));
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.995), rgba(8, 15, 29, 1));
 }
 .btn-action {
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 24px;
   padding: 0 9px;
-  background: #fff;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  background: rgba(255, 255, 255, 0.94);
+  color: #475569;
+  border: 1px solid rgba(203, 213, 225, 0.96);
   border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 10.5px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.12s;
   white-space: nowrap;
 }
-.btn-action:hover { background: #f3f4f6; border-color: #9ca3af; }
+.btn-action:hover { background: #f8fafc; border-color: #94a3b8; color: #1e293b; transform: translateY(-1px); }
 .btn-action.copied {
   background: rgba(191, 219, 254, 0.96);
   color: #1d4ed8;
@@ -185,18 +193,18 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1
   transform: translateY(-1px);
   animation: copyPulse 0.26s ease;
 }
-:global(.app-layout.theme-dark) .string-editor .btn-action {
-  background: rgba(11, 18, 32, 0.98);
-  color: #cbd5e1;
+.string-editor.theme-dark .btn-action {
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(8, 15, 29, 0.98));
+  color: #dbe4f0;
   border-color: rgba(71, 85, 105, 0.96);
 }
-:global(.app-layout.theme-dark) .string-editor .btn-action.copied {
+.string-editor.theme-dark .btn-action.copied {
   background: rgba(30, 64, 175, 0.34);
   color: #dbeafe;
   border-color: rgba(147, 197, 253, 0.72);
   box-shadow: 0 0 14px rgba(59, 130, 246, 0.2);
 }
-:global(.app-layout.theme-dark) .string-editor .btn-action:hover {
+.string-editor.theme-dark .btn-action:hover {
   background: rgba(30, 41, 59, 0.96);
   border-color: #60a5fa;
   color: #e2e8f0;
@@ -209,18 +217,18 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 24px;
   padding: 0 10px;
-  background: #3b82f6;
-  color: #fff;
-  border: none;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  color: #2563eb;
+  border: 1px solid rgba(191, 219, 254, 0.96);
   border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 10.5px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
   white-space: nowrap;
 }
-.btn-primary:hover { background: #2563eb; }
-.btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+.btn-primary:hover { background: linear-gradient(180deg, #f8fbff, #eff6ff); border-color: #60a5fa; color: #1d4ed8; transform: translateY(-1px); }
+.btn-primary:disabled { background: #f8fafc; color: #94a3b8; border-color: #d1d5db; cursor: not-allowed; }
 .btn-primary.success-flash,
 .btn-action.success-flash {
   background: rgba(220, 252, 231, 0.96);
@@ -237,55 +245,30 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1
   box-shadow: 0 0 0 1px rgba(254, 202, 202, 0.78) inset, 0 8px 18px rgba(239, 68, 68, 0.14);
   animation: errorFlashPulse 0.48s ease;
 }
-:global(.app-layout.theme-dark) .string-editor .btn-primary {
+.string-editor.theme-dark .btn-primary {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(10, 17, 30, 0.98));
+  color: #dbeafe;
+  border-color: rgba(71, 85, 105, 0.96);
   box-shadow: 0 8px 18px rgba(30, 64, 175, 0.22);
 }
-:global(.app-layout.theme-dark) .string-editor .btn-primary.success-flash,
-:global(.app-layout.theme-dark) .string-editor .btn-action.success-flash {
+.string-editor.theme-dark .btn-primary.success-flash,
+.string-editor.theme-dark .btn-action.success-flash {
   background: rgba(9, 59, 44, 0.94);
   color: #d1fae5;
   border-color: rgba(52, 211, 153, 0.5);
   box-shadow: 0 0 0 1px rgba(167, 243, 208, 0.08) inset, 0 10px 22px rgba(5, 150, 105, 0.22);
 }
-:global(.app-layout.theme-dark) .string-editor .btn-primary.error-flash,
-:global(.app-layout.theme-dark) .string-editor .btn-action.error-flash {
+.string-editor.theme-dark .btn-primary.error-flash,
+.string-editor.theme-dark .btn-action.error-flash {
   background: rgba(76, 20, 27, 0.94);
   color: #ffe4e6;
   border-color: rgba(251, 113, 133, 0.42);
   box-shadow: 0 0 0 1px rgba(255, 228, 230, 0.06) inset, 0 10px 22px rgba(190, 24, 93, 0.18);
 }
-:global(.app-layout.theme-dark) .string-editor .btn-primary:hover {
-  background: #2563eb;
+.string-editor.theme-dark .btn-primary:hover {
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.2), rgba(30, 41, 59, 0.98));
   box-shadow: 0 10px 22px rgba(30, 64, 175, 0.28);
 }
-.string-editor.theme-dark {
-  color: #e2e8f0;
-}
-
-.string-editor.theme-dark textarea {
-  background: rgba(11, 18, 32, 0.985);
-  color: #e2e8f0;
-  border-color: rgba(71, 85, 105, 0.96);
-  box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.04);
-}
-
-.string-editor.theme-dark .editor-actions {
-  border-top-color: rgba(51, 65, 85, 0.92);
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.99), rgba(11, 18, 32, 0.995));
-}
-
-.string-editor.theme-dark .btn-action {
-  background: rgba(11, 18, 32, 0.98);
-  color: #cbd5e1;
-  border-color: rgba(71, 85, 105, 0.96);
-}
-.string-editor.theme-dark .btn-action.copied {
-  background: rgba(30, 64, 175, 0.34);
-  color: #dbeafe;
-  border-color: rgba(147, 197, 253, 0.72);
-  box-shadow: 0 0 14px rgba(59, 130, 246, 0.2);
-}
-
 @keyframes successFlashPulse {
   0% {
     transform: translateY(0) scale(1);
@@ -312,25 +295,9 @@ textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1
   72% {
     transform: translateY(0) scale(0.995);
   }
-
   100% {
     transform: translateY(0) scale(1);
   }
-}
-
-.string-editor.theme-dark .btn-action:hover {
-  background: rgba(30, 41, 59, 0.96);
-  border-color: #60a5fa;
-  color: #e2e8f0;
-}
-
-.string-editor.theme-dark .btn-primary {
-  box-shadow: 0 8px 18px rgba(30, 64, 175, 0.22);
-}
-
-.string-editor.theme-dark .btn-primary:hover {
-  background: #2563eb;
-  box-shadow: 0 10px 22px rgba(30, 64, 175, 0.28);
 }
 
 @keyframes copyPulse {

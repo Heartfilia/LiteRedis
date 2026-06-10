@@ -21,6 +21,7 @@ func SearchValue(
 	key, keyType, pattern string,
 	settings config.AppSettings,
 	exact bool,
+	cursor uint64,
 ) (config.KeyValue, error) {
 	if strings.TrimSpace(pattern) == "" {
 		pattern = "*"
@@ -42,30 +43,25 @@ func SearchValue(
 			}
 			break
 		}
-		count := settings.HashLoadCount
-		if count <= 0 {
-			count = def.HashLoadCount
-		}
 		result := make(map[string]string)
-		var cursor uint64
+		scanCursor := cursor
 		for {
-			keys, newCursor, err := client.HScan(ctx, key, cursor, pattern, count).Result()
+			keys, newCursor, err := client.HScan(ctx, key, scanCursor, pattern, def.HashLoadCount).Result()
 			if err != nil {
 				return kv, err
 			}
 			for i := 0; i+1 < len(keys); i += 2 {
 				result[keys[i]] = keys[i+1]
-				if int64(len(result)) >= count {
-					goto hashDone
-				}
 			}
-			cursor = newCursor
-			if cursor == 0 {
+			scanCursor = newCursor
+			if scanCursor == 0 {
 				break
 			}
 		}
-	hashDone:
 		kv.HashVal = result
+		kv.TotalCount = int64(len(result))
+		kv.HasMore = false
+		kv.NextCursor = 0
 
 	case "set":
 		if exact {

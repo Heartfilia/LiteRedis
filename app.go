@@ -279,7 +279,8 @@ func (a *App) GetValue(connID, key string, cursor uint64, offset int, zsetSort s
 
 // SearchValue 按 pattern 搜索 key 内成员（Hash/Set/ZSet 使用 Redis glob，List 使用子串匹配）
 // exact=true 时，Set 使用 SIsMember，Hash 使用 HGet 进行精确匹配。
-func (a *App) SearchValue(connID, key, keyType, pattern string, exact bool) (config.KeyValue, error) {
+// cursor 仅在 Hash 模糊搜索时用于继续拉取下一页结果。
+func (a *App) SearchValue(connID, key, keyType, pattern string, exact bool, cursor uint64) (config.KeyValue, error) {
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.KeyValue{}, err
@@ -287,7 +288,7 @@ func (a *App) SearchValue(connID, key, keyType, pattern string, exact bool) (con
 	settings, _ := config.GetSettings()
 	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
 	defer cancel()
-	return redisbackend.SearchValue(ctx, client, key, keyType, pattern, settings, exact)
+	return redisbackend.SearchValue(ctx, client, key, keyType, pattern, settings, exact, cursor)
 }
 
 // SetString 设置 string

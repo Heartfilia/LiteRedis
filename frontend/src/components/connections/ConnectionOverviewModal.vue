@@ -465,11 +465,6 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 32px 84px rgba(15, 23, 42, 0.22), 0 10px 24px rgba(148, 163, 184, 0.08);
 }
-:global(body[data-theme='dark']) .overview-card {
-  border-color: rgba(51, 65, 85, 0.82);
-  background: rgba(15, 23, 42, 0.98);
-  box-shadow: 0 34px 86px rgba(2, 6, 23, 0.54), 0 12px 28px rgba(2, 6, 23, 0.22);
-}
 
 .overview-header {
   display: flex;
@@ -479,31 +474,17 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid rgba(226, 232, 240, 0.96);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.94));
 }
-:global(body[data-theme='dark']) .overview-header {
-  border-bottom-color: rgba(51, 65, 85, 0.94);
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.94));
-}
 
 .overview-title {
   font-size: 15px;
   font-weight: 700;
   color: #1e293b;
 }
-:global(body[data-theme='dark']) .overview-title {
-  color: #e2e8f0;
-}
 
 .overview-subtitle {
   margin-top: 3px;
   font-size: 12px;
   color: #64748b;
-}
-:global(body[data-theme='dark']) .overview-subtitle,
-:global(body[data-theme='dark']) .metric-label,
-:global(body[data-theme='dark']) .console-tip,
-:global(body[data-theme='dark']) .console-placeholder,
-:global(body[data-theme='dark']) .console-meta {
-  color: #94a3b8;
 }
 
 .overview-close {
@@ -523,16 +504,6 @@ onBeforeUnmount(() => {
   color: #334155;
   transform: translateY(-1px);
 }
-:global(body[data-theme='dark']) .overview-close {
-  border-color: rgba(71, 85, 105, 0.96);
-  background: rgba(15, 23, 42, 0.94);
-  color: #94a3b8;
-}
-:global(body[data-theme='dark']) .overview-close:hover {
-  background: rgba(30, 41, 59, 0.96);
-  border-color: rgba(96, 165, 250, 0.28);
-  color: #e2e8f0;
-}
 
 .overview-body {
   overflow: auto;
@@ -547,10 +518,6 @@ onBeforeUnmount(() => {
   border-radius: 14px;
   background: rgba(248, 250, 252, 0.92);
   color: #64748b;
-}
-:global(body[data-theme='dark']) .overview-state {
-  background: rgba(30, 41, 59, 0.9);
-  color: #cbd5e1;
 }
 
 .overview-state.error {
@@ -574,11 +541,6 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.94));
   box-shadow: 0 10px 20px rgba(148, 163, 184, 0.05);
 }
-:global(body[data-theme='dark']) .metric-card {
-  border-color: rgba(51, 65, 85, 0.82);
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.92));
-  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.18);
-}
 
 .metric-label {
   font-size: 11px;
@@ -590,11 +552,6 @@ onBeforeUnmount(() => {
   font-weight: 700;
   color: #0f172a;
 }
-:global(body[data-theme='dark']) .metric-value,
-:global(body[data-theme='dark']) .console-title,
-:global(body[data-theme='dark']) .console-command-text {
-  color: #e2e8f0;
-}
 
 .console-panel {
   display: flex;
@@ -605,11 +562,6 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(226, 232, 240, 0.84);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.96));
   box-shadow: 0 12px 24px rgba(148, 163, 184, 0.06);
-}
-:global(body[data-theme='dark']) .console-panel {
-  border-color: rgba(51, 65, 85, 0.82);
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.96));
-  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.2);
 }
 
 .console-head {

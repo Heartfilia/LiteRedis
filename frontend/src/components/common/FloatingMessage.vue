@@ -104,17 +104,4 @@ onBeforeUnmount(() => {
   }
 }
 
-:global(body[data-theme='dark']) .floating-message.ok {
-  background: linear-gradient(135deg, rgba(9, 59, 44, 0.94), rgba(13, 78, 58, 0.92));
-  color: #d1fae5;
-  border-color: rgba(52, 211, 153, 0.5);
-  box-shadow: 0 16px 34px rgba(5, 150, 105, 0.22), 0 0 0 1px rgba(167, 243, 208, 0.08) inset;
-}
-
-:global(body[data-theme='dark']) .floating-message.err {
-  background: linear-gradient(135deg, rgba(76, 20, 27, 0.94), rgba(101, 26, 37, 0.92));
-  color: #ffe4e6;
-  border-color: rgba(251, 113, 133, 0.42);
-  box-shadow: 0 16px 34px rgba(190, 24, 93, 0.18), 0 0 0 1px rgba(255, 228, 230, 0.06) inset;
-}
 </style>

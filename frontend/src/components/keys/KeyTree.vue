@@ -163,7 +163,13 @@ function mapSessionForDisplay(source) {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
-:global(.app-layout.theme-dark) .key-tree {
+.key-tree.theme-dark {
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.96) 20%, rgba(2, 6, 23, 0.98) 100%);
+}
+.key-tree.theme-dark {
+  color: #e2e8f0;
   background:
     radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 24%),
     linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.96) 20%, rgba(2, 6, 23, 0.98) 100%);
@@ -193,8 +199,8 @@ function mapSessionForDisplay(source) {
   padding: 40px;
   text-align: center;
 }
-:global(.app-layout.theme-dark) .loading,
-:global(.app-layout.theme-dark) .empty-state {
+.key-tree.theme-dark .loading,
+.key-tree.theme-dark .empty-state {
   color: #94a3b8;
 }
 .cluster-empty-state {
@@ -204,7 +210,7 @@ function mapSessionForDisplay(source) {
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(239, 246, 255, 0.88), rgba(248, 250, 252, 0.92));
 }
-:global(.app-layout.theme-dark) .cluster-empty-state {
+.key-tree.theme-dark .cluster-empty-state {
   border-color: rgba(59, 130, 246, 0.34);
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.92));
 }
@@ -213,7 +219,7 @@ function mapSessionForDisplay(source) {
   font-weight: 600;
   color: #0f172a;
 }
-:global(.app-layout.theme-dark) .cluster-empty-title {
+.key-tree.theme-dark .cluster-empty-title {
   color: #e2e8f0;
 }
 .cluster-empty-text {
@@ -222,7 +228,7 @@ function mapSessionForDisplay(source) {
   max-width: 320px;
   line-height: 1.7;
 }
-:global(.app-layout.theme-dark) .cluster-empty-text {
+.key-tree.theme-dark .cluster-empty-text {
   color: #94a3b8;
 }
 
@@ -234,7 +240,7 @@ function mapSessionForDisplay(source) {
   box-shadow: 0 10px 18px rgba(148, 163, 184, 0.08);
   overflow: hidden;
 }
-:global(.app-layout.theme-dark) .search-section {
+.key-tree.theme-dark .search-section {
   border-color: rgba(51, 65, 85, 0.94);
   background: rgba(15, 23, 42, 0.84);
   box-shadow: 0 14px 28px rgba(2, 6, 23, 0.28);
@@ -254,7 +260,7 @@ function mapSessionForDisplay(source) {
   z-index: 2;
   backdrop-filter: blur(8px);
 }
-:global(.app-layout.theme-dark) .search-section-header {
+.key-tree.theme-dark .search-section-header {
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.96));
   color: #cbd5e1;
   border-bottom-color: rgba(51, 65, 85, 0.94);
@@ -288,19 +294,31 @@ function mapSessionForDisplay(source) {
   background: #fee2e2;
   transform: scale(1.04);
 }
+.key-tree.theme-dark .section-close {
+  background: rgba(15, 23, 42, 0.94);
+  color: #94a3b8;
+  box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.9);
+}
+.key-tree.theme-dark .section-close:hover {
+  color: #fca5a5;
+  background: rgba(127, 29, 29, 0.56);
+  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.28);
+}
 .section-tip {
   padding: 16px 18px;
   color: #94a3b8;
   font-size: 12px;
 }
-:global(.app-layout.theme-dark) .section-tip {
+.key-tree.theme-dark .section-tip {
   color: #94a3b8;
 }
 
 .section-load-more {
   display: flex;
   justify-content: center;
-  padding: 12px 0 4px;
+  min-height: 26px;
+  padding: 4px 10px 8px;
+  align-items: center;
   flex-shrink: 0;
 }
 
@@ -308,13 +326,14 @@ function mapSessionForDisplay(source) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
-  padding: 0 14px;
+  min-height: 20px;
+  height: 20px;
+  padding: 0 9px;
   background: linear-gradient(180deg, #ffffff, #f8fafc);
   color: #2563eb;
   border: 1px solid rgba(191, 219, 254, 0.92);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(191, 219, 254, 0.18);
@@ -342,15 +361,16 @@ function mapSessionForDisplay(source) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  min-height: 36px;
-  padding: 5px 14px;
+  min-height: 34px;
+  height: 34px;
+  padding: 3px 12px;
   border-top: 1px solid rgba(226, 232, 240, 0.95);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95));
   flex-shrink: 0;
   box-sizing: border-box;
   backdrop-filter: blur(8px);
 }
-:global(.app-layout.theme-dark) .db-bar {
+.key-tree.theme-dark .db-bar {
   border-top-color: rgba(51, 65, 85, 0.94);
   background: linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(11, 18, 32, 0.995));
   backdrop-filter: none;
@@ -370,7 +390,8 @@ function mapSessionForDisplay(source) {
   align-items: center;
   justify-content: center;
   min-width: 0;
-  padding: 0 10px;
+  height: 100%;
+  padding: 0 8px;
 }
 .db-bar-right {
   justify-content: flex-end;
@@ -381,11 +402,11 @@ function mapSessionForDisplay(source) {
   font-weight: 600;
   white-space: nowrap;
 }
-:global(.app-layout.theme-dark) .db-label {
+.key-tree.theme-dark .db-label {
   color: #94a3b8;
 }
 .db-select {
-  min-height: 28px;
+  min-height: 24px;
   padding: 0 10px;
   border: 1px solid rgba(203, 213, 225, 0.96);
   border-radius: 10px;
@@ -396,7 +417,7 @@ function mapSessionForDisplay(source) {
   cursor: pointer;
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
-:global(.app-layout.theme-dark) .db-select {
+.key-tree.theme-dark .db-select {
   border-color: rgba(71, 85, 105, 0.96);
   background: rgba(15, 23, 42, 0.92);
   color: #e2e8f0;
@@ -406,99 +427,12 @@ function mapSessionForDisplay(source) {
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.14);
 }
 .key-count {
-  font-size: 12px;
+  font-size: 11px;
   color: #64748b;
   font-weight: 500;
   text-align: right;
 }
-:global(.app-layout.theme-dark) .key-count {
-  color: #94a3b8;
-}
-.key-tree.theme-dark {
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 22%),
-    linear-gradient(180deg, rgba(11, 18, 32, 0.995), rgba(12, 19, 33, 0.995) 24%, rgba(2, 6, 23, 1) 100%);
-  color: #e5edf8;
-}
-
-.key-tree.theme-dark .loading,
-.key-tree.theme-dark .empty-state,
-.key-tree.theme-dark .cluster-empty-text,
-.key-tree.theme-dark .section-tip,
-.key-tree.theme-dark .db-label,
 .key-tree.theme-dark .key-count {
   color: #94a3b8;
-}
-
-.key-tree.theme-dark .cluster-empty-state {
-  border-color: rgba(59, 130, 246, 0.34);
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.92));
-}
-
-.key-tree.theme-dark .cluster-empty-title {
-  color: #e2e8f0;
-}
-
-.key-tree.theme-dark .search-section {
-  border-color: rgba(51, 65, 85, 0.94);
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.985), rgba(8, 15, 29, 0.995));
-  box-shadow: 0 16px 32px rgba(2, 6, 23, 0.34);
-}
-
-.key-tree.theme-dark .search-section-header {
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
-  color: #dbe7f5;
-  border-bottom-color: rgba(51, 65, 85, 0.94);
-}
-
-.key-tree.theme-dark .db-bar {
-  border-top-color: rgba(51, 65, 85, 0.94);
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.995), rgba(8, 15, 29, 1));
-  backdrop-filter: none;
-}
-
-.key-tree.theme-dark .db-select {
-  border-color: rgba(71, 85, 105, 0.96);
-  background: rgba(10, 17, 30, 0.98);
-  color: #e5edf8;
-}
-
-.key-tree.theme-dark .btn-load-more {
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(10, 17, 30, 0.98));
-  color: #cfe0ff;
-  border-color: rgba(71, 85, 105, 0.96);
-  box-shadow: 0 8px 18px rgba(2, 6, 23, 0.36);
-}
-
-.key-tree.theme-dark .btn-load-more:hover:not(:disabled) {
-  background: linear-gradient(180deg, rgba(30, 64, 175, 0.24), rgba(30, 41, 59, 0.98));
-  color: #f8fbff;
-  border-color: rgba(96, 165, 250, 0.5);
-  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.42);
-}
-
-.key-tree.theme-dark .btn-load-more:disabled {
-  background: rgba(15, 23, 42, 0.88);
-  color: #64748b;
-  border-color: rgba(51, 65, 85, 0.82);
-}
-
-.key-tree.theme-dark .section-status {
-  color: #aabbd2;
-}
-
-.key-tree.theme-dark .section-close {
-  background: rgba(15, 23, 42, 0.92);
-  color: #94a3b8;
-}
-
-.key-tree.theme-dark .section-close:hover {
-  color: #fecaca;
-  background: rgba(127, 29, 29, 0.54);
-}
-
-.key-tree.theme-dark .tree-scroll,
-.key-tree.theme-dark .merged-scroll {
-  color: #e5edf8;
 }
 </style>

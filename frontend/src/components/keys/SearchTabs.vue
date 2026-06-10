@@ -65,28 +65,6 @@ const activeSessionId = computed(() => workspaceStore.activeSessionId)
   line-height: 1;
 }
 .tab-close:hover { color: #e53e3e; }
-:global(.app-layout.theme-dark) .search-tabs {
-  border-bottom-color: rgba(51, 65, 85, 0.92);
-  background: rgba(11, 18, 32, 0.995);
-}
-:global(.app-layout.theme-dark) .tab {
-  color: #94a3b8;
-  border-right-color: rgba(51, 65, 85, 0.92);
-}
-:global(.app-layout.theme-dark) .tab:hover {
-  background: rgba(30, 41, 59, 0.98);
-}
-:global(.app-layout.theme-dark) .tab.active {
-  background: rgba(17, 24, 39, 0.995);
-  color: #93c5fd;
-  border-bottom-color: #60a5fa;
-}
-:global(.app-layout.theme-dark) .tab-close {
-  color: #64748b;
-}
-:global(.app-layout.theme-dark) .tab-close:hover {
-  color: #fca5a5;
-}
 .search-tabs.theme-dark {
   border-bottom-color: rgba(51, 65, 85, 0.92);
   background: rgba(11, 18, 32, 0.995);

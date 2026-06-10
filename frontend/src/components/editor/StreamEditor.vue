@@ -29,6 +29,7 @@ import { ref, computed, watch } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
+import './editorShared.css'
 
 const props = defineProps({ keyValue: Object })
 const settingsStore = useSettingsStore()
@@ -52,12 +53,10 @@ async function copyEntry(entry) {
 </script>
 
 <style scoped>
-.stream-editor { display: flex; flex-direction: column; height: 100%; gap: 8px; }
-.toolbar { display: flex; align-items: center; }
-.count { font-size: 12px; color: #9ca3af; margin-left: auto; }
+.stream-editor { display: flex; flex-direction: column; height: 100%; gap: 7px; }
 .stream-wrap { flex: 1; overflow-y: auto; }
-.stream-entry { border-bottom: 1px solid #f0f0f0; padding: 7px 10px; font-size: 12px; }
-.stream-entry:hover { background: #f9fafb; }
+.stream-entry { border-bottom: 1px solid rgba(241, 245, 249, 0.96); padding: 8px 10px; font-size: 12px; }
+.stream-entry:hover { background: rgba(248, 250, 252, 0.9); }
 .entry-header { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
 .entry-header,
 .entry-num,
@@ -69,32 +68,34 @@ async function copyEntry(entry) {
   -webkit-user-select: none;
 }
 .entry-num {
-  background: #ecfeff;
+  background: rgba(236, 254, 255, 0.96);
   color: #0e7490;
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 10px;
   min-width: 24px;
   text-align: center;
   flex-shrink: 0;
-  font-weight: 500;
+  font-weight: 600;
 }
 .entry-id { font-family: monospace; color: #0e7490; font-weight: 500; font-size: 11px; flex: 1; }
 .btn-entry-copy {
   margin-left: auto;
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 2px 9px;
-  background: #fff;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  font-size: 11px;
+  min-height: 24px;
+  padding: 0 9px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #475569;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.12s;
   white-space: nowrap;
   flex-shrink: 0;
 }
-.btn-entry-copy:hover { background: #f3f4f6; border-color: #d1d5db; color: #374151; }
+.btn-entry-copy:hover { background: #f8fafc; border-color: #94a3b8; color: #1e293b; transform: translateY(-1px); }
 .btn-entry-copy.copied {
   background: rgba(191, 219, 254, 0.96);
   color: #1d4ed8;
@@ -107,10 +108,10 @@ async function copyEntry(entry) {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: #ecfeff;
-  padding: 2px 7px;
-  border-radius: 4px;
-  border: 1px solid #cffafe;
+  background: rgba(236, 254, 255, 0.84);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(207, 250, 254, 0.96);
   min-width: 0;
 }
 .field-key { color: #0e7490; font-weight: 600; font-size: 11px; }
@@ -125,96 +126,8 @@ async function copyEntry(entry) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.load-more {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  padding: 5px 12px;
-  margin: -8px -12px 0;
-  border-top: 1px solid #e8e8e8;
-  background: #fafafa;
-  flex-shrink: 0;
-  box-sizing: border-box;
-}
-.btn-load-more {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: 4px 18px;
-  background: #fff;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
-  border-radius: 20px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-}
-.btn-load-more:hover { background: #f9fafb; border-color: #9ca3af; color: #374151; }
-:global(.app-layout.theme-dark) .stream-editor {
-  color: #e2e8f0;
-}
-:global(.app-layout.theme-dark) .stream-editor .count {
-  color: #94a3b8;
-}
-:global(.app-layout.theme-dark) .stream-editor .entry-num {
-  background: rgba(8, 47, 73, 0.42);
-  color: #67e8f9;
-}
-:global(.app-layout.theme-dark) .stream-editor .stream-entry {
-  border-bottom-color: rgba(30, 41, 59, 0.92);
-}
-:global(.app-layout.theme-dark) .stream-editor .stream-entry:hover {
-  background: rgba(30, 41, 59, 0.66);
-}
-:global(.app-layout.theme-dark) .stream-editor .entry-id,
-:global(.app-layout.theme-dark) .stream-editor .field-key {
-  color: #67e8f9;
-}
-:global(.app-layout.theme-dark) .stream-editor .btn-entry-copy {
-  background: rgba(15, 23, 42, 0.94);
-  color: #cbd5e1;
-  border-color: rgba(71, 85, 105, 0.96);
-}
-:global(.app-layout.theme-dark) .stream-editor .btn-entry-copy.copied {
-  background: rgba(30, 64, 175, 0.34);
-  color: #dbeafe;
-  border-color: rgba(147, 197, 253, 0.72);
-  box-shadow: 0 0 14px rgba(59, 130, 246, 0.2);
-}
-:global(.app-layout.theme-dark) .stream-editor .btn-entry-copy:hover {
-  background: rgba(30, 41, 59, 0.96);
-  color: #e2e8f0;
-  border-color: rgba(103, 232, 249, 0.26);
-}
-:global(.app-layout.theme-dark) .stream-editor .field-pair {
-  background: rgba(8, 47, 73, 0.34);
-  border-color: rgba(6, 182, 212, 0.18);
-}
-:global(.app-layout.theme-dark) .stream-editor .field-sep {
-  color: #64748b;
-}
-:global(.app-layout.theme-dark) .stream-editor .field-val {
-  color: #cbd5e1;
-}
-:global(.app-layout.theme-dark) .stream-editor .load-more {
-  border-top-color: rgba(51, 65, 85, 0.92);
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.82), rgba(15, 23, 42, 0.98));
-}
-:global(.app-layout.theme-dark) .stream-editor .btn-load-more {
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
-  color: #cbd5e1;
-  border-color: rgba(71, 85, 105, 0.96);
-}
-:global(.app-layout.theme-dark) .stream-editor .btn-load-more:hover {
-  background: linear-gradient(180deg, rgba(8, 47, 73, 0.44), rgba(30, 41, 59, 0.98));
-  border-color: rgba(103, 232, 249, 0.28);
-  color: #e2e8f0;
-}
 .stream-editor.theme-dark {
   color: #e2e8f0;
-}
-
-.stream-editor.theme-dark .count {
-  color: #94a3b8;
 }
 
 .stream-editor.theme-dark .entry-num {
