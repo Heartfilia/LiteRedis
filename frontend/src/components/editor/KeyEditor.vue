@@ -143,6 +143,12 @@
 
       <!-- Value 编辑器（按类型分发） -->
       <div class="editor-body">
+        <div v-if="keyValueRefreshing && keyValue.type === 'list'" class="refresh-overlay">
+          <div class="refresh-overlay-chip">
+            <div class="spinner refresh-spinner"></div>
+            <span>{{ t('keyEditor.loading') }}</span>
+          </div>
+        </div>
         <StringEditor v-if="keyValue.type === 'string'" :keyValue="keyValue" />
         <HashEditor   v-else-if="keyValue.type === 'hash'"   :keyValue="keyValue" />
         <ListEditor   v-else-if="keyValue.type === 'list'"   :keyValue="keyValue" />
@@ -166,6 +172,7 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
+import { getKeyInfo } from '../../api/wails.js'
 import { getTypeColor } from '../../utils/typeColors.js'
 import StringEditor from './StringEditor.vue'
 import HashEditor from './HashEditor.vue'
@@ -184,6 +191,7 @@ const settingsStore = useSettingsStore()
 const selectedKey = computed(() => workspaceStore.selectedKey)
 const keyValue = computed(() => workspaceStore.keyValue)
 const keyValueLoading = computed(() => workspaceStore.keyValueLoading)
+const keyValueRefreshing = computed(() => workspaceStore.keyValueRefreshing)
 const keyValueError = computed(() => workspaceStore.keyValueError)
 const typeColor = computed(() => getTypeColor(keyValue.value?.type))
 const ttlTriggerRef = ref(null)
@@ -254,7 +262,20 @@ async function doRename() {
 // 刷新
 async function refreshKey() {
   if (!selectedKey.value) return
-  await workspaceStore.selectKey(selectedKey.value)
+  const preserveCurrentValue = keyValue.value?.type === 'list'
+  if (preserveCurrentValue) {
+    try {
+      const info = await getKeyInfo(workspaceStore.activeConnID, selectedKey.value)
+      if (workspaceStore.keyValue && workspaceStore.keyValue.key === selectedKey.value) {
+        workspaceStore.keyValue = {
+          ...workspaceStore.keyValue,
+          ttl: info.ttl,
+          total_count: typeof info.count === 'number' ? info.count : workspaceStore.keyValue.total_count,
+        }
+      }
+    } catch (e) {}
+  }
+  await workspaceStore.selectKey(selectedKey.value, { preserveCurrentValue })
   if (keyValueError.value && isConnectionErrorMessage(keyValueError.value)) {
     await connectionsStore.handleConnectionFailure(workspaceStore.activeConnID, keyValueError.value)
   }
@@ -705,9 +726,13 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 :deep(.key-actions .header-action-delete > .btn-tiny.danger) {
+  border-color: rgba(203, 213, 225, 0.92);
+  color: #64748b;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 .key-editor.theme-dark :deep(.key-actions .header-action-delete > .btn-tiny.danger) {
+  border-color: rgba(71, 85, 105, 0.92);
+  color: #cbd5e1;
   box-shadow: 0 6px 14px rgba(2, 6, 23, 0.24), inset 0 0 0 1px rgba(148, 163, 184, 0.04);
 }
 .key-actions .top-action-btn svg,
@@ -822,6 +847,49 @@ onBeforeUnmount(() => {
   padding: 14px 12px 0;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+.refresh-overlay {
+  position: absolute;
+  inset: 14px 12px 0;
+  z-index: 8;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.18) 26%, rgba(255, 255, 255, 0.04) 56%, rgba(255, 255, 255, 0));
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12px;
+}
+.refresh-overlay-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(191, 219, 254, 0.92);
+  background: rgba(255, 255, 255, 0.94);
+  color: #2563eb;
+  box-shadow: 0 10px 22px rgba(191, 219, 254, 0.22);
+  font-size: 11px;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+}
+.refresh-spinner {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+  flex-shrink: 0;
+}
+.key-editor.theme-dark .refresh-overlay {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.48), rgba(15, 23, 42, 0.16) 26%, rgba(15, 23, 42, 0.04) 56%, rgba(15, 23, 42, 0));
+}
+.key-editor.theme-dark .refresh-overlay-chip {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(15, 23, 42, 0.92);
+  color: #93c5fd;
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.34);
+  backdrop-filter: none;
 }
 @keyframes keyCopyPulse {
   0% {

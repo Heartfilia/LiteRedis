@@ -332,6 +332,7 @@ export namespace config {
 	    name: string;
 	    type: string;
 	    ttl: number;
+	    count: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new RedisKey(source);
@@ -342,6 +343,7 @@ export namespace config {
 	        this.name = source["name"];
 	        this.type = source["type"];
 	        this.ttl = source["ttl"];
+	        this.count = source["count"];
 	    }
 	}
 	

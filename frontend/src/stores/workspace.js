@@ -73,6 +73,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       selectedKey: null,
       keyValue: null,
       keyValueLoading: false,
+      keyValueRefreshing: false,
       keyValueError: null,   // 加载失败的错误信息
 
       // 竞态控制：记录当前"有效"请求的 key，旧请求结果自动丢弃
@@ -122,6 +123,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.keyValueError = message
       }
       this.keyValueLoading = false
+      this.keyValueRefreshing = false
       this._loadingKey = null
       return {
         success: false,
@@ -132,8 +134,14 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     applyConnectionLostState(connId, message) {
       if (!connId || this.activeConnID !== connId) return
+      this.searchSessions = this.searchSessions.map(session => ({
+        ...session,
+        loading: false,
+        error: message || session.error || null,
+      }))
       this.keyValue = null
       this.keyValueLoading = false
+      this.keyValueRefreshing = false
       this.keyValueError = message
       this._loadingKey = null
     },
@@ -254,6 +262,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.keyValue = s.keyValue
         this.keyValueError = s.keyValueError
         this.keyValueLoading = false
+        this.keyValueRefreshing = false
         this.expandedNodes[id] = { ...(s.expandedNodes || this.expandedNodes[id] || {}) }
         return true
       }
@@ -266,6 +275,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       this.keyValue = null
       this.keyValueError = null
       this.keyValueLoading = false
+      this.keyValueRefreshing = false
       if (id && !this.expandedNodes[id]) {
         this.expandedNodes[id] = {}
       }
@@ -558,6 +568,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.keyValue = null
         this.keyValueError = null
         this.keyValueLoading = false
+        this.keyValueRefreshing = false
         this._loadingKey = null
       }
     },
@@ -572,6 +583,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.keyValue = null
         this.keyValueError = null
         this.keyValueLoading = false
+        this.keyValueRefreshing = false
         this._loadingKey = null
       }
     },
@@ -581,12 +593,16 @@ export const useWorkspaceStore = defineStore('workspace', {
      * 异步加载 value。使用"令牌"机制丢弃过时的响应：
      * 若用户在本次请求返回前又点击了其他 key，本次结果自动丢弃。
      */
-    async selectKey(key) {
+    async selectKey(key, options = {}) {
+      const preserveCurrentValue = options?.preserveCurrentValue === true
       // 立即切换选中状态，让 UI 即时响应
       this.selectedKey = key
-      this.keyValue = null
       this.keyValueError = null
-      this.keyValueLoading = true
+      if (!preserveCurrentValue) {
+        this.keyValue = null
+      }
+      this.keyValueLoading = !preserveCurrentValue
+      this.keyValueRefreshing = preserveCurrentValue
       this._loadingKey = key   // 设置本次令牌
 
       try {
@@ -601,13 +617,16 @@ export const useWorkspaceStore = defineStore('workspace', {
         // 同样检查竞态
         if (this._loadingKey !== key) return
 
-        this.keyValue = null
+        if (!preserveCurrentValue) {
+          this.keyValue = null
+        }
         const disconnected = await this._handleConnectionFailure(e)
         this.keyValueError = disconnected?.message || e.message || String(e)
       } finally {
         // 仅当本次令牌仍有效时才清除 loading
         if (this._loadingKey === key) {
           this.keyValueLoading = false
+          this.keyValueRefreshing = false
           this._loadingKey = null
         }
       }
@@ -634,6 +653,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       this.keyValue = null
       this.keyValueError = null
       this.keyValueLoading = false
+      this.keyValueRefreshing = false
       if (this._loadingKey === deletedKey) {
         this._loadingKey = null
       }
@@ -720,6 +740,7 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.keyValue = null
         this.keyValueError = null
         this.keyValueLoading = false
+        this.keyValueRefreshing = false
         this._loadingKey = null
         await this.fetchTotalKeys()
       }

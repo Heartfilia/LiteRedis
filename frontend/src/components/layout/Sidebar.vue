@@ -489,11 +489,17 @@ async function handleConnect(conn) {
   const result = await connectionsStore.connect(conn.id)
   if (result?.message === 'connecting') return
   if (result.success) {
-    workspaceStore.setActiveConn(conn.id, conn.name, result.init_db || 0)
-    if (!conn.is_cluster) {
-      await workspaceStore.search('*')
+    const restored = workspaceStore.setActiveConn(conn.id, conn.name, result.init_db || 0)
+    workspaceStore.keyValueError = null
+    workspaceStore.keyValueLoading = false
+    if (restored) {
+      await workspaceStore.refreshAfterReconnect(conn.id)
+    } else {
+      if (!conn.is_cluster) {
+        await workspaceStore.search('*')
+      }
+      workspaceStore.fetchTotalKeys()
     }
-    workspaceStore.fetchTotalKeys()
   } else {
     showToast(formatError(t('sidebar.connectFailed'), result.message))
   }

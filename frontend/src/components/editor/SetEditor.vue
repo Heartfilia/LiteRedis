@@ -10,10 +10,29 @@
           :placeholder="t('keyEditor.searchMember')"
           @keydown.enter="executeSearch"
         />
-        <button class="btn-search" :disabled="isSearching" @click="executeSearch">
-          {{ isSearching ? '…' : (searchResults !== null ? t('keyEditor.refresh') : t('keyTree.searchBtn')) }}
+        <button
+          class="btn-search icon-search-btn"
+          :disabled="isSearching"
+          :title="searchResults !== null ? t('keyEditor.refresh') : t('keyTree.searchBtn')"
+          @click="executeSearch"
+        >
+          <span v-if="isSearching">…</span>
+          <svg v-else-if="searchResults !== null" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path d="M19.25 10.25a7.35 7.35 0 00-13.38-3.1L4.75 8.72" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M4.7 4.55v4.2h4.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M4.75 13.75a7.35 7.35 0 0013.38 3.1l1.12-1.57" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M19.3 19.45v-4.2h-4.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <circle cx="11" cy="11" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M15.2 15.2 19 19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
         </button>
-        <button v-if="searchResults !== null" class="btn-clear-search" @click="clearSearch">✕</button>
+        <button v-if="searchResults !== null" class="btn-clear-search icon-search-btn" :title="t('keyEditor.cancel')" @click="clearSearch">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path d="M6.7 6.7l10.6 10.6M17.3 6.7L6.7 17.3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" />
+          </svg>
+        </button>
         <label class="fuzzy-check" :class="{ active: fuzzySearch, disabled: !canToggleFuzzy }" title="模糊搜索需要内容自行带*">
           <input v-model="fuzzySearch" type="checkbox" :disabled="!canToggleFuzzy" />
           <span class="fuzzy-indicator" aria-hidden="true" />
@@ -524,8 +543,8 @@ async function removeMember(m) {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  padding: 5px 12px;
+  min-height: var(--editor-footer-height);
+  padding: 4px 12px;
   margin: -8px -12px 0;
   border-top: 1px solid rgba(226, 232, 240, 0.95);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95));
@@ -536,13 +555,14 @@ async function removeMember(m) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
-  padding: 0 14px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0 10px;
   background: linear-gradient(180deg, #ffffff, #f8fafc);
   color: #3b82f6;
   border: 1px solid rgba(191, 219, 254, 0.92);
   border-radius: 20px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(191, 219, 254, 0.18);
@@ -562,7 +582,7 @@ async function removeMember(m) {
   box-shadow: none;
 }
 .load-more-hint {
-  font-size: 12px;
+  font-size: 11px;
   color: #9ca3af;
   line-height: 1;
 }

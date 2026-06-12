@@ -195,10 +195,28 @@ func GetKeyInfo(ctx context.Context, client redis.UniversalClient, key string) (
 		ttlSec = int64(ttlDur / time.Second)
 	}
 
+	keyType := typeCmd.Val()
+	var count int64
+	switch keyType {
+	case "list":
+		count, _ = client.LLen(ctx, key).Result()
+	case "hash":
+		count, _ = client.HLen(ctx, key).Result()
+	case "set":
+		count, _ = client.SCard(ctx, key).Result()
+	case "zset":
+		count, _ = client.ZCard(ctx, key).Result()
+	case "stream":
+		count, _ = client.XLen(ctx, key).Result()
+	default:
+		count = 0
+	}
+
 	return config.RedisKey{
 		Name: key,
-		Type: typeCmd.Val(),
+		Type: keyType,
 		TTL:  ttlSec,
+		Count: count,
 	}, nil
 }
 

@@ -93,6 +93,7 @@ type RedisKey struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
 	TTL  int64  `json:"ttl"` // -1=永久，-2=不存在，>0=剩余秒数
+	Count int64 `json:"count"`
 }
 
 // KeyNode 树节点（:折叠）

@@ -10,10 +10,29 @@
           :placeholder="t('keyEditor.searchField')"
           @keydown.enter="executeSearch"
         />
-        <button class="btn-search" :disabled="isSearching" @click="executeSearch">
-          {{ isSearching ? '…' : (searchResults !== null ? t('keyEditor.refresh') : t('keyTree.searchBtn')) }}
+        <button
+          class="btn-search icon-search-btn"
+          :disabled="isSearching"
+          :title="searchResults !== null ? t('keyEditor.refresh') : t('keyTree.searchBtn')"
+          @click="executeSearch"
+        >
+          <span v-if="isSearching">…</span>
+          <svg v-else-if="searchResults !== null" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path d="M19.25 10.25a7.35 7.35 0 00-13.38-3.1L4.75 8.72" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M4.7 4.55v4.2h4.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M4.75 13.75a7.35 7.35 0 0013.38 3.1l1.12-1.57" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M19.3 19.45v-4.2h-4.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <circle cx="11" cy="11" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M15.2 15.2 19 19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
         </button>
-        <button v-if="searchResults !== null" class="btn-clear-search" @click="clearSearch">✕</button>
+        <button v-if="searchResults !== null" class="btn-clear-search icon-search-btn" :title="t('keyEditor.cancel')" @click="clearSearch">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path d="M6.7 6.7l10.6 10.6M17.3 6.7L6.7 17.3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" />
+          </svg>
+        </button>
         <label class="fuzzy-check" :class="{ active: fuzzySearch, disabled: !canToggleFuzzy }" title="模糊搜索需要内容自行带*">
           <input v-model="fuzzySearch" type="checkbox" :disabled="!canToggleFuzzy" />
           <span class="fuzzy-indicator" aria-hidden="true" />
@@ -300,6 +319,9 @@ import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import FloatingMessage from '../common/FloatingMessage.vue'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
 import './editorShared.css'
+
+const INT32_MIN = -2147483648
+const INT32_MAX = 2147483647
 
 const props = defineProps({ keyValue: Object })
 const workspaceStore = useWorkspaceStore()
@@ -942,6 +964,10 @@ async function runCalculation() {
         pushCalcLog(t('keyEditor.calcNonNumericSkipped', { field, value: val }), 'skip')
         continue
       }
+      if (numericValue < INT32_MIN || numericValue > INT32_MAX) {
+        pushCalcLog(t('keyEditor.calcIntOverflowSkipped', { field, value: val }), 'skip')
+        continue
+      }
 
       total += numericValue
       pushCalcLog(`${field}: ${val}`, 'ok')
@@ -1223,6 +1249,20 @@ async function addField() {
 .search-bar-invalid {
   border-color: rgba(245, 158, 11, 0.9);
   box-shadow: 0 0 0 3px rgba(253, 224, 71, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+.hash-editor:not(.theme-dark) .search-bar.search-bar-filter-active {
+  border-color: rgba(96, 165, 250, 0.92);
+  box-shadow:
+    0 0 0 3px rgba(191, 219, 254, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 1px 2px rgba(148, 163, 184, 0.08);
+}
+.hash-editor:not(.theme-dark) .search-bar.search-bar-invalid {
+  border-color: rgba(245, 158, 11, 0.9);
+  box-shadow:
+    0 0 0 3px rgba(253, 224, 71, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 1px 2px rgba(148, 163, 184, 0.08);
 }
 .calc-panel-body {
   display: flex;

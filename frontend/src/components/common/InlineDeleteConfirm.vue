@@ -180,6 +180,19 @@ onBeforeUnmount(() => {
   padding: 0;
 }
 
+.delete-wrap > .btn-tiny {
+  border-color: rgba(203, 213, 225, 0.96);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+  color: #64748b;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.delete-wrap > .btn-tiny:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(241, 245, 249, 0.96));
+  border-color: rgba(148, 163, 184, 0.96);
+  color: #334155;
+}
+
 .btn-tiny.danger-confirm {
   background: #dc2626;
   color: #fff;
@@ -195,6 +208,7 @@ onBeforeUnmount(() => {
   background: rgba(15, 23, 42, 0.94);
   color: #cbd5e1;
   border-color: rgba(71, 85, 105, 0.96);
+  box-shadow: 0 6px 14px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(148, 163, 184, 0.04);
 }
 
 .delete-wrap.theme-dark > .btn-tiny:hover {

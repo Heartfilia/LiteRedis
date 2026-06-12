@@ -10,10 +10,18 @@
           :placeholder="t('keyEditor.searchElement')"
           @keydown.enter="executeSearch"
         />
-        <button class="btn-search" :disabled="isSearching" @click="executeSearch">
-          {{ isSearching ? '…' : t('keyTree.searchBtn') }}
+        <button class="btn-search icon-search-btn" :disabled="isSearching" :title="t('keyTree.searchBtn')" @click="executeSearch">
+          <span v-if="isSearching">…</span>
+          <svg v-else viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <circle cx="11" cy="11" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M15.2 15.2 19 19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
         </button>
-        <button v-if="searchResults !== null" class="btn-clear-search" @click="clearSearch">✕</button>
+        <button v-if="searchResults !== null" class="btn-clear-search icon-search-btn" :title="t('keyEditor.cancel')" @click="clearSearch">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path d="M6.7 6.7l10.6 10.6M17.3 6.7L6.7 17.3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" />
+          </svg>
+        </button>
       </div>
       <span class="count">
         <template v-if="searchResults !== null">{{ t('keyEditor.searchResult', { current: displayItems.length, total: searchResults.length }) }}</template>
@@ -475,8 +483,8 @@ async function addItem() {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  padding: 5px 12px;
+  min-height: var(--editor-footer-height);
+  padding: 4px 12px;
   margin: -8px -12px 0;
   border-top: 1px solid rgba(226, 232, 240, 0.95);
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95));
@@ -487,13 +495,14 @@ async function addItem() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
-  padding: 0 14px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0 10px;
   background: linear-gradient(180deg, #ffffff, #f8fafc);
   color: #3b82f6;
   border: 1px solid rgba(191, 219, 254, 0.92);
   border-radius: 20px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 4px 10px rgba(191, 219, 254, 0.18);
@@ -513,7 +522,7 @@ async function addItem() {
   box-shadow: none;
 }
 .load-more-hint {
-  font-size: 12px;
+  font-size: 11px;
   color: #9ca3af;
   line-height: 1;
 }
