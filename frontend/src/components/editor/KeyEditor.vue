@@ -633,8 +633,35 @@ onBeforeUnmount(() => {
   border-color: rgba(59, 130, 246, 0.82);
 }
 .ttl-popover-btn {
-  min-width: 28px;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
   padding: 0;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.ttl-popover .ttl-popover-btn {
+  border-color: rgba(203, 213, 225, 0.96);
+  background: rgba(255, 255, 255, 0.96);
+  color: #64748b;
+}
+.ttl-popover .ttl-popover-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+.ttl-popover.theme-dark .ttl-popover-btn {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(11, 18, 32, 0.98);
+  color: #cbd5e1;
+}
+.ttl-popover.theme-dark .ttl-popover-btn:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(96, 165, 250, 0.34);
+  color: #e2e8f0;
 }
 .key-actions {
   display: flex;
