@@ -21,7 +21,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24.5'
           cache: true
 
       - name: Setup Node
@@ -30,7 +30,7 @@ jobs:
           node-version: '20'
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
       - name: Build
         run: wails build -platform darwin/arm64 -clean -ldflags "-X main.AppVersion=${{ github.ref_name }}"
@@ -67,7 +67,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24.5'
           cache: true
 
       - name: Setup Node
@@ -85,7 +85,7 @@ jobs:
             pkg-config
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
       - name: Build
         run: wails build -platform linux/amd64 -clean -tags webkit2_41 -ldflags "-X main.AppVersion=${{ github.ref_name }}"
@@ -112,7 +112,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24.5'
           cache: true
 
       - name: Setup Node
@@ -121,7 +121,7 @@ jobs:
           node-version: '20'
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
       - name: Build
         run: wails build -platform windows/amd64 -nsis -clean -ldflags "-X main.AppVersion=${{ github.ref_name }}"
