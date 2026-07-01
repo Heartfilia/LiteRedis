@@ -359,6 +359,99 @@ func (f *LocalForward) untrackConn(conn net.Conn) {
 	f.connMu.Unlock()
 }
 
+// ClusterForwardDialer 为 Redis Cluster 维护按节点地址分配的本地转发。
+// 这样 go-redis 看到的始终是本地 TCP 连接，避免直接使用 SSH channel
+// 在不同平台上出现不一致的 deadline / I/O 行为。
+type ClusterForwardDialer struct {
+	sshClient *gossh.Client
+	timeout   time.Duration
+
+	mu       sync.Mutex
+	forwards map[string]*LocalForward
+	closed   bool
+}
+
+func NewClusterForwardDialer(sshClient *gossh.Client, timeout time.Duration) *ClusterForwardDialer {
+	if sshClient == nil {
+		return nil
+	}
+	if timeout <= 0 {
+		timeout = defaultSSHDialTimeout
+	}
+	return &ClusterForwardDialer{
+		sshClient: sshClient,
+		timeout:   timeout,
+		forwards:  make(map[string]*LocalForward),
+	}
+}
+
+func (d *ClusterForwardDialer) getOrCreateForward(remoteAddr string) (*LocalForward, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.closed {
+		return nil, fmt.Errorf("cluster ssh forward dialer already closed")
+	}
+	if forward, ok := d.forwards[remoteAddr]; ok {
+		return forward, nil
+	}
+
+	config.AppendDebugLog("[ssh] cluster forward create remote=%s", remoteAddr)
+	forward, err := StartLocalForward(d.sshClient, remoteAddr)
+	if err != nil {
+		config.AppendDebugLog("[ssh] cluster forward create failed remote=%s err=%v", remoteAddr, err)
+		return nil, err
+	}
+	d.forwards[remoteAddr] = forward
+	config.AppendDebugLog("[ssh] cluster forward ready remote=%s local=%s", remoteAddr, forward.Addr())
+	return forward, nil
+}
+
+func (d *ClusterForwardDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	if d == nil {
+		return nil, fmt.Errorf("cluster ssh forward dialer is nil")
+	}
+	forward, err := d.getOrCreateForward(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	localDialer := &net.Dialer{Timeout: d.timeout}
+	config.AppendDebugLog("[ssh] cluster local dial begin remote=%s local=%s", addr, forward.Addr())
+	conn, err := localDialer.DialContext(ctx, "tcp", forward.Addr())
+	if err != nil {
+		config.AppendDebugLog("[ssh] cluster local dial failed remote=%s local=%s err=%v", addr, forward.Addr(), err)
+		return nil, err
+	}
+	config.AppendDebugLog("[ssh] cluster local dial ok remote=%s local=%s", addr, forward.Addr())
+	return conn, nil
+}
+
+func (d *ClusterForwardDialer) Close() error {
+	if d == nil {
+		return nil
+	}
+
+	d.mu.Lock()
+	if d.closed {
+		d.mu.Unlock()
+		return nil
+	}
+	d.closed = true
+	forwards := d.forwards
+	d.forwards = map[string]*LocalForward{}
+	d.mu.Unlock()
+
+	var firstErr error
+	for remoteAddr, forward := range forwards {
+		config.AppendDebugLog("[ssh] cluster forward close remote=%s", remoteAddr)
+		if err := forward.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
 // MakeDialer 返回一个使用 SSH 客户端拨号的 Dialer 函数
 // 如果 sshClient 为 nil，则走正常 TCP
 // timeout 控制单次 dial 的最大等待时间，防止 sshClient.Dial 永久阻塞

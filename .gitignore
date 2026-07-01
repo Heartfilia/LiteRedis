@@ -6,6 +6,7 @@ frontend/dist
 **/.DS_Store
 .idea
 .claude
+.gocache/
 
 LiteRedis
 
