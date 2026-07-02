@@ -5,7 +5,7 @@
         <input
           v-model="pattern"
           type="text"
-          :placeholder="isCluster ? t('keyTree.clusterSearchPlaceholder') : t('keyTree.searchPlaceholder')"
+          :placeholder="clusterExactOnly ? t('keyTree.clusterSearchPlaceholder') : t('keyTree.searchPlaceholder')"
           @keydown.enter="onEnter"
           @keydown.down.prevent="onArrowDown"
           @keydown.up.prevent="onArrowUp"
@@ -26,7 +26,7 @@
       <CreateKeyButton v-if="workspaceStore.activeConnID" />
     </div>
     <div class="search-options">
-      <label v-if="!isCluster" class="keep-label">
+      <label v-if="!clusterExactOnly" class="keep-label">
         <input type="checkbox" v-model="keep" />
         {{ t('keyTree.keepPrev') }}
       </label>
@@ -119,6 +119,8 @@ const dropdownStyle = ref({})
 let blurTimer = null
 const activeConn = computed(() => connectionsStore.connections.find(c => c.id === workspaceStore.activeConnID))
 const isCluster = computed(() => !!activeConn.value?.is_cluster)
+const allowClusterScan = computed(() => !!activeConn.value?.allow_cluster_scan)
+const clusterExactOnly = computed(() => isCluster.value && !allowClusterScan.value)
 
 const filteredPinnedHistory = computed(() => {
   const id = workspaceStore.activeConnID
@@ -164,14 +166,14 @@ function handleViewportChange() {
 }
 
 watch(keep, val => {
-  if (isCluster.value) {
+  if (clusterExactOnly.value) {
     workspaceStore.keepPrevSearch = true
     return
   }
   workspaceStore.keepPrevSearch = val
 })
 
-watch(isCluster, (val) => {
+watch(clusterExactOnly, (val) => {
   if (val) {
     keep.value = true
     workspaceStore.keepPrevSearch = true
@@ -180,7 +182,7 @@ watch(isCluster, (val) => {
 
 watch(() => workspaceStore.activeConnID, () => {
   pattern.value = ''
-  keep.value = isCluster.value ? true : workspaceStore.keepPrevSearch
+  keep.value = clusterExactOnly.value ? true : workspaceStore.keepPrevSearch
   loading.value = false
   showHistory.value = false
   activeIndex.value = -1
@@ -262,7 +264,7 @@ async function doSearch() {
   try {
     let searchSucceeded = false
     const p = pattern.value.trim()
-    if (isCluster.value) {
+    if (clusterExactOnly.value) {
       if (!p) return
       await workspaceStore.searchExact(p)
       searchSucceeded = true

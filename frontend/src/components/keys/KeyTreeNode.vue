@@ -2,8 +2,20 @@
   <div :class="['tree-node', `theme-${settingsStore.themeMode || 'light'}`, { expanded: isExpanded }]">
     <!-- 目录节点 -->
     <div v-if="!node.isLeaf" class="node-row dir-row" @click="toggle">
-      <span class="expand-icon">{{ isExpanded ? '▼' : '▶' }}</span>
-      <span class="folder-icon">📁</span>
+      <span class="expand-icon" aria-hidden="true">
+        <svg v-if="isExpanded" viewBox="0 0 16 16" fill="none">
+          <path d="M3.5 6l4.5 4.5L12.5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg v-else viewBox="0 0 16 16" fill="none">
+          <path d="M6 3.5L10.5 8 6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="folder-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none">
+          <path d="M2.5 5.5a2 2 0 012-2H8l1.5 2H15.5a2 2 0 012 2v7a2 2 0 01-2 2h-11a2 2 0 01-2-2v-9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M2.5 7.5h15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </span>
       <span class="node-label">{{ node.label }}</span>
       <span class="node-count">({{ node.count }})</span>
     </div>
@@ -84,14 +96,32 @@ function selectKey(fullPath) {
 }
 .dir-row { color: #475569; }
 .expand-icon {
-  font-size: 9px;
   color: #94a3b8;
   width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
+.expand-icon svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
 .folder-icon {
-  font-size: 12px;
-  filter: saturate(0.8);
+  width: 13px;
+  height: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #7c8da5;
+  flex-shrink: 0;
+}
+.folder-icon svg {
+  width: 13px;
+  height: 13px;
+  display: block;
 }
 .node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .leaf-label {
@@ -157,6 +187,15 @@ function selectKey(fullPath) {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+:global(.platform-windows) .tree-node .node-row {
+  min-height: 31px;
+}
+
+:global(.platform-windows) .tree-node .leaf-label {
+  letter-spacing: 0;
+  font-weight: 600;
 }
 
 </style>

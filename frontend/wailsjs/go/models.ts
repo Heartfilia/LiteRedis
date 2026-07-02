@@ -74,6 +74,7 @@ export namespace config {
 	    password: string;
 	    db: number;
 	    is_cluster: boolean;
+	    allow_cluster_scan: boolean;
 	    cluster_addrs?: string[];
 	    proxy_enabled: boolean;
 	    proxy_url?: string;
@@ -100,6 +101,7 @@ export namespace config {
 	        this.password = source["password"];
 	        this.db = source["db"];
 	        this.is_cluster = source["is_cluster"];
+	        this.allow_cluster_scan = source["allow_cluster_scan"];
 	        this.cluster_addrs = source["cluster_addrs"];
 	        this.proxy_enabled = source["proxy_enabled"];
 	        this.proxy_url = source["proxy_url"];

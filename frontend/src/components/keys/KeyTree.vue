@@ -41,7 +41,7 @@
                   :disabled="sess.loading"
                   @click="workspaceStore.loadMoreKeys(sess.id)"
                 >
-                  {{ sess.loading ? t('keyTree.loading') : t('keyTree.loadMore') }}
+                  {{ sess.loading ? '...' : t('keyTree.loadMore') }}
                 </button>
               </div>
             </div>
@@ -67,12 +67,37 @@
       <!-- DB 选择 + Key 统计 -->
       <div class="db-bar">
         <div class="db-bar-side db-bar-left">
-          <template v-if="!activeConn?.is_cluster">
-            <label class="db-label">{{ t('keyTree.db') }}</label>
-            <select :value="currentDB" @change="switchDB($event.target.value)" class="db-select">
-              <option v-for="i in 16" :key="i-1" :value="i-1">{{ i-1 }}</option>
-            </select>
-          </template>
+          <div class="db-bar-left-inner" :class="{ 'cluster-align': activeConn?.is_cluster }">
+            <template v-if="!activeConn?.is_cluster">
+              <select :value="currentDB" @change="switchDB($event.target.value)" class="db-select">
+                <option v-for="i in 16" :key="i-1" :value="i-1">{{ i-1 }}</option>
+              </select>
+            </template>
+            <div v-if="showTreeExpandControls" class="tree-bulk-controls" aria-label="tree bulk controls">
+              <button
+                class="tree-bulk-btn"
+                type="button"
+                :title="t('keyTree.collapseAll')"
+                @click="collapseVisibleTree"
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M6 15.75h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                  <path d="M8.25 12.75 12 9l3.75 3.75" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button
+                class="tree-bulk-btn"
+                type="button"
+                :title="t('keyTree.expandAll')"
+                @click="expandVisibleTree"
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M6 8.25h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                  <path d="M8.25 11.25 12 15l3.75-3.75" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
         <div class="db-bar-center">
           <button
@@ -81,11 +106,11 @@
             :disabled="session?.loading"
             @click="workspaceStore.loadMoreKeys(session.id)"
           >
-            {{ session?.loading ? t('keyTree.loading') : t('keyTree.loadMore') }}
+            {{ session?.loading ? '...' : t('keyTree.loadMore') }}
           </button>
         </div>
         <div class="db-bar-side db-bar-right">
-          <span class="key-count">{{ t('keyTree.totalKeys', { count: totalKeys }) }}</span>
+          <span class="key-count">key:{{ totalKeys }}</span>
         </div>
       </div>
     </template>
@@ -114,10 +139,22 @@ const keyDisplayMode = computed(() => settingsStore.keyDisplayMode || 'tree')
 const session = computed(() => mapSessionForDisplay(workspaceStore.activeSession))
 const displaySessions = computed(() => workspaceStore.displaySessions.map(mapSessionForDisplay))
 const activeConn = computed(() => connectionsStore.connections.find(c => c.id === activeConnID.value))
+const clusterExactOnly = computed(() => !!activeConn.value?.is_cluster && !activeConn.value?.allow_cluster_scan)
 const showClusterEmptyHint = computed(() =>
-  !!activeConn.value?.is_cluster &&
+  clusterExactOnly.value &&
   !session.value &&
   displaySessions.value.length === 0
+)
+const visibleTreeData = computed(() => {
+  if (workspaceStore.keepPrevSearch) {
+    return displaySessions.value.flatMap(item => item?.treeData || [])
+  }
+  return session.value?.treeData || []
+})
+const showTreeExpandControls = computed(() =>
+  keyDisplayMode.value === 'tree' &&
+  visibleTreeData.value.length > 0 &&
+  !showClusterEmptyHint.value
 )
 const showBottomLoadMore = computed(() =>
   !workspaceStore.keepPrevSearch &&
@@ -148,6 +185,14 @@ function mapSessionForDisplay(source) {
     ...source,
     treeData: keyDisplayMode.value === 'flat' ? buildFlatTree(keys) : buildKeyTree(keys),
   }
+}
+
+function expandVisibleTree() {
+  workspaceStore.setVisibleTreeExpanded(visibleTreeData.value, true)
+}
+
+function collapseVisibleTree() {
+  workspaceStore.setVisibleTreeExpanded(visibleTreeData.value, false)
 }
 </script>
 
@@ -326,13 +371,13 @@ function mapSessionForDisplay(source) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 20px;
-  height: 20px;
-  padding: 0 9px;
+  min-height: 24px;
+  height: 24px;
+  padding: 0 10px;
   background: linear-gradient(180deg, #ffffff, #f8fafc);
-  color: #2563eb;
+  color: #3b82f6;
   border: 1px solid rgba(191, 219, 254, 0.92);
-  border-radius: 999px;
+  border-radius: 20px;
   font-size: 10px;
   font-weight: 600;
   cursor: pointer;
@@ -359,7 +404,7 @@ function mapSessionForDisplay(source) {
 
 .db-bar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
   align-items: center;
   min-height: 34px;
   height: 34px;
@@ -376,13 +421,22 @@ function mapSessionForDisplay(source) {
   backdrop-filter: none;
 }
 .db-bar-side {
-  flex: 1 1 0;
   display: flex;
   align-items: center;
   min-width: 0;
 }
 .db-bar-left {
+  justify-content: flex-start;
+  overflow: hidden;
+}
+.db-bar-left-inner {
+  display: flex;
+  align-items: center;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+.db-bar-left-inner.cluster-align {
   justify-content: flex-start;
 }
 .db-bar-center {
@@ -391,23 +445,19 @@ function mapSessionForDisplay(source) {
   justify-content: center;
   min-width: 0;
   height: 100%;
-  padding: 0 8px;
+  padding: 0 6px;
+  overflow: hidden;
 }
 .db-bar-right {
   justify-content: flex-end;
-}
-.db-label {
-  font-size: 11px;
-  color: #64748b;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.key-tree.theme-dark .db-label {
-  color: #94a3b8;
+  min-width: fit-content;
+  padding-left: 6px;
 }
 .db-select {
+  width: 46px;
+  min-width: 46px;
   min-height: 24px;
-  padding: 0 10px;
+  padding: 0 6px;
   border: 1px solid rgba(203, 213, 225, 0.96);
   border-radius: 10px;
   font-size: 12px;
@@ -426,11 +476,57 @@ function mapSessionForDisplay(source) {
   border-color: #60a5fa;
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.14);
 }
+.tree-bulk-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.tree-bulk-btn {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.16s ease, color 0.16s ease, opacity 0.16s ease;
+  opacity: 0.78;
+}
+.tree-bulk-btn svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+.tree-bulk-btn:hover {
+  color: #2563eb;
+  background: rgba(239, 246, 255, 0.72);
+  opacity: 1;
+}
+.tree-bulk-btn:active {
+  opacity: 1;
+}
+.key-tree.theme-dark .tree-bulk-btn {
+  color: #94a3b8;
+  opacity: 0.84;
+}
+.key-tree.theme-dark .tree-bulk-btn:hover {
+  color: #dbeafe;
+  background: rgba(30, 41, 59, 0.9);
+  opacity: 1;
+}
 .key-count {
   font-size: 11px;
   color: #64748b;
   font-weight: 500;
   text-align: right;
+  white-space: nowrap;
 }
 .key-tree.theme-dark .key-count {
   color: #94a3b8;

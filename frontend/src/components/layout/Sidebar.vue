@@ -25,7 +25,11 @@
             </div>
           </div>
           <button class="btn-expand-bottom" :title="t('sidebar.expand')" @click="sidebarCollapsed = false">
-            <span class="btn-expand-glyph" aria-hidden="true">▶</span>
+            <span class="btn-expand-glyph" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none">
+                <path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
           </button>
         </div>
       </div>
@@ -84,15 +88,29 @@
               class="btn-tiny btn-conn-action btn-disconnect"
               :title="t('sidebar.disconnect')"
               @click.stop="disconnectConn(conn.id)"
-            >⊘</button>
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+              </svg>
+            </button>
             <button
               v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id) && !conn.is_cluster"
               class="btn-tiny btn-conn-action btn-overview"
               :title="t('sidebar.connectionOverview')"
               @click.stop="openOverview(conn)"
-            >⌘</button>
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 6.5h7v5H4zM13 6.5h7v5h-7zM4 12.5h7V18H4zM13 12.5h7V18h-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              </svg>
+            </button>
             <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
-            <button class="btn-tiny btn-conn-action" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
+            <button class="btn-tiny btn-conn-action" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 20h4l9.5-9.5-4-4L4 16v4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                <path d="M12.8 6.7l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              </svg>
+            </button>
             <InlineDeleteConfirm
               class="sidebar-delete-confirm"
               label="✕"
@@ -163,15 +181,29 @@
                   class="btn-tiny btn-conn-action btn-disconnect"
                   :title="t('sidebar.disconnect')"
                   @click.stop="disconnectConn(conn.id)"
-                >⊘</button>
+                >
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+                  </svg>
+                </button>
                 <button
                   v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id) && !conn.is_cluster"
                   class="btn-tiny btn-conn-action btn-overview"
                   :title="t('sidebar.connectionOverview')"
                   @click.stop="openOverview(conn)"
-                >⌘</button>
+                >
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 6.5h7v5H4zM13 6.5h7v5h-7zM4 12.5h7V18H4zM13 12.5h7V18h-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                  </svg>
+                </button>
                 <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
-                <button class="btn-tiny btn-conn-action" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">✎</button>
+                <button class="btn-tiny btn-conn-action" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 20h4l9.5-9.5-4-4L4 16v4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                    <path d="M12.8 6.7l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                  </svg>
+                </button>
                 <InlineDeleteConfirm
                   class="sidebar-delete-confirm"
                   label="✕"
@@ -210,16 +242,43 @@
             :title="settingsStore.themeMode === 'dark' ? '切换浅色主题' : '切换暗色主题'"
             @click="settingsStore.toggleTheme()"
           >
-            <span class="btn-icon-glyph" aria-hidden="true">{{ settingsStore.themeMode === 'dark' ? '☾' : '☀' }}</span>
+            <span class="btn-icon-glyph" aria-hidden="true">
+              <svg v-if="settingsStore.themeMode === 'dark'" viewBox="0 0 24 24" fill="none">
+                <path d="M18 14.5A7.5 7.5 0 119.5 6 6 6 0 0018 14.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              </svg>
+              <svg v-else viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9L5.3 5.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </span>
           </button>
-          <button class="btn-icon" :title="t('sidebar.manageConn')" @click="openConnManager()"><span class="btn-icon-glyph" aria-hidden="true">＋</span></button>
-          <button class="btn-icon btn-settings" :title="t('sidebar.settings')" @click="openSettings()"><span class="btn-icon-glyph" aria-hidden="true">⚙</span></button>
+          <button class="btn-icon" :title="t('sidebar.manageConn')" @click="openConnManager()">
+            <span class="btn-icon-glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+              </svg>
+            </span>
+          </button>
+          <button class="btn-icon btn-settings" :title="t('sidebar.settings')" @click="openSettings()">
+            <span class="btn-icon-glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 8.4A3.6 3.6 0 1112 15.6 3.6 3.6 0 0112 8.4z" stroke="currentColor" stroke-width="1.7"/>
+                <path d="M4.5 13.5v-3l2.1-.6a5.9 5.9 0 01.7-1.6L6.2 6.3l2.1-2.1 2 1.1c.5-.3 1-.5 1.6-.7l.6-2.1h3l.6 2.1c.6.2 1.1.4 1.6.7l2-1.1 2.1 2.1-1.1 2c.3.5.5 1 .7 1.6l2.1.6v3l-2.1.6a5.9 5.9 0 01-.7 1.6l1.1 2-2.1 2.1-2-1.1c-.5.3-1 .5-1.6.7l-.6 2.1h-3l-.6-2.1a5.9 5.9 0 01-1.6-.7l-2 1.1-2.1-2.1 1.1-2a5.9 5.9 0 01-.7-1.6l-2.1-.6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </button>
           <button
             class="btn-icon btn-collapse"
             :title="t('sidebar.collapse')"
             :disabled="!hasConnections"
             @click="hasConnections && (sidebarCollapsed = true)"
-          ><span class="btn-icon-glyph" aria-hidden="true">◀</span></button>
+          >
+            <span class="btn-icon-glyph" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none">
+                <path d="M10 3.5L5.5 8l4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </button>
         </div>
       </div>
       </div>
@@ -232,9 +291,9 @@
       :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
       @click.stop
     >
-      <div class="ctx-item" @click="openEdit(ctxMenu.conn); ctxMenu.visible = false">✎ {{ t('sidebar.edit') }}</div>
+      <div class="ctx-item" @click="openEdit(ctxMenu.conn); ctxMenu.visible = false">{{ t('sidebar.edit') }}</div>
       <div class="ctx-divider" />
-      <div class="ctx-item ctx-danger" @click="removeConnection(ctxMenu.conn.id); ctxMenu.visible = false">✕ {{ t('sidebar.delete') }}</div>
+      <div class="ctx-item ctx-danger" @click="removeConnection(ctxMenu.conn.id); ctxMenu.visible = false">{{ t('sidebar.delete') }}</div>
     </div>
 
     <Teleport to="body">
@@ -479,7 +538,7 @@ async function handleConnect(conn) {
     } else {
       // Cluster 模式不默认扫 key，避免模糊查询
       await workspaceStore.switchDB(conn.db || 0)
-      if (!conn.is_cluster) {
+      if (!conn.is_cluster || conn.allow_cluster_scan) {
         await workspaceStore.search('*')
       }
       workspaceStore.fetchTotalKeys()
@@ -495,7 +554,7 @@ async function handleConnect(conn) {
     if (restored) {
       await workspaceStore.refreshAfterReconnect(conn.id)
     } else {
-      if (!conn.is_cluster) {
+      if (!conn.is_cluster || conn.allow_cluster_scan) {
         await workspaceStore.search('*')
       }
       workspaceStore.fetchTotalKeys()
@@ -626,9 +685,9 @@ async function disconnectConn(id) {
   box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.98), 0 0 0 4px rgba(96, 165, 250, 0.34);
 }
 .btn-expand-bottom {
-  background: rgba(255, 255, 255, 0.9);
+  background: transparent;
   color: #64748b;
-  border: 1px solid rgba(203, 213, 225, 0.96);
+  border: 1px solid transparent;
   border-radius: 8px;
   width: 28px;
   height: 28px;
@@ -639,7 +698,8 @@ async function disconnectConn(id) {
   justify-content: center;
   flex-shrink: 0;
   margin-top: 6px;
-  box-shadow: 0 8px 16px rgba(148, 163, 184, 0.14);
+  box-shadow: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 .btn-expand-glyph {
   width: 12px;
@@ -651,16 +711,21 @@ async function disconnectConn(id) {
   font-size: 10px;
   transform: translateX(0.5px);
 }
+.btn-expand-glyph svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
 .btn-expand-bottom:hover {
   background: #eff6ff;
   color: #2563eb;
   border-color: #93c5fd;
 }
 .sidebar.theme-dark .btn-expand-bottom {
-  background: rgba(15, 23, 42, 0.92);
+  background: transparent;
   color: #94a3b8;
-  border-color: rgba(71, 85, 105, 0.96);
-  box-shadow: 0 12px 22px rgba(2, 6, 23, 0.34);
+  border-color: transparent;
+  box-shadow: none;
 }
 .sidebar.theme-dark .btn-expand-bottom:hover {
   background: rgba(30, 41, 59, 0.96);
@@ -779,9 +844,9 @@ async function disconnectConn(id) {
   gap: 4px;
 }
 .btn-icon {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.94));
+  background: transparent;
   color: #64748b;
-  border: 1px solid rgba(203, 213, 225, 0.94);
+  border: 1px solid transparent;
   border-radius: 8px;
   width: 24px; height: 24px;
   min-width: 24px; min-height: 24px;
@@ -790,14 +855,14 @@ async function disconnectConn(id) {
   display: flex; align-items: center; justify-content: center;
   box-sizing: border-box;
   overflow: hidden;
-  box-shadow: 0 6px 14px rgba(148, 163, 184, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  box-shadow: none;
   transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 .btn-icon:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(239, 246, 255, 0.96));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.96));
   color: #2563eb;
   border-color: rgba(147, 197, 253, 0.92);
-  box-shadow: 0 8px 18px rgba(191, 219, 254, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  box-shadow: none;
 }
 .btn-icon-glyph {
   width: 14px;
@@ -809,11 +874,16 @@ async function disconnectConn(id) {
   transform-origin: center center;
   transition: transform 0.16s ease;
 }
+.btn-icon-glyph svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+  flex-shrink: 0;
+}
 .btn-icon:hover .btn-icon-glyph {
   transform: scale(1.08);
 }
 .btn-settings {
-  background: linear-gradient(180deg, rgba(250, 252, 255, 0.98), rgba(241, 245, 249, 0.94));
   color: #5b6b82;
 }
 .btn-settings:hover {
@@ -821,17 +891,15 @@ async function disconnectConn(id) {
   color: #2563eb;
 }
 .btn-theme {
-  background: linear-gradient(180deg, rgba(255, 252, 240, 0.98), rgba(254, 249, 195, 0.92));
   color: #ca8a04;
-  box-shadow: 0 8px 18px rgba(250, 204, 21, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: none;
 }
 .btn-theme:hover {
   background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(254, 240, 138, 0.98));
   color: #a16207;
-  box-shadow: 0 10px 22px rgba(250, 204, 21, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  box-shadow: none;
 }
 .btn-collapse {
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.92));
   color: #64748b;
 }
 .btn-collapse .btn-icon-glyph { font-size: 10px; }
@@ -843,8 +911,8 @@ async function disconnectConn(id) {
   cursor: default;
   opacity: 0.46;
   color: #a8b4c5;
-  border-color: rgba(226, 232, 240, 0.9);
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.82), rgba(241, 245, 249, 0.78));
+  border-color: transparent;
+  background: transparent;
   box-shadow: none;
 }
 .btn-icon:disabled .btn-icon-glyph {
@@ -852,8 +920,8 @@ async function disconnectConn(id) {
 }
 .btn-icon:disabled:hover {
   color: #a8b4c5;
-  border-color: rgba(226, 232, 240, 0.9);
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.82), rgba(241, 245, 249, 0.78));
+  border-color: transparent;
+  background: transparent;
   box-shadow: none;
 }
 .sidebar.theme-dark .btn-icon {
@@ -1078,6 +1146,12 @@ async function disconnectConn(id) {
 }
 .btn-conn-action {
   font-size: 11px;
+}
+.btn-conn-action svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+  flex-shrink: 0;
 }
 .connecting-spinner {
   width: 12px;
@@ -1357,6 +1431,23 @@ async function disconnectConn(id) {
   background: rgba(127, 29, 29, 0.96);
   color: #fee2e2;
   border-color: rgba(248, 113, 113, 0.34);
+}
+.sidebar.platform-windows,
+:global(.platform-windows) .sidebar {
+  -webkit-font-smoothing: auto;
+  text-rendering: geometricPrecision;
+}
+
+:global(.platform-windows) .sidebar .conn-name {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+:global(.platform-windows) .sidebar .btn-icon-glyph,
+:global(.platform-windows) .sidebar .btn-expand-glyph,
+:global(.platform-windows) .sidebar .btn-conn-action svg,
+:global(.platform-windows) .sidebar .sidebar-link-glyph svg {
+  transform: translateZ(0);
 }
 .toast-enter-active, .toast-leave-active { transition: opacity 0.25s, transform 0.25s; }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-12px); }

@@ -61,6 +61,12 @@
           <label>{{ t('connManager.clusterAddrsLabel') }}</label>
           <textarea v-model="clusterAddrsText" rows="4" placeholder="127.0.0.1:7000&#10;127.0.0.1:7001&#10;127.0.0.1:7002" />
         </div>
+        <div class="form-group toggle-row cluster-scan-toggle">
+          <label>{{ t('connManager.allowClusterScan') }}</label>
+          <input type="checkbox" v-model="form.allowClusterScan" />
+        </div>
+        <div class="field-hint">{{ t('connManager.allowClusterScanHint') }}</div>
+        <div class="field-hint field-hint-warning">{{ t('connManager.allowClusterScanWarning') }}</div>
         <div class="form-group">
           <label>Password</label>
           <input v-model="form.password" type="password" :placeholder="t('connManager.passwordPlaceholder')" />
@@ -229,6 +235,7 @@ const defaultForm = () => ({
   password: '',
   db: 0,
   isCluster: false,
+  allowClusterScan: false,
   clusterAddrs: [],
   proxyEnabled: false,
   proxyUrl: '',
@@ -281,6 +288,7 @@ function snapshotValue() {
     password: form.password || '',
     db: form.db || 0,
     isCluster: !!form.isCluster,
+    allowClusterScan: !!form.allowClusterScan,
     cluster_addrs: form.isCluster
       ? clusterAddrsText.value.split('\n').map(s => s.trim()).filter(Boolean)
       : [],
@@ -308,6 +316,7 @@ watch(() => props.connection, (conn) => {
       ...conn,
       group: conn.group || '',
       isCluster: conn.isCluster ?? conn.is_cluster,
+      allowClusterScan: conn.allowClusterScan ?? conn.allow_cluster_scan ?? false,
       proxyEnabled: conn.proxyEnabled ?? conn.proxy_enabled,
       proxyUrl: conn.proxyUrl ?? conn.proxy_url ?? '',
       iconColor: conn.iconColor ?? conn.icon_color ?? '',
@@ -386,6 +395,7 @@ function buildCfg() {
     password: form.password,
     db: form.db || 0,
     is_cluster: form.isCluster,
+    allow_cluster_scan: !!form.allowClusterScan,
     cluster_addrs: form.isCluster
       ? clusterAddrsText.value.split('\n').map(s => s.trim()).filter(Boolean)
       : [],
@@ -597,6 +607,11 @@ textarea { resize: vertical; font-family: monospace; }
   box-shadow: 0 0 0 1px #1f2937;
 }
 .field-hint { margin-top: 4px; font-size: 12px; color: #9ca3af; }
+.field-hint-warning {
+  margin-top: 2px;
+  margin-bottom: 10px;
+  color: #b45309;
+}
 .form-actions {
   display: flex;
   gap: 8px;
@@ -727,6 +742,10 @@ textarea { resize: vertical; font-family: monospace; }
 .connection-form.theme-dark .icon-preview-subtitle,
 .connection-form.theme-dark .field-hint {
   color: #94a3b8;
+}
+
+.connection-form.theme-dark .field-hint-warning {
+  color: #fbbf24;
 }
 
 .connection-form.theme-dark .form-actions,

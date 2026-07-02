@@ -13,6 +13,7 @@ type ConnectionConfig struct {
 	Password     string     `json:"password"`
 	DB           int        `json:"db"`
 	IsCluster    bool       `json:"is_cluster"`
+	AllowClusterScan bool   `json:"allow_cluster_scan"`
 	ClusterAddrs []string   `json:"cluster_addrs,omitempty"`
 	ProxyEnabled bool       `json:"proxy_enabled"`
 	ProxyURL     string     `json:"proxy_url,omitempty"`

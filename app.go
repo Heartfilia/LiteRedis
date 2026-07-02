@@ -163,7 +163,7 @@ func (a *App) ScanKeys(connID string, pattern string, count int64, cursor uint64
 		return config.ScanResult{}, err
 	}
 	cfg, cfgErr := config.GetConnection(connID)
-	if cfgErr == nil && cfg != nil && cfg.IsCluster {
+	if cfgErr == nil && cfg != nil && cfg.IsCluster && !cfg.AllowClusterScan {
 		normalized := strings.TrimSpace(pattern)
 		if normalized == "" || normalized == "*" || strings.ContainsAny(normalized, "*?[") {
 			return config.ScanResult{}, nil

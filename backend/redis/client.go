@@ -552,6 +552,17 @@ func buildClusterOptions(addrs []string, password string, dialer func(ctx contex
 	}
 	if dialer != nil {
 		opts.Dialer = dialer
+		// SSH + Cluster 在 Windows 上更容易触发大量 socket 占用。
+		// 这里主动压低每个节点的连接池和并发拨号规模，优先保证稳定性。
+		opts.PoolSize = 2
+		opts.MaxConcurrentDials = 1
+		opts.MinIdleConns = 0
+		opts.MaxIdleConns = 1
+		opts.MaxActiveConns = 4
+		opts.DialerRetries = 1
+		opts.DialerRetryTimeout = 150 * time.Millisecond
+		opts.ConnMaxIdleTime = 20 * time.Second
+		opts.ConnMaxLifetime = 2 * time.Minute
 	}
 	return opts
 }

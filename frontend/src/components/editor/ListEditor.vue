@@ -88,10 +88,10 @@
         :disabled="valueLoading"
         @click="loadMore"
       >
-        {{ valueLoading ? t('keyEditor.loading') : t('keyTree.loadMore') }}
+        {{ valueLoading ? '...' : t('keyTree.loadMore') }}
       </button>
       <span v-else-if="searchResults === null && !hasMore && totalItems > 0" class="load-more-hint">
-        {{ t('keyEditor.allItemsLoaded', { count: totalItems }) }}
+        item:{{ totalItems }}
       </span>
     </div>
 

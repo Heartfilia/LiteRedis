@@ -292,13 +292,13 @@
         :disabled="valueLoading"
         @click="loadMore"
       >
-        {{ valueLoading ? t('keyEditor.loading') : t('keyTree.loadMore') }}
+        {{ valueLoading ? '...' : t('keyTree.loadMore') }}
       </button>
       <span
         v-else-if="searchResults === null ? (!hasMore && totalFields > 0) : (!searchHasMore && searchResults.length > 0)"
         class="load-more-hint"
       >
-        {{ t('keyEditor.allFieldsLoaded', { count: searchResults === null ? totalFields : searchAllResults.length }) }}
+        field:{{ searchResults === null ? totalFields : searchAllResults.length }}
       </span>
     </div>
 

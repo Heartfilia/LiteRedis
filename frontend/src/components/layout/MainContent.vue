@@ -26,7 +26,7 @@ import KeyTree from '../keys/KeyTree.vue'
 import KeyEditor from '../editor/KeyEditor.vue'
 import { useSettingsStore } from '../../stores/settings.js'
 
-const MIN_WIDTH = 220
+const MIN_WIDTH = 250
 const MAX_WIDTH = 600
 const DEFAULT_WIDTH = 320
 const RESIZER_WIDTH = 2
@@ -128,7 +128,7 @@ function startResize(e) {
   pointer-events: auto;
 }
 .key-tree-panel {
-  min-width: 220px;
+  min-width: 250px;
   max-width: 600px;
   display: flex;
   flex-direction: column;

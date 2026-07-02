@@ -13,9 +13,21 @@
           <span class="label-text">{{ t('settings.keyScanCount') }}</span>
           <span class="label-hint">{{ t('settings.keyScanHint') }}</span>
         </label>
-        <div class="input-unit">
-          <input v-model.number="form.keyScanCount" type="number" min="10" max="10000" step="10" />
-          <span class="unit">{{ t('settings.unitCount') }}</span>
+        <div class="input-unit count-input-wrap">
+          <div class="count-input-row">
+            <input
+              v-model="form.keyScanCount"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              :class="{ 'input-invalid': shouldShowCountError('keyScanCount') }"
+              @keydown="blockNonNumericInput"
+              @input="sanitizeCountField('keyScanCount')"
+              @blur="markCountFieldBlur('keyScanCount')"
+            />
+            <span class="unit">{{ t('settings.unitCount') }}</span>
+          </div>
+          <div v-if="shouldShowCountError('keyScanCount')" class="input-error-text">{{ COUNT_ERROR_TEXT }}</div>
         </div>
       </div>
 
@@ -26,9 +38,21 @@
           <span class="label-text">{{ t('settings.hashLoadCount') }}</span>
           <span class="label-hint">{{ t('settings.hashLoadHint') }}</span>
         </label>
-        <div class="input-unit">
-          <input v-model.number="form.hashLoadCount" type="number" min="10" max="100000" step="50" />
-          <span class="unit">{{ t('settings.unitItem') }}</span>
+        <div class="input-unit count-input-wrap">
+          <div class="count-input-row">
+            <input
+              v-model="form.hashLoadCount"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              :class="{ 'input-invalid': shouldShowCountError('hashLoadCount') }"
+              @keydown="blockNonNumericInput"
+              @input="sanitizeCountField('hashLoadCount')"
+              @blur="markCountFieldBlur('hashLoadCount')"
+            />
+            <span class="unit">{{ t('settings.unitItem') }}</span>
+          </div>
+          <div v-if="shouldShowCountError('hashLoadCount')" class="input-error-text">{{ COUNT_ERROR_TEXT }}</div>
         </div>
       </div>
 
@@ -37,9 +61,21 @@
           <span class="label-text">{{ t('settings.listLoadCount') }}</span>
           <span class="label-hint">{{ t('settings.listLoadHint') }}</span>
         </label>
-        <div class="input-unit">
-          <input v-model.number="form.listLoadCount" type="number" min="10" max="10000" step="50" />
-          <span class="unit">{{ t('settings.unitItem') }}</span>
+        <div class="input-unit count-input-wrap">
+          <div class="count-input-row">
+            <input
+              v-model="form.listLoadCount"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              :class="{ 'input-invalid': shouldShowCountError('listLoadCount') }"
+              @keydown="blockNonNumericInput"
+              @input="sanitizeCountField('listLoadCount')"
+              @blur="markCountFieldBlur('listLoadCount')"
+            />
+            <span class="unit">{{ t('settings.unitItem') }}</span>
+          </div>
+          <div v-if="shouldShowCountError('listLoadCount')" class="input-error-text">{{ COUNT_ERROR_TEXT }}</div>
         </div>
       </div>
 
@@ -48,9 +84,21 @@
           <span class="label-text">{{ t('settings.setLoadCount') }}</span>
           <span class="label-hint">{{ t('settings.setLoadHint') }}</span>
         </label>
-        <div class="input-unit">
-          <input v-model.number="form.setLoadCount" type="number" min="10" max="10000" step="50" />
-          <span class="unit">{{ t('settings.unitMember') }}</span>
+        <div class="input-unit count-input-wrap">
+          <div class="count-input-row">
+            <input
+              v-model="form.setLoadCount"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              :class="{ 'input-invalid': shouldShowCountError('setLoadCount') }"
+              @keydown="blockNonNumericInput"
+              @input="sanitizeCountField('setLoadCount')"
+              @blur="markCountFieldBlur('setLoadCount')"
+            />
+            <span class="unit">{{ t('settings.unitMember') }}</span>
+          </div>
+          <div v-if="shouldShowCountError('setLoadCount')" class="input-error-text">{{ COUNT_ERROR_TEXT }}</div>
         </div>
       </div>
 
@@ -59,9 +107,21 @@
           <span class="label-text">{{ t('settings.zsetLoadCount') }}</span>
           <span class="label-hint">{{ t('settings.zsetLoadHint') }}</span>
         </label>
-        <div class="input-unit">
-          <input v-model.number="form.zsetLoadCount" type="number" min="10" max="10000" step="50" />
-          <span class="unit">{{ t('settings.unitMember') }}</span>
+        <div class="input-unit count-input-wrap">
+          <div class="count-input-row">
+            <input
+              v-model="form.zsetLoadCount"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              :class="{ 'input-invalid': shouldShowCountError('zsetLoadCount') }"
+              @keydown="blockNonNumericInput"
+              @input="sanitizeCountField('zsetLoadCount')"
+              @blur="markCountFieldBlur('zsetLoadCount')"
+            />
+            <span class="unit">{{ t('settings.unitMember') }}</span>
+          </div>
+          <div v-if="shouldShowCountError('zsetLoadCount')" class="input-error-text">{{ COUNT_ERROR_TEXT }}</div>
         </div>
       </div>
 
@@ -70,9 +130,21 @@
           <span class="label-text">{{ t('settings.streamLoadCount') }}</span>
           <span class="label-hint">{{ t('settings.streamLoadHint') }}</span>
         </label>
-        <div class="input-unit">
-          <input v-model.number="form.streamLoadCount" type="number" min="10" max="10000" step="50" />
-          <span class="unit">{{ t('settings.unitItem') }}</span>
+        <div class="input-unit count-input-wrap">
+          <div class="count-input-row">
+            <input
+              v-model="form.streamLoadCount"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              :class="{ 'input-invalid': shouldShowCountError('streamLoadCount') }"
+              @keydown="blockNonNumericInput"
+              @input="sanitizeCountField('streamLoadCount')"
+              @blur="markCountFieldBlur('streamLoadCount')"
+            />
+            <span class="unit">{{ t('settings.unitItem') }}</span>
+          </div>
+          <div v-if="shouldShowCountError('streamLoadCount')" class="input-error-text">{{ COUNT_ERROR_TEXT }}</div>
         </div>
       </div>
 
@@ -281,10 +353,20 @@ const titleTapCount = ref(0)
 let titleTapTimer = null
 let saveFlashTimer = null
 let errorFlashTimer = null
+const COUNT_ERROR_TEXT = '只允许输入1到10000'
+const countFieldTouched = reactive({
+  keyScanCount: false,
+  hashLoadCount: false,
+  listLoadCount: false,
+  setLoadCount: false,
+  zsetLoadCount: false,
+  streamLoadCount: false,
+})
 
 onMounted(async () => {
   await settingsStore.load()
   syncFromStore()
+  resetCountFieldTouched()
   try {
     appVersion.value = await getAppVersion()
   } catch {
@@ -293,12 +375,12 @@ onMounted(async () => {
 })
 
 function syncFromStore() {
-  form.keyScanCount = settingsStore.keyScanCount
-  form.hashLoadCount = settingsStore.hashLoadCount
-  form.listLoadCount = settingsStore.listLoadCount
-  form.setLoadCount = settingsStore.setLoadCount
-  form.zsetLoadCount = settingsStore.zsetLoadCount
-  form.streamLoadCount = settingsStore.streamLoadCount
+  form.keyScanCount = normalizeCountValue(settingsStore.keyScanCount)
+  form.hashLoadCount = normalizeCountValue(settingsStore.hashLoadCount)
+  form.listLoadCount = normalizeCountValue(settingsStore.listLoadCount)
+  form.setLoadCount = normalizeCountValue(settingsStore.setLoadCount)
+  form.zsetLoadCount = normalizeCountValue(settingsStore.zsetLoadCount)
+  form.streamLoadCount = normalizeCountValue(settingsStore.streamLoadCount)
   form.searchHistoryLimit = settingsStore.searchHistoryLimit
   form.keyDisplayMode = settingsStore.keyDisplayMode
   form.fontSizeLevel = settingsStore.fontSizeLevel
@@ -328,6 +410,63 @@ function reset() {
   form.watermarkOpacity = 12
   form.watermarkDensity = 3
   form.language = 'zh'
+  resetCountFieldTouched()
+}
+
+const COUNT_FIELDS = [
+  'keyScanCount',
+  'hashLoadCount',
+  'listLoadCount',
+  'setLoadCount',
+  'zsetLoadCount',
+  'streamLoadCount',
+]
+
+function blockNonNumericInput(event) {
+  const allowKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']
+  if (allowKeys.includes(event.key) || event.ctrlKey || event.metaKey) {
+    return
+  }
+  if (!/^\d$/.test(event.key)) {
+    event.preventDefault()
+  }
+}
+
+function normalizeCountValue(value) {
+  const digits = String(value ?? '').replace(/\D/g, '')
+  if (!digits) return 1
+  const numeric = Number.parseInt(digits, 10)
+  if (!Number.isFinite(numeric)) return 1
+  return Math.min(10000, Math.max(1, numeric))
+}
+
+function sanitizeCountField(field) {
+  form[field] = String(form[field] ?? '').replace(/\D/g, '')
+}
+
+function normalizeCountField(field) {
+  form[field] = normalizeCountValue(form[field])
+}
+
+function markCountFieldBlur(field) {
+  countFieldTouched[field] = true
+}
+
+function resetCountFieldTouched() {
+  for (const field of COUNT_FIELDS) {
+    countFieldTouched[field] = false
+  }
+}
+
+function isCountFieldInvalid(field) {
+  const raw = String(form[field] ?? '').trim()
+  if (!raw) return true
+  const numeric = Number.parseInt(raw, 10)
+  return !Number.isFinite(numeric) || numeric < 1 || numeric > 10000
+}
+
+function shouldShowCountError(field) {
+  return !!countFieldTouched[field] && isCountFieldInvalid(field)
 }
 
 function handleTitleClick() {
@@ -379,6 +518,18 @@ async function doSave() {
   saving.value = true
   msg.value = ''
   try {
+    for (const field of COUNT_FIELDS) {
+      if (isCountFieldInvalid(field)) {
+        countFieldTouched[field] = true
+        ok.value = false
+        msg.value = COUNT_ERROR_TEXT
+        triggerErrorFlash()
+        return
+      }
+    }
+    for (const field of COUNT_FIELDS) {
+      normalizeCountField(field)
+    }
     const result = await settingsStore.save({ ...form })
     ok.value = result.success
     msg.value = result.success ? t('settings.saveOk') : (result.message || t('settings.saveErr'))
@@ -534,6 +685,17 @@ function openRelease() {
   gap: 4px;
   flex-shrink: 0;
 }
+.count-input-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.count-input-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .input-unit input {
   width: 80px;
   padding: 7px 10px;
@@ -549,6 +711,16 @@ function openRelease() {
   width: 220px !important;
   text-align: left !important;
 }
+.input-unit input.input-invalid {
+  border-color: rgba(239, 68, 68, 0.9);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+.input-error-text {
+  font-size: 11px;
+  color: #dc2626;
+  line-height: 1.2;
+}
 .input-unit-wide {
   width: 220px;
   justify-content: flex-end;
@@ -562,6 +734,11 @@ function openRelease() {
 .unit {
   font-size: 12px;
   color: #6b7280;
+  white-space: nowrap;
+}
+.input-range-hint {
+  font-size: 11px;
+  color: #94a3b8;
   white-space: nowrap;
 }
 .lang-select {
@@ -844,7 +1021,8 @@ function openRelease() {
 }
 
 .settings-panel.theme-dark .label-hint,
-.settings-panel.theme-dark .unit {
+.settings-panel.theme-dark .unit,
+.settings-panel.theme-dark .input-range-hint {
   color: #94a3b8;
 }
 
@@ -854,6 +1032,14 @@ function openRelease() {
   border-color: rgba(71, 85, 105, 0.96);
   background: rgba(15, 23, 42, 0.94);
   color: #e2e8f0;
+}
+.settings-panel.theme-dark .input-unit input.input-invalid {
+  border-color: rgba(248, 113, 113, 0.9);
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.14);
+  color: #fecaca;
+}
+.settings-panel.theme-dark .input-error-text {
+  color: #fda4af;
 }
 
 .settings-panel.theme-dark .settings-footer {

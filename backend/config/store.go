@@ -226,20 +226,38 @@ func SaveSettings(s AppSettings) error {
 	if s.KeyScanCount <= 0 {
 		s.KeyScanCount = 100
 	}
+	if s.KeyScanCount > 10000 {
+		s.KeyScanCount = 10000
+	}
 	if s.HashLoadCount <= 0 {
 		s.HashLoadCount = 200
+	}
+	if s.HashLoadCount > 10000 {
+		s.HashLoadCount = 10000
 	}
 	if s.ListLoadCount <= 0 {
 		s.ListLoadCount = 100
 	}
+	if s.ListLoadCount > 10000 {
+		s.ListLoadCount = 10000
+	}
 	if s.SetLoadCount <= 0 {
 		s.SetLoadCount = 100
+	}
+	if s.SetLoadCount > 10000 {
+		s.SetLoadCount = 10000
 	}
 	if s.ZSetLoadCount <= 0 {
 		s.ZSetLoadCount = 100
 	}
+	if s.ZSetLoadCount > 10000 {
+		s.ZSetLoadCount = 10000
+	}
 	if s.StreamLoadCount <= 0 {
 		s.StreamLoadCount = 100
+	}
+	if s.StreamLoadCount > 10000 {
+		s.StreamLoadCount = 10000
 	}
 	if s.SearchHistoryLimit <= 0 {
 		s.SearchHistoryLimit = 10

@@ -48,6 +48,19 @@ function normalizePersistedSearchHistory(raw) {
   return normalized
 }
 
+function collectExpandableNodePaths(treeData = [], output = []) {
+  for (const node of treeData) {
+    if (!node || node.isLeaf) continue
+    if (node.fullPath) {
+      output.push(node.fullPath)
+    }
+    if (Array.isArray(node.children) && node.children.length) {
+      collectExpandableNodePaths(node.children, output)
+    }
+  }
+  return output
+}
+
 export const useWorkspaceStore = defineStore('workspace', {
   state: () => {
     // 从 localStorage 加载持久化的搜索历史
@@ -149,15 +162,21 @@ export const useWorkspaceStore = defineStore('workspace', {
     async refreshAfterReconnect(connId) {
       if (!connId || this.activeConnID !== connId) return
       this.keyValueError = null
+      const connectionsStore = useConnectionsStore()
+      const conn = connectionsStore.connections.find(item => item.id === connId)
+      const clusterExactOnly = !!conn?.is_cluster && !conn?.allow_cluster_scan
 
       if (this.activeSession?.pattern) {
         const pattern = this.activeSession.pattern
-        if (pattern !== '*') {
+        if (clusterExactOnly && pattern === '*') {
+          this.searchSessions = []
+          this.activeSessionId = null
+        } else if (pattern !== '*') {
           await this.search(pattern)
         } else {
           await this.search('*')
         }
-      } else {
+      } else if (!clusterExactOnly) {
         await this.search('*')
       }
 
@@ -283,6 +302,10 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     isNodeExpanded(fullPath, depth = 0) {
+      const connMap = this.expandedNodes[this.activeConnID] || {}
+      if (Object.prototype.hasOwnProperty.call(connMap, fullPath)) {
+        return !!connMap[fullPath]
+      }
       if (this.keepPrevSearch) return true
       const session = this.activeSession
       // 搜索了具体 pattern 且有有效数据时，默认全部展开
@@ -295,10 +318,6 @@ export const useWorkspaceStore = defineStore('workspace', {
       ) {
         return true
       }
-      const connMap = this.expandedNodes[this.activeConnID] || {}
-      if (Object.prototype.hasOwnProperty.call(connMap, fullPath)) {
-        return !!connMap[fullPath]
-      }
       return depth < 1
     },
 
@@ -310,6 +329,19 @@ export const useWorkspaceStore = defineStore('workspace', {
         [fullPath]: expanded,
       }
       // 用户手动干预展开状态后，不再自动全部展开
+      this._autoExpandSessionId = null
+    },
+
+    setVisibleTreeExpanded(treeData, expanded) {
+      if (!this.activeConnID || !Array.isArray(treeData) || treeData.length === 0) return
+      const paths = collectExpandableNodePaths(treeData)
+      if (!paths.length) return
+      const connMap = this.expandedNodes[this.activeConnID] || {}
+      const nextMap = { ...connMap }
+      for (const path of paths) {
+        nextMap[path] = expanded
+      }
+      this.expandedNodes[this.activeConnID] = nextMap
       this._autoExpandSessionId = null
     },
 
