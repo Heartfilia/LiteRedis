@@ -3,6 +3,14 @@ import { getSettings, saveSettings } from '../api/wails.js'
 import { setLanguage } from '../i18n/index.js'
 import { useWorkspaceStore } from './workspace.js'
 
+const DEFAULT_LOAD_COUNT = 20
+
+export function normalizeLoadCount(value, fallback = DEFAULT_LOAD_COUNT) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) return fallback
+  return Math.min(10000, Math.trunc(numeric))
+}
+
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
     loaded: false,
@@ -54,12 +62,12 @@ export const useSettingsStore = defineStore('settings', {
           }
         } catch (e) {}
         const s = await getSettings()
-        this.keyScanCount = s.key_scan_count || 20
-        this.hashLoadCount = s.hash_load_count || 20
-        this.listLoadCount = s.list_load_count || 20
-        this.setLoadCount = s.set_load_count || 20
-        this.zsetLoadCount = s.zset_load_count || 20
-        this.streamLoadCount = s.stream_load_count || 20
+        this.keyScanCount = normalizeLoadCount(s.key_scan_count)
+        this.hashLoadCount = normalizeLoadCount(s.hash_load_count)
+        this.listLoadCount = normalizeLoadCount(s.list_load_count)
+        this.setLoadCount = normalizeLoadCount(s.set_load_count)
+        this.zsetLoadCount = normalizeLoadCount(s.zset_load_count)
+        this.streamLoadCount = normalizeLoadCount(s.stream_load_count)
         this.searchHistoryLimit = s.search_history_limit || 10
         this.keyDisplayMode = s.key_display_mode || 'tree'
         this.fontSizeLevel = s.font_size_level || 'small'

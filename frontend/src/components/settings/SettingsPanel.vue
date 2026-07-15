@@ -283,8 +283,13 @@
 
     <div class="settings-footer">
       <div class="footer-status">
-        <button class="version-box" :disabled="checkingUpdate" @click="checkUpdate">
-          {{ t('settings.version') }} {{ appVersion }}
+        <button
+          class="version-box"
+          :disabled="checkingUpdate || updating"
+          :title="hasUpdate ? t('settings.updateNow') : t('settings.checkUpdate')"
+          @click="handleVersionClick"
+        >
+          {{ hasUpdate ? t('settings.updateNow') : `${t('settings.version')} ${appVersion}` }}
         </button>
         <span
           v-if="hasUpdate"
@@ -311,10 +316,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onBeforeUnmount, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
-import { getAppVersion, checkLatestRelease } from '../../api/wails.js'
+import { getAppVersion, checkLatestRelease, startUpdate } from '../../api/wails.js'
+import { createRequestGuard } from '../../utils/requestGuard.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 
 const { t, setLanguage } = useI18n()
@@ -343,6 +349,7 @@ const form = reactive({
 
 const saving = ref(false)
 const checkingUpdate = ref(false)
+const updating = ref(false)
 const appVersion = ref('dev')
 const hasUpdate = ref(false)
 const msg = ref('')
@@ -353,6 +360,8 @@ const titleTapCount = ref(0)
 let titleTapTimer = null
 let saveFlashTimer = null
 let errorFlashTimer = null
+let messageTimer = null
+const requestGuard = createRequestGuard(() => ({}))
 const COUNT_ERROR_TEXT = '只允许输入1到10000'
 const countFieldTouched = reactive({
   keyScanCount: false,
@@ -372,6 +381,14 @@ onMounted(async () => {
   } catch {
     appVersion.value = 'dev'
   }
+})
+
+onBeforeUnmount(() => {
+  requestGuard.invalidateAll()
+  if (titleTapTimer) clearTimeout(titleTapTimer)
+  if (saveFlashTimer) clearTimeout(saveFlashTimer)
+  if (errorFlashTimer) clearTimeout(errorFlashTimer)
+  if (messageTimer) clearTimeout(messageTimer)
 })
 
 function syncFromStore() {
@@ -549,35 +566,83 @@ async function doSave() {
   }
 }
 
+async function handleVersionClick() {
+  if (hasUpdate.value) {
+    await installUpdate()
+    return
+  }
+  await checkUpdate()
+}
+
+function clearMessageTimer() {
+  if (!messageTimer) return
+  clearTimeout(messageTimer)
+  messageTimer = null
+}
+
+function scheduleMessageClear() {
+  clearMessageTimer()
+  messageTimer = setTimeout(() => {
+    msg.value = ''
+    messageTimer = null
+  }, 3000)
+}
+
 async function checkUpdate() {
+  const request = requestGuard.begin('update')
   checkingUpdate.value = true
+  clearMessageTimer()
   msg.value = ''
   try {
     const result = await checkLatestRelease()
+    if (!requestGuard.isCurrent(request)) return
     if (result.error) {
       hasUpdate.value = false
       ok.value = false
       msg.value = result.error || t('settings.updateFailed')
-      setTimeout(() => { msg.value = '' }, 3000)
+      scheduleMessageClear()
       return
     }
     ok.value = true
     if (result.need_update) {
       hasUpdate.value = true
       msg.value = t('settings.updateAvailable').replace('{version}', `v${result.latest}`)
-      setTimeout(() => { msg.value = '' }, 3000)
+      scheduleMessageClear()
       return
     }
     hasUpdate.value = false
     msg.value = t('settings.latestVersion')
-    setTimeout(() => { msg.value = '' }, 3000)
+    scheduleMessageClear()
   } catch (e) {
+    if (!requestGuard.isCurrent(request)) return
     hasUpdate.value = false
     ok.value = false
     msg.value = e.message || String(e) || t('settings.updateFailed')
-    setTimeout(() => { msg.value = '' }, 3000)
+    scheduleMessageClear()
   } finally {
-    checkingUpdate.value = false
+    if (requestGuard.isCurrent(request)) checkingUpdate.value = false
+    requestGuard.finish(request)
+  }
+}
+
+async function installUpdate() {
+  const request = requestGuard.begin('update')
+  updating.value = true
+  clearMessageTimer()
+  msg.value = ''
+  try {
+    const result = await startUpdate()
+    if (!requestGuard.isCurrent(request)) return
+    ok.value = !!result.success
+    msg.value = result.message || (result.success ? t('settings.updateStarted') : t('settings.updateFailed'))
+    if (result.success) hasUpdate.value = false
+  } catch (e) {
+    if (!requestGuard.isCurrent(request)) return
+    ok.value = false
+    msg.value = e?.message || String(e) || t('settings.updateFailed')
+  } finally {
+    if (requestGuard.isCurrent(request)) updating.value = false
+    requestGuard.finish(request)
   }
 }
 

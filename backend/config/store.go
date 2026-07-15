@@ -1,9 +1,12 @@
 package config
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"sync"
 	"time"
@@ -38,9 +41,16 @@ func loadStore() (*ConfigStore, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := secureConfigPermissions(configPath); err != nil {
+		return nil, fmt.Errorf("secure config permissions: %w", err)
+	}
 	var store ConfigStore
 	if err := json.Unmarshal(data, &store); err != nil {
-		return &ConfigStore{Version: 1, Connections: []ConnectionConfig{}, Settings: DefaultSettings()}, nil
+		backupPath, backupErr := backupCorruptStore(data)
+		if backupErr != nil {
+			return nil, fmt.Errorf("invalid config JSON at %s: %w (backup failed: %v)", configPath, err, backupErr)
+		}
+		return nil, fmt.Errorf("invalid config JSON at %s; original preserved and backup saved to %s: %w", configPath, backupPath, err)
 	}
 	// 迁移：若旧数据没有 Settings 字段，补默认值
 	if store.Settings.KeyScanCount == 0 || store.Settings.SearchHistoryLimit == 0 {
@@ -50,6 +60,25 @@ func loadStore() (*ConfigStore, error) {
 	return &store, nil
 }
 
+func backupCorruptStore(data []byte) (string, error) {
+	modifiedAt := time.Now()
+	if info, err := os.Stat(configPath); err == nil {
+		modifiedAt = info.ModTime()
+	}
+	digest := sha256.Sum256(data)
+	stamp := modifiedAt.UTC().Format("20060102T150405.000000000Z")
+	backupPath := fmt.Sprintf("%s.corrupt-%s-%x.bak", configPath, stamp, digest[:6])
+	if _, err := os.Stat(backupPath); err == nil {
+		return backupPath, nil
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	if err := atomicWriteFile(backupPath, data, 0600); err != nil {
+		return "", err
+	}
+	return backupPath, nil
+}
+
 // saveStore 写入磁盘（不加锁，调用方负责）
 func saveStore(store *ConfigStore) error {
 	ensureConnectionOrder(store)
@@ -57,7 +86,14 @@ func saveStore(store *ConfigStore) error {
 	if err != nil {
 		return err
 	}
-	return atomicWriteFile(configPath, data, 0644)
+	return atomicWriteFile(configPath, data, 0600)
+}
+
+func secureConfigPermissions(path string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	return os.Chmod(path, 0600)
 }
 
 func ensureConnectionOrder(store *ConfigStore) {
@@ -222,39 +258,40 @@ func SaveSettings(s AppSettings) error {
 	if err != nil {
 		return err
 	}
-	// 边界保护：不允许为 0
+	defaults := DefaultSettings()
+	// 边界保护：非法值回退到与新配置一致的默认值。
 	if s.KeyScanCount <= 0 {
-		s.KeyScanCount = 100
+		s.KeyScanCount = defaults.KeyScanCount
 	}
 	if s.KeyScanCount > 10000 {
 		s.KeyScanCount = 10000
 	}
 	if s.HashLoadCount <= 0 {
-		s.HashLoadCount = 200
+		s.HashLoadCount = defaults.HashLoadCount
 	}
 	if s.HashLoadCount > 10000 {
 		s.HashLoadCount = 10000
 	}
 	if s.ListLoadCount <= 0 {
-		s.ListLoadCount = 100
+		s.ListLoadCount = defaults.ListLoadCount
 	}
 	if s.ListLoadCount > 10000 {
 		s.ListLoadCount = 10000
 	}
 	if s.SetLoadCount <= 0 {
-		s.SetLoadCount = 100
+		s.SetLoadCount = defaults.SetLoadCount
 	}
 	if s.SetLoadCount > 10000 {
 		s.SetLoadCount = 10000
 	}
 	if s.ZSetLoadCount <= 0 {
-		s.ZSetLoadCount = 100
+		s.ZSetLoadCount = defaults.ZSetLoadCount
 	}
 	if s.ZSetLoadCount > 10000 {
 		s.ZSetLoadCount = 10000
 	}
 	if s.StreamLoadCount <= 0 {
-		s.StreamLoadCount = 100
+		s.StreamLoadCount = defaults.StreamLoadCount
 	}
 	if s.StreamLoadCount > 10000 {
 		s.StreamLoadCount = 10000

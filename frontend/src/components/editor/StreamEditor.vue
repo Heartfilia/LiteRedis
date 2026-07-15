@@ -1,7 +1,10 @@
 <template>
   <div class="stream-editor" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <div class="toolbar">
-      <span class="count">{{ displayEntries.length }} / {{ entries.length }} {{ t('settings.unitItem') }}</span>
+      <span class="count">{{ entries.length }} / {{ totalEntries }} {{ t('settings.unitItem') }}</span>
+      <button v-if="hasMore" class="btn-load-more" :disabled="valueLoading" @click="loadMore">
+        {{ valueLoading ? '...' : t('keyTree.loadMore') }}
+      </button>
     </div>
     <div class="stream-wrap">
       <div v-for="(entry, idx) in displayEntries" :key="entry.id" class="stream-entry">
@@ -25,30 +28,88 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue'
+import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
+import { createRequestGuard } from '../../utils/requestGuard.js'
+import { mergeStreamEntries } from '../../utils/streamPagination.js'
+import { isConnectionErrorMessage } from '../../utils/connection.js'
+import { getValue } from '../../api/wails.js'
 import './editorShared.css'
 
 const props = defineProps({ keyValue: Object })
+const workspaceStore = useWorkspaceStore()
+const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
+const requestGuard = createRequestGuard(() => ({
+  connID: workspaceStore.activeConnID,
+  db: workspaceStore.currentDB,
+  key: props.keyValue?.key || null,
+}))
 
 const entries = ref([])
 const copiedEntry = ref(null)
+const hasMore = ref(false)
+const nextStreamID = ref('')
+const totalCount = ref(-1)
+const valueLoading = ref(false)
+let copyTimer = null
 
-// Stream 暂不分页，直接显示全部
 const displayEntries = computed(() => entries.value)
+const totalEntries = computed(() => totalCount.value >= 0 ? totalCount.value : entries.value.length)
 
 watch(() => props.keyValue, kv => {
+  requestGuard.invalidateAll()
   entries.value = kv?.stream_val || []
+  hasMore.value = !!kv?.has_more
+  nextStreamID.value = kv?.next_stream_id || ''
+  totalCount.value = Number.isFinite(kv?.total_count) ? kv.total_count : -1
+  valueLoading.value = false
+  copiedEntry.value = null
 }, { immediate: true })
+
+onBeforeUnmount(() => {
+  requestGuard.invalidateAll()
+  if (copyTimer) clearTimeout(copyTimer)
+})
+
+async function loadMore() {
+  if (!hasMore.value || valueLoading.value || !nextStreamID.value) return
+  const request = requestGuard.begin('load')
+  valueLoading.value = true
+  try {
+    const result = await getValue(request.context.connID, request.context.key, 0, 0, '', nextStreamID.value)
+    if (!requestGuard.isCurrent(request)) return
+    entries.value = mergeStreamEntries(entries.value, result.stream_val)
+    hasMore.value = !!result.has_more
+    nextStreamID.value = result.next_stream_id || ''
+    totalCount.value = Number.isFinite(result.total_count) ? result.total_count : totalCount.value
+    connectionsStore.reportConnectionSuccess(request.context.connID)
+  } catch (e) {
+    if (!requestGuard.isCurrent(request)) return
+    const message = e?.message || String(e)
+    if (isConnectionErrorMessage(message)) {
+      await connectionsStore.handleConnectionFailure(request.context.connID, message)
+    }
+    if (requestGuard.isCurrent(request)) connectionsStore.showGlobalToast(message, false)
+  } finally {
+    if (requestGuard.isCurrent(request)) valueLoading.value = false
+    requestGuard.finish(request)
+  }
+}
 
 async function copyEntry(entry) {
   await copyToClipboard(JSON.stringify(entry.fields, null, 2))
   copiedEntry.value = entry.id
-  setTimeout(() => { copiedEntry.value = null }, 1200)
+  if (copyTimer) clearTimeout(copyTimer)
+  copyTimer = setTimeout(() => {
+    copiedEntry.value = null
+    copyTimer = null
+  }, 1200)
 }
 </script>
 

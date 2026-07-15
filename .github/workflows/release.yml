@@ -149,6 +149,14 @@ jobs:
       - name: List artifacts
         run: find artifacts -type f
 
+      - name: Generate SHA-256 checksums
+        run: |
+          find artifacts -mindepth 2 -type f -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            | sed -E 's#  artifacts/[^/]+/#  #' \
+            > artifacts/SHA256SUMS
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -159,3 +167,4 @@ jobs:
             artifacts/linux-amd64/LiteRedis-linux-amd64.tar.gz
             artifacts/windows-amd64/LiteRedis.exe
             artifacts/windows-amd64/LiteRedis-amd64-installer.exe
+            artifacts/SHA256SUMS

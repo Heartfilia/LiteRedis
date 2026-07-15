@@ -215,6 +215,7 @@ export namespace config {
 	    has_more: boolean;
 	    next_cursor: number;
 	    next_offset: number;
+	    next_stream_id?: string;
 	    total_count: number;
 	
 	    static createFrom(source: any = {}) {
@@ -235,6 +236,7 @@ export namespace config {
 	        this.has_more = source["has_more"];
 	        this.next_cursor = source["next_cursor"];
 	        this.next_offset = source["next_offset"];
+	        this.next_stream_id = source["next_stream_id"];
 	        this.total_count = source["total_count"];
 	    }
 	
@@ -259,6 +261,7 @@ export namespace config {
 	export class OperationResult {
 	    success: boolean;
 	    message?: string;
+	    disconnected?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new OperationResult(source);
@@ -268,6 +271,7 @@ export namespace config {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
 	        this.message = source["message"];
+	        this.disconnected = source["disconnected"];
 	    }
 	}
 	export class RedisConnectionOverview {

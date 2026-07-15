@@ -27,7 +27,7 @@ export function GetKeyInfo(arg1:string,arg2:string):Promise<config.RedisKey>;
 
 export function GetSettings():Promise<config.AppSettings>;
 
-export function GetValue(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string):Promise<config.KeyValue>;
+export function GetValue(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string):Promise<config.KeyValue>;
 
 export function HDel(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
@@ -49,6 +49,10 @@ export function RPush(arg1:string,arg2:string,arg3:string):Promise<config.Operat
 
 export function RenameKey(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
+export function RenameSetMember(arg1:string,arg2:string,arg3:string,arg4:string):Promise<config.OperationResult>;
+
+export function RenameZSetMember(arg1:string,arg2:string,arg3:string,arg4:string):Promise<config.OperationResult>;
+
 export function ReorderConnections(arg1:Array<config.ConnectionOrderItem>):Promise<config.OperationResult>;
 
 export function SAdd(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
@@ -65,7 +69,7 @@ export function SearchValue(arg1:string,arg2:string,arg3:string,arg4:string,arg5
 
 export function SelectDB(arg1:string,arg2:number):Promise<config.OperationResult>;
 
-export function SetString(arg1:string,arg2:string,arg3:string,arg4:number):Promise<config.OperationResult>;
+export function SetString(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
 export function SetTTL(arg1:string,arg2:string,arg3:number):Promise<config.OperationResult>;
 

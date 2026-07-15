@@ -313,6 +313,7 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
+import { createRequestGuard } from '../../utils/requestGuard.js'
 import { hSet, hDel, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
@@ -328,6 +329,11 @@ const workspaceStore = useWorkspaceStore()
 const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
+const requestGuard = createRequestGuard(() => ({
+  connID: workspaceStore.activeConnID,
+  db: workspaceStore.currentDB,
+  key: props.keyValue?.key || null,
+}))
 
 const rawHashVal = ref({})
 const showAdd = ref(false)
@@ -390,6 +396,8 @@ const searchAllResults = ref([])
 const searchVisibleCount = ref(0)
 const searchAppliedQuery = ref('')
 const searchAppliedFuzzy = ref(false)
+const searchNextCursor = ref(0)
+const searchBackendHasMore = ref(false)
 const isSearching   = ref(false)
 const fuzzySearch   = ref(false)
 const canToggleFuzzy = computed(() => searchQuery.value.trim().length > 0)
@@ -427,9 +435,11 @@ const hasMore = ref(false)
 const nextCursor = ref(0)
 const valueLoading = ref(false)
 
-async function handleConnectionFailure(error) {
+async function handleConnectionFailure(error, request = null) {
+  if (request && !requestGuard.isCurrent(request)) return true
   if (!isConnectionErrorMessage(error)) return false
-  await connectionsStore.handleConnectionFailure(workspaceStore.activeConnID, error)
+  await connectionsStore.handleConnectionFailure(request?.context.connID || workspaceStore.activeConnID, error)
+  if (request && !requestGuard.isCurrent(request)) return true
   ok.value = false
   msg.value = formatConnectionLostMessage(error)
   return true
@@ -459,7 +469,11 @@ const filteredCalcLogs = computed(() => {
   return calcLogs.value.filter(log => log.tone === calcLogFilter.value)
 })
 const visibleSearchResults = computed(() => searchAllResults.value.slice(0, searchVisibleCount.value))
-const searchHasMore = computed(() => searchResults.value !== null && searchVisibleCount.value < searchAllResults.value.length)
+const searchHasMore = computed(() =>
+  searchResults.value !== null && (
+    searchVisibleCount.value < searchAllResults.value.length || searchBackendHasMore.value
+  )
+)
 const canUseCalcSearchFilter = computed(() => searchQuery.value.trim().length > 0)
 const calcSearchHighlight = computed(() =>
   calcPanelOpen.value && calcUseSearchFilter.value && canUseCalcSearchFilter.value
@@ -535,12 +549,18 @@ watch(calcGroupOptions, (options) => {
 })
 
 onBeforeUnmount(() => {
+  requestGuard.invalidateAll()
   persistSearchState()
   hideCalcFilterHint()
 })
 
 watch(() => props.keyValue, (kv) => {
+  requestGuard.invalidateAll()
   persistSearchState(lastKey.value)
+  valueLoading.value = false
+  isSearching.value = false
+  calculating.value = false
+  expandSaving.value = false
 
   rawHashVal.value = { ...(kv?.hash_val || {}) }
   hasMore.value = kv?.has_more || false
@@ -568,6 +588,8 @@ watch(() => props.keyValue, (kv) => {
   searchVisibleCount.value = 0
   searchAppliedQuery.value = ''
   searchAppliedFuzzy.value = false
+  searchNextCursor.value = 0
+  searchBackendHasMore.value = false
 
   sortOrder.value = 'none'
   msg.value = ''
@@ -577,30 +599,102 @@ watch(() => props.keyValue, (kv) => {
 async function loadMore() {
   if (valueLoading.value || !props.keyValue?.key) return
   if (searchResults.value !== null) {
-    if (!searchHasMore.value) return
-    searchVisibleCount.value = Math.min(
-      searchAllResults.value.length,
-      searchVisibleCount.value + searchPageSize.value,
-    )
+    if (searchVisibleCount.value < searchAllResults.value.length) {
+      searchVisibleCount.value = Math.min(
+        searchAllResults.value.length,
+        searchVisibleCount.value + searchPageSize.value,
+      )
+      return
+    }
+    if (!searchBackendHasMore.value) return
+    const request = requestGuard.begin('search')
+    valueLoading.value = true
+    try {
+      const page = await fetchHashSearchPage(
+        searchAppliedQuery.value,
+        !searchAppliedFuzzy.value,
+        searchNextCursor.value,
+        request,
+      )
+      if (!page || !requestGuard.isCurrent(request)) return
+      mergeHashSearchEntries(page.entries)
+      searchNextCursor.value = page.nextCursor
+      searchBackendHasMore.value = page.hasMore
+      searchVisibleCount.value = Math.min(
+        searchAllResults.value.length,
+        searchVisibleCount.value + searchPageSize.value,
+      )
+    } catch (e) {
+      if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
+        ok.value = false
+        msg.value = e.message || String(e)
+      }
+    } finally {
+      if (requestGuard.isCurrent(request)) valueLoading.value = false
+      requestGuard.finish(request)
+    }
     return
   }
+  const request = requestGuard.begin('load')
   valueLoading.value = true
   try {
     if (!hasMore.value) return
-    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, nextCursor.value, 0, '')
+    const result = await getValue(request.context.connID, request.context.key, nextCursor.value, 0, '')
+    if (!requestGuard.isCurrent(request)) return
     if (result.hash_val) {
       rawHashVal.value = { ...rawHashVal.value, ...result.hash_val }
     }
     hasMore.value = result.has_more || false
     nextCursor.value = result.next_cursor || 0
   } catch (e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message || String(e)
     }
   } finally {
-    valueLoading.value = false
+    if (requestGuard.isCurrent(request)) valueLoading.value = false
+    requestGuard.finish(request)
   }
+}
+
+async function fetchHashSearchPage(pattern, exact, cursor = 0, request) {
+  let pageCursor = cursor
+  let hasMore = true
+  const entries = []
+  const seenCursors = new Set([cursor])
+
+  while (hasMore && entries.length === 0) {
+    const kv = await searchValue(
+      request.context.connID,
+      request.context.key,
+      'hash',
+      pattern,
+      exact,
+      pageCursor,
+    )
+    if (!requestGuard.isCurrent(request)) return null
+    entries.push(...Object.entries(kv.hash_val || {}))
+    const nextCursor = kv.next_cursor || 0
+    hasMore = !!kv.has_more && nextCursor !== 0
+    if (!hasMore || seenCursors.has(nextCursor)) {
+      if (seenCursors.has(nextCursor) && nextCursor !== 0) hasMore = false
+      pageCursor = nextCursor
+      break
+    }
+    seenCursors.add(nextCursor)
+    pageCursor = nextCursor
+  }
+
+  return { entries, nextCursor: pageCursor, hasMore }
+}
+
+function mergeHashSearchEntries(entries, replace = false) {
+  const merged = new Map(replace ? [] : searchAllResults.value)
+  for (const [field, value] of entries) {
+    merged.set(field, value)
+  }
+  searchAllResults.value = [...merged.entries()]
+  searchResults.value = searchAllResults.value
 }
 
 // 搜索
@@ -612,40 +706,47 @@ async function executeSearch() {
     msg.value = t('keyEditor.fuzzyRequireStar')
     return
   }
+  const request = requestGuard.begin('search')
   isSearching.value = true
+  searchResults.value = []
+  searchAllResults.value = []
+  searchVisibleCount.value = 0
+  searchAppliedQuery.value = ''
+  searchAppliedFuzzy.value = false
+  searchNextCursor.value = 0
+  searchBackendHasMore.value = false
   try {
     const exact = !fuzzySearch.value
-    let cursor = 0
-    let merged = {}
-
-    while (true) {
-      const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'hash', pattern, exact, cursor)
-      merged = { ...merged, ...(kv.hash_val || {}) }
-      if (!kv.has_more || !kv.next_cursor) break
-      cursor = kv.next_cursor
-    }
-
-    searchAllResults.value = Object.entries(merged)
-    searchVisibleCount.value = searchPageSize.value
-    searchResults.value = searchAllResults.value
+    const page = await fetchHashSearchPage(pattern, exact, 0, request)
+    if (!page || !requestGuard.isCurrent(request)) return
+    mergeHashSearchEntries(page.entries, true)
+    searchVisibleCount.value = Math.min(searchPageSize.value, searchAllResults.value.length)
+    searchNextCursor.value = page.nextCursor
+    searchBackendHasMore.value = page.hasMore
     searchAppliedQuery.value = pattern
     searchAppliedFuzzy.value = fuzzySearch.value
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
   }
-  finally { isSearching.value = false }
+  finally {
+    if (requestGuard.isCurrent(request)) isSearching.value = false
+    requestGuard.finish(request)
+  }
 }
 
 function clearSearch() {
+  requestGuard.invalidate('search')
   searchQuery.value = ''
   searchResults.value = null
   searchAllResults.value = []
   searchVisibleCount.value = 0
   searchAppliedQuery.value = ''
   searchAppliedFuzzy.value = false
+  searchNextCursor.value = 0
+  searchBackendHasMore.value = false
   fuzzySearch.value = false
   if (props.keyValue?.key) {
   workspaceStore.setEditorSearchState(props.keyValue.key, 'hash', null)
@@ -870,29 +971,34 @@ function evaluateCalcSubRules(field, match) {
   return { ok: true, reason: '' }
 }
 
-async function resolveCalculationEntries() {
+async function resolveCalculationEntries(request) {
   const pattern = searchQuery.value.trim()
   if (calcUseSearchFilter.value && pattern) {
-    if (
+    const matchesAppliedSearch =
       searchResults.value !== null &&
       searchAppliedQuery.value === pattern &&
       searchAppliedFuzzy.value === fuzzySearch.value
-    ) {
+
+    if (matchesAppliedSearch && !searchBackendHasMore.value) {
       return searchAllResults.value
     }
 
     const exact = !fuzzySearch.value
-    let cursor = 0
-    let merged = {}
+    let cursor = matchesAppliedSearch ? searchNextCursor.value : 0
+    let hasMore = matchesAppliedSearch ? searchBackendHasMore.value : true
+    const merged = new Map(matchesAppliedSearch ? searchAllResults.value : [])
 
-    while (true) {
-      const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'hash', pattern, exact, cursor)
-      merged = { ...merged, ...(kv.hash_val || {}) }
-      if (!kv.has_more || !kv.next_cursor) break
-      cursor = kv.next_cursor
+    while (hasMore) {
+      const page = await fetchHashSearchPage(pattern, exact, cursor, request)
+      if (!page || !requestGuard.isCurrent(request)) return null
+      for (const [field, value] of page.entries) {
+        merged.set(field, value)
+      }
+      cursor = page.nextCursor
+      hasMore = page.hasMore
     }
 
-    return Object.entries(merged)
+    return [...merged.entries()]
   }
 
   if (calcUseSearchFilter.value && !pattern) {
@@ -904,7 +1010,8 @@ async function resolveCalculationEntries() {
     let cursor = nextCursor.value
     let more = hasMore.value
     while (more) {
-      const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, cursor, 0, '')
+      const result = await getValue(request.context.connID, request.context.key, cursor, 0, '')
+      if (!requestGuard.isCurrent(request)) return null
       merged = { ...merged, ...(result.hash_val || {}) }
       cursor = result.next_cursor || 0
       more = result.has_more || false
@@ -939,9 +1046,11 @@ async function runCalculation() {
 
   calculating.value = true
   calcLogs.value = []
+  const request = requestGuard.begin('calculation')
 
   try {
-    const entries = await resolveCalculationEntries()
+    const entries = await resolveCalculationEntries(request)
+    if (!entries || !requestGuard.isCurrent(request)) return
     let matchedCount = 0
     let total = 0
 
@@ -981,7 +1090,7 @@ async function runCalculation() {
     pushCalcLog('', 'spacer')
     pushCalcLog(t('keyEditor.calcSummary', { total }), 'ok')
   } catch (e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       calcLogs.value = [{
         id: 'calc-log-runtime-error',
         text: t('keyEditor.calcRunFailed', { message: e.message || String(e) }),
@@ -989,7 +1098,8 @@ async function runCalculation() {
       }]
     }
   } finally {
-    calculating.value = false
+    if (requestGuard.isCurrent(request)) calculating.value = false
+    requestGuard.finish(request)
   }
 }
 
@@ -1013,10 +1123,12 @@ function openEdit(field, val) {
 async function saveFromModal(newVal) {
   const field = editModalField.value
   if (!field) return
+  const request = requestGuard.begin(`write:modal:${field}`)
   expandSaving.value = true
   try {
-    const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, field, newVal)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const result = await hSet(request.context.connID, request.context.key, field, newVal)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
@@ -1027,12 +1139,13 @@ async function saveFromModal(newVal) {
       expandShow.value = false
     }
   } catch (e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
   } finally {
-    expandSaving.value = false
+    if (requestGuard.isCurrent(request)) expandSaving.value = false
+    requestGuard.finish(request)
   }
 }
 
@@ -1044,30 +1157,37 @@ async function copyVal(val, field) {
 
 async function saveEdit(field) {
   if (editingField.value !== field) return
+  const nextValue = editValue.value
+  const request = requestGuard.begin(`write:field:${field}`)
   editingField.value = null
   try {
-    const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, field, editValue.value)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const result = await hSet(request.context.connID, request.context.key, field, nextValue)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      rawHashVal.value = { ...rawHashVal.value, [field]: editValue.value }
+      rawHashVal.value = { ...rawHashVal.value, [field]: nextValue }
       if (searchResults.value !== null) {
-        searchResults.value = searchResults.value.map(([f, v]) => f === field ? [field, editValue.value] : [f, v])
+        searchResults.value = searchResults.value.map(([f, v]) => f === field ? [field, nextValue] : [f, v])
       }
     }
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
+  } finally {
+    requestGuard.finish(request)
   }
 }
 
 async function deleteField(field) {
+  const request = requestGuard.begin(`write:delete:${field}`)
   try {
-    const result = await hDel(workspaceStore.activeConnID, props.keyValue.key, field)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const result = await hDel(request.context.connID, request.context.key, field)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
@@ -1080,24 +1200,29 @@ async function deleteField(field) {
       }
     }
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
+  } finally {
+    requestGuard.finish(request)
   }
 }
 
 async function addField() {
   if (!newField.value.trim()) return
+  const field = newField.value.trim()
+  const value = newValue.value
+  const request = requestGuard.begin(`write:add:${field}`)
   try {
-    const field = newField.value.trim()
     const existed = Object.prototype.hasOwnProperty.call(rawHashVal.value, field)
-    const result = await hSet(workspaceStore.activeConnID, props.keyValue.key, field, newValue.value)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const result = await hSet(request.context.connID, request.context.key, field, value)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      rawHashVal.value = { ...rawHashVal.value, [field]: newValue.value }
+      rawHashVal.value = { ...rawHashVal.value, [field]: value }
       if (!existed) {
         totalFieldCount.value++
       }
@@ -1105,10 +1230,12 @@ async function addField() {
       triggerAddFlash()
     }
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
+  } finally {
+    requestGuard.finish(request)
   }
 }
 </script>

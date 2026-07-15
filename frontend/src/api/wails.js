@@ -30,10 +30,11 @@ export const setTTL = (connID, key, ttl) => callGo('SetTTL', connID, key, ttl)
 export const dbSize = (connID) => callGo('DBSize', connID)
 
 // ===== Value CRUD =====
-export const getValue = (connID, key, cursor, offset, zsetSort = '') => callGo('GetValue', connID, key, cursor, offset, zsetSort)
+export const getValue = (connID, key, cursor, offset, zsetSort = '', streamStart = '') =>
+  callGo('GetValue', connID, key, cursor, offset, zsetSort, streamStart)
 export const searchValue = (connID, key, keyType, pattern, exact = false, cursor = 0) =>
   callGo('SearchValue', connID, key, keyType, pattern, exact, cursor)
-export const setString = (connID, key, value, ttl) => callGo('SetString', connID, key, value, ttl)
+export const setString = (connID, key, value) => callGo('SetString', connID, key, value)
 export const createKey = (connID, req) => callGo('CreateKey', connID, req)
 export const hSet = (connID, key, field, value) => callGo('HSet', connID, key, field, value)
 export const hDel = (connID, key, field) => callGo('HDel', connID, key, field)
@@ -43,8 +44,12 @@ export const lSet = (connID, key, index, value) => callGo('LSet', connID, key, i
 export const lRem = (connID, key, count, value) => callGo('LRem', connID, key, count, value)
 export const sAdd = (connID, key, member) => callGo('SAdd', connID, key, member)
 export const sRem = (connID, key, member) => callGo('SRem', connID, key, member)
+export const renameSetMember = (connID, key, source, destination) =>
+  callGo('RenameSetMember', connID, key, source, destination)
 export const zAdd = (connID, key, member, score) => callGo('ZAdd', connID, key, member, score)
 export const zRem = (connID, key, member) => callGo('ZRem', connID, key, member)
+export const renameZSetMember = (connID, key, source, destination) =>
+  callGo('RenameZSetMember', connID, key, source, destination)
 
 // ===== 设置 =====
 export const getSettings = () => callGo('GetSettings')

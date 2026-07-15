@@ -338,20 +338,10 @@ function releaseHoverState() {
 
 function buildCfg(conn, group) {
   return {
-    id: conn.id,
-    name: conn.name,
+    ...conn,
     group: group !== undefined ? group : (conn.group || ''),
-    host: conn.host,
-    port: conn.port,
-    password: conn.password,
-    db: conn.db,
-    is_cluster: conn.is_cluster,
-    cluster_addrs: conn.cluster_addrs || [],
-    proxy_enabled: conn.proxy_enabled,
-    proxy_url: conn.proxy_url || '',
-    icon_color: conn.icon_color || '',
-    ssh_enabled: conn.ssh_enabled,
-    ssh: conn.ssh || null,
+    cluster_addrs: [...(conn.cluster_addrs || [])],
+    ssh: conn.ssh ? { ...conn.ssh } : null,
   }
 }
 

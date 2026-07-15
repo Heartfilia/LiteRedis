@@ -85,6 +85,12 @@ wails dev
 
 首次运行时如果出现 SmartScreen 提示，可点击“更多信息”后选择“仍要运行”。
 
+### 本地凭据
+
+Redis、SSH 和代理凭据保存在当前系统用户的 LiteRedis 配置目录中。macOS 和 Linux 上，`connections.json` 会自动设置为仅当前用户可读写（`0600`）；Windows 上由当前用户配置目录的系统 ACL 负责隔离。
+
+配置内容仍是本地明文，不应放入代码仓库、共享目录或公开备份。Debug 日志不会记录 Redis/SSH 密码，带认证信息的代理 URL 也会脱敏。后续如迁移到 Keychain 或 Credential Manager，需要保留对现有配置的兼容读取。
+
 ---
 
 ## 打包发布

@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -56,7 +57,7 @@ func NewSSHTunnelWithConfig(host string, port int, user string, password string,
 		Timeout:         timeout,
 	}
 
-	addr := fmt.Sprintf("%s:%d", host, port)
+	addr := sshAddress(host, port)
 
 	// 自己控制 TCP 连接超时，避免某些 Windows 环境下 net.DialTimeout 不生效的问题
 	tcpConn, err := net.DialTimeout("tcp", addr, timeout)
@@ -83,6 +84,10 @@ func NewSSHTunnelWithConfig(host string, port int, user string, password string,
 
 	client := gossh.NewClient(conn, chans, reqs)
 	return client, nil
+}
+
+func sshAddress(host string, port int) string {
+	return net.JoinHostPort(strings.TrimSpace(host), strconv.Itoa(port))
 }
 
 func buildAuthMethods(password string, privateKeyPath string, passphrase string) ([]gossh.AuthMethod, error) {

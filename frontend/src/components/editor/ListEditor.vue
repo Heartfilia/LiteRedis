@@ -83,15 +83,18 @@
     <!-- 加载更多 -->
     <div class="load-more">
       <button
-        v-if="searchResults === null && hasMore"
+        v-if="(searchResults === null && hasMore) || (searchResults !== null && searchHasMore)"
         class="btn-load-more"
         :disabled="valueLoading"
         @click="loadMore"
       >
         {{ valueLoading ? '...' : t('keyTree.loadMore') }}
       </button>
-      <span v-else-if="searchResults === null && !hasMore && totalItems > 0" class="load-more-hint">
-        item:{{ totalItems }}
+      <span
+        v-else-if="searchResults === null ? (!hasMore && totalItems > 0) : (!searchHasMore && searchResults.length > 0)"
+        class="load-more-hint"
+      >
+        item:{{ searchResults === null ? totalItems : searchResults.length }}
       </span>
     </div>
 
@@ -106,6 +109,7 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
+import { createRequestGuard } from '../../utils/requestGuard.js'
 import { lPush, rPush, lSet, lRem, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
@@ -118,6 +122,11 @@ const workspaceStore = useWorkspaceStore()
 const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
+const requestGuard = createRequestGuard(() => ({
+  connID: workspaceStore.activeConnID,
+  db: workspaceStore.currentDB,
+  key: props.keyValue?.key || null,
+}))
 
 const rawItems = ref([])      // 原始加载的 items（保留原始索引）
 const showAdd = ref(false)
@@ -144,6 +153,9 @@ function triggerAddFlash() {
 // 搜索状态（搜索结果是纯字符串数组，不含原始索引）
 const searchQuery   = ref('')
 const searchResults = ref(null)
+const searchAppliedQuery = ref('')
+const searchNextCursor = ref(0)
+const searchHasMore = ref(false)
 const isSearching   = ref(false)
 
 // 排序状态
@@ -167,9 +179,11 @@ const hasMore = ref(false)
 const nextOffset = ref(0)
 const valueLoading = ref(false)
 
-async function handleConnectionFailure(error) {
+async function handleConnectionFailure(error, request = null) {
+  if (request && !requestGuard.isCurrent(request)) return true
   if (!isConnectionErrorMessage(error)) return false
-  await connectionsStore.handleConnectionFailure(workspaceStore.activeConnID, error)
+  await connectionsStore.handleConnectionFailure(request?.context.connID || workspaceStore.activeConnID, error)
+  if (request && !requestGuard.isCurrent(request)) return true
   ok.value = false
   msg.value = formatConnectionLostMessage(error)
   return true
@@ -218,11 +232,16 @@ watch(searchQuery, () => {
 })
 
 onBeforeUnmount(() => {
+  requestGuard.invalidateAll()
   persistSearchState()
 })
 
 watch(() => props.keyValue, (kv) => {
+  requestGuard.invalidateAll()
   persistSearchState(lastKey.value)
+  valueLoading.value = false
+  isSearching.value = false
+  expandSaving.value = false
 
   rawItems.value = [...(kv?.list_val || [])]
   hasMore.value = kv?.has_more || false
@@ -242,6 +261,9 @@ watch(() => props.keyValue, (kv) => {
     lastKey.value = ''
   }
   searchResults.value = null
+  searchAppliedQuery.value = ''
+  searchNextCursor.value = 0
+  searchHasMore.value = false
 
   sortOrder.value = 'none'
   msg.value = ''
@@ -249,20 +271,42 @@ watch(() => props.keyValue, (kv) => {
 }, { immediate: true })
 
 async function loadMore() {
-  if (!hasMore.value || valueLoading.value || !props.keyValue?.key) return
+  if (valueLoading.value || !props.keyValue?.key) return
+  if (searchResults.value !== null && !searchHasMore.value) return
+  if (searchResults.value === null && !hasMore.value) return
+  const request = requestGuard.begin(searchResults.value !== null ? 'search' : 'load')
   valueLoading.value = true
   try {
-    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, 0, nextOffset.value, '')
+    if (searchResults.value !== null) {
+      const result = await searchValue(
+        request.context.connID,
+        request.context.key,
+        'list',
+        searchAppliedQuery.value,
+        false,
+        searchNextCursor.value,
+      )
+      if (!requestGuard.isCurrent(request)) return
+      searchResults.value = [...searchResults.value, ...(result.list_val || [])]
+      searchNextCursor.value = result.next_cursor || 0
+      searchHasMore.value = !!result.has_more && searchNextCursor.value !== 0
+      return
+    }
+    const result = await getValue(request.context.connID, request.context.key, 0, nextOffset.value, '')
+    if (!requestGuard.isCurrent(request)) return
     if (result.list_val) {
       rawItems.value.push(...result.list_val)
     }
     hasMore.value = result.has_more || false
     nextOffset.value = result.next_offset || 0
   } catch (e) {
-    ok.value = false
-    msg.value = e.message || String(e)
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
+      ok.value = false
+      msg.value = e.message || String(e)
+    }
   } finally {
-    valueLoading.value = false
+    if (requestGuard.isCurrent(request)) valueLoading.value = false
+    requestGuard.finish(request)
   }
 }
 
@@ -295,8 +339,8 @@ function removeLocalItem(val) {
   }
 }
 
-function addLocalItem(val) {
-  rawItems.value = pushDir.value === 'lpush'
+function addLocalItem(val, direction = pushDir.value) {
+  rawItems.value = direction === 'lpush'
     ? [val, ...rawItems.value]
     : [...rawItems.value, val]
   totalItemCount.value++
@@ -305,23 +349,39 @@ function addLocalItem(val) {
 async function executeSearch() {
   const pattern = searchQuery.value.trim()
   if (!pattern) { clearSearch(); return }
+  const request = requestGuard.begin('search')
   isSearching.value = true
+  searchResults.value = []
+  searchAppliedQuery.value = ''
+  searchNextCursor.value = 0
+  searchHasMore.value = false
   try {
-    const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'list', pattern, false)
+    const kv = await searchValue(request.context.connID, request.context.key, 'list', pattern, false)
+    if (!requestGuard.isCurrent(request)) return
     searchResults.value = kv.list_val || []
+    searchAppliedQuery.value = pattern
+    searchNextCursor.value = kv.next_cursor || 0
+    searchHasMore.value = !!kv.has_more && searchNextCursor.value !== 0
     editingIdx.value = -1
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
   }
-  finally { isSearching.value = false }
+  finally {
+    if (requestGuard.isCurrent(request)) isSearching.value = false
+    requestGuard.finish(request)
+  }
 }
 
 function clearSearch() {
+  requestGuard.invalidate('search')
   searchQuery.value = ''
   searchResults.value = null
+  searchAppliedQuery.value = ''
+  searchNextCursor.value = 0
+  searchHasMore.value = false
   if (props.keyValue?.key) {
   workspaceStore.setEditorSearchState(props.keyValue.key, 'list', null)
   }
@@ -346,10 +406,12 @@ function openEdit(idx, val) {
 async function saveFromModal(newVal) {
   const idx = editModalIdx.value
   if (idx === -1) return
+  const request = requestGuard.begin(`write:modal:${idx}`)
   expandSaving.value = true
   try {
-    const result = await lSet(workspaceStore.activeConnID, props.keyValue.key, idx, newVal)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const result = await lSet(request.context.connID, request.context.key, idx, newVal)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
@@ -357,12 +419,13 @@ async function saveFromModal(newVal) {
       expandShow.value = false
     }
   } catch (e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
   } finally {
-    expandSaving.value = false
+    if (requestGuard.isCurrent(request)) expandSaving.value = false
+    requestGuard.finish(request)
   }
 }
 
@@ -374,52 +437,67 @@ async function copyItem(item, idx) {
 
 async function saveEdit(idx) {
   if (editingIdx.value !== idx || idx === -1) return
+  const nextValue = editValue.value
+  const request = requestGuard.begin(`write:item:${idx}`)
   editingIdx.value = -1
   try {
-    const result = await lSet(workspaceStore.activeConnID, props.keyValue.key, idx, editValue.value)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const result = await lSet(request.context.connID, request.context.key, idx, nextValue)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) replaceLocalItem(idx, editValue.value)
+    if (result.success) replaceLocalItem(idx, nextValue)
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
+  } finally {
+    requestGuard.finish(request)
   }
 }
 
 async function removeItem(val, origIdx) {
+  const request = requestGuard.begin(`write:remove:${origIdx}:${val}`)
   try {
-    const result = await lRem(workspaceStore.activeConnID, props.keyValue.key, 1, val)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const result = await lRem(request.context.connID, request.context.key, 1, val)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) removeLocalItem(val)
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
+  } finally {
+    requestGuard.finish(request)
   }
 }
 
 async function addItem() {
   if (!newValue.value.trim()) return
+  const value = newValue.value
+  const direction = pushDir.value
+  const request = requestGuard.begin('write:add')
   try {
-    const fn = pushDir.value === 'lpush' ? lPush : rPush
-    const result = await fn(workspaceStore.activeConnID, props.keyValue.key, newValue.value)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const fn = direction === 'lpush' ? lPush : rPush
+    const result = await fn(request.context.connID, request.context.key, value)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      addLocalItem(newValue.value)
+      addLocalItem(value, direction)
       newValue.value = ''
       showAdd.value = false
       triggerAddFlash()
     }
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
+  } finally {
+    requestGuard.finish(request)
   }
 }
 </script>

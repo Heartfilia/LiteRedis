@@ -4,24 +4,24 @@ import "time"
 
 // ConnectionConfig 连接配置
 type ConnectionConfig struct {
-	ID           string     `json:"id"`
-	Name         string     `json:"name"`
-	SortOrder    int        `json:"sort_order"`
-	Group        string     `json:"group,omitempty"`
-	Host         string     `json:"host"`
-	Port         int        `json:"port"`
-	Password     string     `json:"password"`
-	DB           int        `json:"db"`
-	IsCluster    bool       `json:"is_cluster"`
-	AllowClusterScan bool   `json:"allow_cluster_scan"`
-	ClusterAddrs []string   `json:"cluster_addrs,omitempty"`
-	ProxyEnabled bool       `json:"proxy_enabled"`
-	ProxyURL     string     `json:"proxy_url,omitempty"`
-	IconColor    string     `json:"icon_color,omitempty"`
-	SSHEnabled   bool       `json:"ssh_enabled"`
-	SSH          *SSHConfig `json:"ssh,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ID               string     `json:"id"`
+	Name             string     `json:"name"`
+	SortOrder        int        `json:"sort_order"`
+	Group            string     `json:"group,omitempty"`
+	Host             string     `json:"host"`
+	Port             int        `json:"port"`
+	Password         string     `json:"password"`
+	DB               int        `json:"db"`
+	IsCluster        bool       `json:"is_cluster"`
+	AllowClusterScan bool       `json:"allow_cluster_scan"`
+	ClusterAddrs     []string   `json:"cluster_addrs,omitempty"`
+	ProxyEnabled     bool       `json:"proxy_enabled"`
+	ProxyURL         string     `json:"proxy_url,omitempty"`
+	IconColor        string     `json:"icon_color,omitempty"`
+	SSHEnabled       bool       `json:"ssh_enabled"`
+	SSH              *SSHConfig `json:"ssh,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 type ConnectionOrderItem struct {
@@ -91,10 +91,10 @@ type ConfigStore struct {
 
 // RedisKey key 元信息
 type RedisKey struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
-	TTL  int64  `json:"ttl"` // -1=永久，-2=不存在，>0=剩余秒数
-	Count int64 `json:"count"`
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+	TTL   int64  `json:"ttl"` // -1=永久，-2=不存在，>0=剩余秒数
+	Count int64  `json:"count"`
 }
 
 // KeyNode 树节点（:折叠）
@@ -110,19 +110,20 @@ type KeyNode struct {
 
 // KeyValue Value（按类型按需填充）
 type KeyValue struct {
-	Key        string            `json:"key"`
-	Type       string            `json:"type"`
-	TTL        int64             `json:"ttl"`
-	StringVal  string            `json:"string_val,omitempty"`
-	HashVal    map[string]string `json:"hash_val,omitempty"`
-	ListVal    []string          `json:"list_val,omitempty"`
-	SetVal     []string          `json:"set_val,omitempty"`
-	ZSetVal    []ZSetMember      `json:"zset_val,omitempty"`
-	StreamVal  []StreamEntry     `json:"stream_val,omitempty"`
-	HasMore    bool              `json:"has_more"`    // 是否还有更多数据
-	NextCursor uint64            `json:"next_cursor"` // Hash/Set 下一页 cursor
-	NextOffset int               `json:"next_offset"` // List/ZSet 下一页 offset
-	TotalCount int64             `json:"total_count"` // 总元素数（-1 表示未知）
+	Key          string            `json:"key"`
+	Type         string            `json:"type"`
+	TTL          int64             `json:"ttl"`
+	StringVal    string            `json:"string_val,omitempty"`
+	HashVal      map[string]string `json:"hash_val,omitempty"`
+	ListVal      []string          `json:"list_val,omitempty"`
+	SetVal       []string          `json:"set_val,omitempty"`
+	ZSetVal      []ZSetMember      `json:"zset_val,omitempty"`
+	StreamVal    []StreamEntry     `json:"stream_val,omitempty"`
+	HasMore      bool              `json:"has_more"`                 // 是否还有更多数据
+	NextCursor   uint64            `json:"next_cursor"`              // Hash/Set 下一页 cursor
+	NextOffset   int               `json:"next_offset"`              // List/ZSet 下一页 offset
+	NextStreamID string            `json:"next_stream_id,omitempty"` // Stream 下一页的排他起始 ID
+	TotalCount   int64             `json:"total_count"`              // 总元素数（-1 表示未知）
 }
 
 // CreateKeyRequest 新建 key 请求
@@ -159,27 +160,28 @@ type StreamEntry struct {
 
 // OperationResult 通用操作结果
 type OperationResult struct {
-	Success bool   `json:"success"`
-	Message string `json:"message,omitempty"`
+	Success      bool   `json:"success"`
+	Message      string `json:"message,omitempty"`
+	Disconnected bool   `json:"disconnected,omitempty"`
 }
 
 // RedisConnectionOverview 当前连接概览信息
 type RedisConnectionOverview struct {
-	ConnID            string `json:"conn_id"`
-	ConnName          string `json:"conn_name"`
-	Host              string `json:"host"`
-	Port              int    `json:"port"`
-	CurrentDB         int    `json:"current_db"`
-	IsCluster         bool   `json:"is_cluster"`
-	RedisVersion      string `json:"redis_version"`
-	Role              string `json:"role"`
-	ConnectedClients  int64  `json:"connected_clients"`
-	InstantOpsPerSec  int64  `json:"instant_ops_per_sec"`
-	TotalKeys         int64  `json:"total_keys"`
-	UsedMemory        string `json:"used_memory"`
-	UsedMemoryBytes   int64  `json:"used_memory_bytes"`
-	UptimeDays        int64  `json:"uptime_days"`
-	UptimeHuman       string `json:"uptime_human"`
+	ConnID           string `json:"conn_id"`
+	ConnName         string `json:"conn_name"`
+	Host             string `json:"host"`
+	Port             int    `json:"port"`
+	CurrentDB        int    `json:"current_db"`
+	IsCluster        bool   `json:"is_cluster"`
+	RedisVersion     string `json:"redis_version"`
+	Role             string `json:"role"`
+	ConnectedClients int64  `json:"connected_clients"`
+	InstantOpsPerSec int64  `json:"instant_ops_per_sec"`
+	TotalKeys        int64  `json:"total_keys"`
+	UsedMemory       string `json:"used_memory"`
+	UsedMemoryBytes  int64  `json:"used_memory_bytes"`
+	UptimeDays       int64  `json:"uptime_days"`
+	UptimeHuman      string `json:"uptime_human"`
 }
 
 // RedisConsoleResult Redis Console 执行结果

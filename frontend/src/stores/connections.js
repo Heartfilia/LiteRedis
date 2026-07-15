@@ -10,6 +10,8 @@ export const useConnectionsStore = defineStore('connections', {
     heartbeatFailures: {},
     heartbeatTimer: null,
     heartbeatRunning: false,
+    heartbeatInFlight: false,
+    heartbeatGeneration: 0,
     heartbeatVisible: true,
     globalToast: '',
     globalToastOk: true,
@@ -34,10 +36,12 @@ export const useConnectionsStore = defineStore('connections', {
   actions: {
     async loadConnections() {
       this.loading = true
+      this.error = null
       try {
         this.connections = await listConnections() || []
       } catch (e) {
         this.error = e.message || String(e)
+        this.showGlobalToast(this.error, false)
       } finally {
         this.loading = false
       }
@@ -46,6 +50,14 @@ export const useConnectionsStore = defineStore('connections', {
     async save(cfg) {
       const result = await saveConnection(cfg)
       if (result.success) {
+        if (result.disconnected && cfg.id) {
+          this.connectedIds.delete(cfg.id)
+          this.connectingIds.delete(cfg.id)
+          const nextFailures = { ...this.heartbeatFailures }
+          delete nextFailures[cfg.id]
+          this.heartbeatFailures = nextFailures
+          this.showGlobalToast(result.message || 'Connection settings changed; reconnect required', true)
+        }
         await this.loadConnections()
       }
       return result
@@ -103,18 +115,34 @@ export const useConnectionsStore = defineStore('connections', {
       return result
     },
 
-    async handleConnectionFailure(id, error) {
+    reportConnectionSuccess(id) {
+      if (!id || (this.heartbeatFailures[id] || 0) === 0) return
+      this.heartbeatFailures = { ...this.heartbeatFailures, [id]: 0 }
+    },
+
+    async reportConnectionFailure(id, error, threshold = 1) {
       if (!id || !isConnectionErrorMessage(error)) return null
+      const failCount = (this.heartbeatFailures[id] || 0) + 1
+      this.heartbeatFailures = { ...this.heartbeatFailures, [id]: failCount }
+      const message = formatConnectionLostMessage(error)
+      if (failCount < Math.max(1, threshold)) {
+        return { success: false, disconnected: false, message }
+      }
       this.connectedIds.delete(id)
       this.connectingIds.delete(id)
       try {
         await disconnectAPI(id)
       } catch (e) {}
+      this.heartbeatFailures = { ...this.heartbeatFailures, [id]: 0 }
       return {
         success: false,
         disconnected: true,
-        message: formatConnectionLostMessage(error),
+        message,
       }
+    },
+
+    async handleConnectionFailure(id, error) {
+      return await this.reportConnectionFailure(id, error, 1)
     },
 
     showGlobalToast(message, ok = true) {
@@ -177,61 +205,78 @@ export const useConnectionsStore = defineStore('connections', {
     },
 
     stopHeartbeat() {
+      this.heartbeatGeneration++
       if (this.heartbeatTimer) {
-        clearInterval(this.heartbeatTimer)
+        clearTimeout(this.heartbeatTimer)
         this.heartbeatTimer = null
       }
       this.heartbeatRunning = false
+      this.heartbeatInFlight = false
     },
 
     startHeartbeat(workspaceStore) {
       if (this.heartbeatRunning) return
       this.heartbeatRunning = true
-      this.heartbeatTimer = setInterval(async () => {
-        if (!this.heartbeatVisible) return
-        const ids = [...this.connectedIds]
-        if (!ids.length) return
+      const generation = ++this.heartbeatGeneration
+      this._scheduleHeartbeat(workspaceStore, generation)
+    },
 
-        for (const id of ids) {
-          if (this.connectingIds.has(id)) continue
-          try {
-            const result = await pingConnection(id)
-            if (result?.success) {
-              const hadFailures = (this.heartbeatFailures[id] || 0) > 0
-              if ((this.heartbeatFailures[id] || 0) !== 0) {
-                this.heartbeatFailures = { ...this.heartbeatFailures, [id]: 0 }
-              }
-              if (hadFailures && workspaceStore?.activeConnID === id) {
-                this.showGlobalToast('当前 Redis 连接已恢复', true)
-                await workspaceStore.refreshAfterReconnect(id)
-              }
-              continue
-            }
+    _heartbeatIsCurrent(generation) {
+      return this.heartbeatRunning && this.heartbeatGeneration === generation
+    },
 
-            const failCount = (this.heartbeatFailures[id] || 0) + 1
-            this.heartbeatFailures = { ...this.heartbeatFailures, [id]: failCount }
-            if (failCount >= 2) {
-              const failure = await this.handleConnectionFailure(id, result?.message || 'Redis connection lost')
-              this.heartbeatFailures = { ...this.heartbeatFailures, [id]: 0 }
-              if (workspaceStore?.activeConnID === id && failure?.message) {
-                workspaceStore.applyConnectionLostState(id, failure.message)
-                this.showGlobalToast('当前 Redis 连接已断开', false)
-              }
-            }
-          } catch (e) {
-            const failCount = (this.heartbeatFailures[id] || 0) + 1
-            this.heartbeatFailures = { ...this.heartbeatFailures, [id]: failCount }
-            if (failCount >= 2) {
-              const failure = await this.handleConnectionFailure(id, e)
-              this.heartbeatFailures = { ...this.heartbeatFailures, [id]: 0 }
-              if (workspaceStore?.activeConnID === id && failure?.message) {
-                workspaceStore.applyConnectionLostState(id, failure.message)
-                this.showGlobalToast('当前 Redis 连接已断开', false)
-              }
-            }
+    _scheduleHeartbeat(workspaceStore, generation) {
+      if (!this._heartbeatIsCurrent(generation) || this.heartbeatTimer || this.heartbeatInFlight) return
+      this.heartbeatTimer = setTimeout(async () => {
+        this.heartbeatTimer = null
+        if (!this._heartbeatIsCurrent(generation)) return
+        this.heartbeatInFlight = true
+        try {
+          if (this.heartbeatVisible) {
+            await this._runHeartbeatCycle(workspaceStore, generation)
+          }
+        } finally {
+          if (this._heartbeatIsCurrent(generation)) {
+            this.heartbeatInFlight = false
+            this._scheduleHeartbeat(workspaceStore, generation)
           }
         }
       }, 20000)
+    },
+
+    async _runHeartbeatCycle(workspaceStore, generation) {
+      const ids = [...this.connectedIds]
+      for (const id of ids) {
+        if (!this._heartbeatIsCurrent(generation)) return
+        if (!this.connectedIds.has(id) || this.connectingIds.has(id)) continue
+        try {
+          const result = await pingConnection(id)
+          if (!this._heartbeatIsCurrent(generation) || !this.connectedIds.has(id)) continue
+          if (result?.success) {
+            const hadFailures = (this.heartbeatFailures[id] || 0) > 0
+            this.reportConnectionSuccess(id)
+            if (hadFailures && workspaceStore?.activeConnID === id) {
+              this.showGlobalToast('当前 Redis 连接已恢复', true)
+              await workspaceStore.refreshAfterReconnect(id)
+            }
+            continue
+          }
+          await this._recordHeartbeatFailure(id, result?.message || 'Redis connection lost', workspaceStore, generation)
+        } catch (e) {
+          if (!this._heartbeatIsCurrent(generation) || !this.connectedIds.has(id)) continue
+          await this._recordHeartbeatFailure(id, e, workspaceStore, generation)
+        }
+      }
+    },
+
+    async _recordHeartbeatFailure(id, error, workspaceStore, generation) {
+      if (!this._heartbeatIsCurrent(generation) || !this.connectedIds.has(id)) return
+      const failure = await this.reportConnectionFailure(id, error, 2)
+      if (!this._heartbeatIsCurrent(generation)) return
+      if (failure?.disconnected && workspaceStore?.activeConnID === id && failure.message) {
+        workspaceStore.applyConnectionLostState(id, failure.message)
+        this.showGlobalToast('当前 Redis 连接已断开', false)
+      }
     },
   },
 })

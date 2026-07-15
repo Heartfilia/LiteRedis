@@ -50,8 +50,8 @@ export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
 
-export function GetValue(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['GetValue'](arg1, arg2, arg3, arg4, arg5);
+export function GetValue(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['GetValue'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function HDel(arg1, arg2, arg3) {
@@ -94,6 +94,14 @@ export function RenameKey(arg1, arg2, arg3) {
   return window['go']['main']['App']['RenameKey'](arg1, arg2, arg3);
 }
 
+export function RenameSetMember(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RenameSetMember'](arg1, arg2, arg3, arg4);
+}
+
+export function RenameZSetMember(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RenameZSetMember'](arg1, arg2, arg3, arg4);
+}
+
 export function ReorderConnections(arg1) {
   return window['go']['main']['App']['ReorderConnections'](arg1);
 }
@@ -126,8 +134,8 @@ export function SelectDB(arg1, arg2) {
   return window['go']['main']['App']['SelectDB'](arg1, arg2);
 }
 
-export function SetString(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['SetString'](arg1, arg2, arg3, arg4);
+export function SetString(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetString'](arg1, arg2, arg3);
 }
 
 export function SetTTL(arg1, arg2, arg3) {

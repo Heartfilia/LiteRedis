@@ -16,12 +16,13 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
+import { createRequestGuard } from '../../utils/requestGuard.js'
 import { setString } from '../../api/wails.js'
 import FloatingMessage from '../common/FloatingMessage.vue'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
@@ -32,6 +33,11 @@ const workspaceStore = useWorkspaceStore()
 const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
+const requestGuard = createRequestGuard(() => ({
+  connID: workspaceStore.activeConnID,
+  db: workspaceStore.currentDB,
+  key: props.keyValue?.key || null,
+}))
 
 const localVal = ref(props.keyValue?.string_val || '')
 const saving = ref(false)
@@ -73,9 +79,11 @@ function triggerErrorFlash() {
   }, 1300)
 }
 
-async function handleConnectionFailure(error) {
+async function handleConnectionFailure(error, request = null) {
+  if (request && !requestGuard.isCurrent(request)) return true
   if (!isConnectionErrorMessage(error)) return false
-  await connectionsStore.handleConnectionFailure(workspaceStore.activeConnID, error)
+  await connectionsStore.handleConnectionFailure(request?.context.connID || workspaceStore.activeConnID, error)
+  if (request && !requestGuard.isCurrent(request)) return true
   ok.value = false
   msg.value = formatConnectionLostMessage(error)
   triggerErrorFlash()
@@ -83,9 +91,17 @@ async function handleConnectionFailure(error) {
 }
 
 watch(() => props.keyValue, (kv) => {
+  requestGuard.invalidateAll()
+  saving.value = false
   localVal.value = kv?.string_val || ''
   originalVal.value = kv?.string_val || ''
   msg.value = ''
+})
+
+onBeforeUnmount(() => {
+  requestGuard.invalidateAll()
+  if (saveFlashTimer) clearTimeout(saveFlashTimer)
+  if (errorFlashTimer) clearTimeout(errorFlashTimer)
 })
 
 async function copyValue() {
@@ -97,27 +113,31 @@ async function copyValue() {
 }
 
 async function save() {
+  const request = requestGuard.begin('save')
+  const value = localVal.value
   saving.value = true
   msg.value = ''
   try {
-    const result = await setString(workspaceStore.activeConnID, props.keyValue.key, localVal.value, props.keyValue.ttl)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const result = await setString(request.context.connID, request.context.key, value)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.saveSuccess') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      originalVal.value = localVal.value
+      originalVal.value = value
       triggerSaveFlash()
     } else {
       triggerErrorFlash()
     }
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message || String(e)
       triggerErrorFlash()
     }
   } finally {
-    saving.value = false
+    if (requestGuard.isCurrent(request)) saving.value = false
+    requestGuard.finish(request)
   }
 }
 </script>

@@ -24,7 +24,10 @@ func GetConnectionOverview(ctx context.Context, client redis.UniversalClient, cf
 	}
 
 	infoMap := parseInfoText(info)
-	totalKeys, _ := DBSize(ctx, client)
+	totalKeys, err := DBSize(ctx, client)
+	if err != nil {
+		return config.RedisConnectionOverview{}, err
+	}
 	usedMemoryBytes := parseInt64(infoMap["used_memory"])
 	uptimeDays := parseInt64(infoMap["uptime_in_days"])
 	if uptimeDays <= 0 {
@@ -229,24 +232,28 @@ func splitCommand(input string) ([]interface{}, error) {
 	var buf strings.Builder
 	var quote rune
 	escaped := false
+	tokenStarted := false
 
 	flush := func() {
-		if buf.Len() == 0 {
+		if !tokenStarted {
 			return
 		}
 		args = append(args, buf.String())
 		buf.Reset()
+		tokenStarted = false
 	}
 
 	for _, ch := range input {
 		if escaped {
 			buf.WriteRune(ch)
+			tokenStarted = true
 			escaped = false
 			continue
 		}
 		switch {
 		case ch == '\\':
 			escaped = true
+			tokenStarted = true
 		case quote != 0:
 			if ch == quote {
 				quote = 0
@@ -255,15 +262,18 @@ func splitCommand(input string) ([]interface{}, error) {
 			}
 		case ch == '\'' || ch == '"':
 			quote = ch
+			tokenStarted = true
 		case ch == ' ' || ch == '\t' || ch == '\n':
 			flush()
 		default:
 			buf.WriteRune(ch)
+			tokenStarted = true
 		}
 	}
 
 	if escaped {
 		buf.WriteRune('\\')
+		tokenStarted = true
 	}
 	if quote != 0 {
 		return nil, fmt.Errorf("unterminated quote")

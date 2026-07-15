@@ -112,6 +112,8 @@ import { executeRedisCommand, getConnectionOverview } from '../../api/wails.js'
 import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useConnectionsStore } from '../../stores/connections.js'
+import { isConnectionErrorMessage } from '../../utils/connection.js'
 
 const props = defineProps({
   connId: { type: String, required: true },
@@ -123,6 +125,7 @@ defineEmits(['close'])
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 const workspaceStore = useWorkspaceStore()
+const connectionsStore = useConnectionsStore()
 
 const overview = ref(null)
 const loading = ref(false)
@@ -243,9 +246,16 @@ async function refreshOverview() {
   loading.value = true
   try {
     overview.value = await getConnectionOverview(props.connId)
+    connectionsStore.reportConnectionSuccess(props.connId)
     error.value = ''
   } catch (e) {
-    error.value = e?.message || String(e)
+    const rawMessage = e?.message || String(e)
+    const failure = await connectionsStore.reportConnectionFailure(props.connId, rawMessage, 2)
+    error.value = failure?.message || rawMessage
+    if (failure?.disconnected && workspaceStore.activeConnID === props.connId) {
+      workspaceStore.applyConnectionLostState(props.connId, failure.message)
+      connectionsStore.showGlobalToast('当前 Redis 连接已断开', false)
+    }
   } finally {
     loading.value = false
   }
@@ -359,6 +369,17 @@ async function runCommand() {
 
   try {
     const result = await executeRedisCommand(props.connId, text)
+    let connectionFailureReported = false
+    if (result.success) {
+      connectionsStore.reportConnectionSuccess(props.connId)
+    } else if (isConnectionErrorMessage(result.error)) {
+      connectionFailureReported = true
+      const failure = await connectionsStore.reportConnectionFailure(props.connId, result.error, 2)
+      if (failure?.disconnected && workspaceStore.activeConnID === props.connId) {
+        workspaceStore.applyConnectionLostState(props.connId, failure.message)
+        connectionsStore.showGlobalToast('当前 Redis 连接已断开', false)
+      }
+    }
     consoleHistory.value.push({
       prompt: promptBeforeRun,
       command: text,
@@ -378,8 +399,10 @@ async function runCommand() {
         workspaceStore.currentDB = selectTargetDB
       }
     }
-    await refreshOverview()
-    if (isActiveConnection.value) {
+    if (!connectionFailureReported) {
+      await refreshOverview()
+    }
+    if (!connectionFailureReported && isActiveConnection.value) {
       workspaceStore.currentDB = overview.value?.current_db ?? workspaceStore.currentDB
       await workspaceStore.fetchTotalKeys()
     }

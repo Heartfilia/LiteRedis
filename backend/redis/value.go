@@ -2,17 +2,65 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"time"
+	"strings"
 
 	"LiteRedis/backend/config"
 
 	"github.com/redis/go-redis/v9"
 )
 
+var (
+	errSetMemberNotFound  = errors.New("set member does not exist")
+	errZSetMemberNotFound = errors.New("zset member does not exist")
+	errStringKeyNotFound  = errors.New("string key does not exist")
+
+	setStringPreserveTTLScript = redis.NewScript(`
+local ttl = redis.call('PTTL', KEYS[1])
+if ttl == -2 then
+  return 0
+end
+redis.call('SET', KEYS[1], ARGV[1])
+if ttl > 0 then
+  redis.call('PEXPIRE', KEYS[1], ttl)
+end
+return 1
+`)
+
+	renameSetMemberScript = redis.NewScript(`
+local source = ARGV[1]
+local destination = ARGV[2]
+if redis.call('SISMEMBER', KEYS[1], source) == 0 then
+  return 0
+end
+if source == destination then
+  return 1
+end
+redis.call('SREM', KEYS[1], source)
+redis.call('SADD', KEYS[1], destination)
+return 1
+`)
+
+	renameZSetMemberScript = redis.NewScript(`
+local source = ARGV[1]
+local destination = ARGV[2]
+local score = redis.call('ZSCORE', KEYS[1], source)
+if not score then
+  return 0
+end
+if source == destination then
+  return 1
+end
+redis.call('ZREM', KEYS[1], source)
+redis.call('ZADD', KEYS[1], score, destination)
+return 1
+`)
+)
+
 // GetValue 读取 key 的值（按类型分支），支持 cursor/offset 分页。
 // cursor=0, offset=0 表示第一页。loadCount 控制每次加载条数（≤0 取默认）。
-func GetValue(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings, cursor uint64, offset int, zsetSort string) (config.KeyValue, error) {
+func GetValue(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings, cursor uint64, offset int, zsetSort, streamStart string) (config.KeyValue, error) {
 	keyInfo, err := GetKeyInfo(ctx, client, key)
 	if err != nil {
 		return config.KeyValue{}, err
@@ -77,7 +125,10 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		kv.HashVal = result
 		kv.NextCursor = cursor
 		kv.HasMore = cursor != 0
-		total, _ := client.HLen(ctx, key).Result()
+		total, err := client.HLen(ctx, key).Result()
+		if err != nil {
+			return kv, err
+		}
 		kv.TotalCount = total
 
 	case "list":
@@ -86,7 +137,10 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		if err != nil {
 			return kv, err
 		}
-		total, _ := client.LLen(ctx, key).Result()
+		total, err := client.LLen(ctx, key).Result()
+		if err != nil {
+			return kv, err
+		}
 		kv.ListVal = val
 		kv.NextOffset = offset + len(val)
 		kv.TotalCount = total
@@ -108,7 +162,10 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		kv.SetVal = members
 		kv.NextCursor = cursor
 		kv.HasMore = cursor != 0
-		total, _ := client.SCard(ctx, key).Result()
+		total, err := client.SCard(ctx, key).Result()
+		if err != nil {
+			return kv, err
+		}
 		kv.TotalCount = total
 
 	case "zset":
@@ -125,7 +182,10 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		if err != nil {
 			return kv, err
 		}
-		total, _ := client.ZCard(ctx, key).Result()
+		total, err := client.ZCard(ctx, key).Result()
+		if err != nil {
+			return kv, err
+		}
 		members := make([]config.ZSetMember, len(vals))
 		for i, z := range vals {
 			members[i] = config.ZSetMember{
@@ -139,35 +199,69 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		kv.HasMore = int64(offset+len(vals)) < total
 
 	case "stream":
-		vals, err := client.XRevRangeN(ctx, key, "+", "-", streamCount).Result()
+		entries, nextID, hasMore, err := getStreamPage(ctx, client, key, streamCount, streamStart)
 		if err != nil {
 			return kv, err
 		}
-		entries := make([]config.StreamEntry, len(vals))
-		for i, msg := range vals {
-			fields := make(map[string]string, len(msg.Values))
-			for k, v := range msg.Values {
-				fields[k] = fmt.Sprintf("%v", v)
-			}
-			entries[i] = config.StreamEntry{
-				ID:     msg.ID,
-				Fields: fields,
-			}
+		total, err := client.XLen(ctx, key).Result()
+		if err != nil {
+			return kv, err
 		}
 		kv.StreamVal = entries
-		kv.HasMore = false
+		kv.NextStreamID = nextID
+		kv.HasMore = hasMore
+		kv.TotalCount = total
 	}
 
 	return kv, nil
 }
 
-// SetString 设置 string 类型
-func SetString(ctx context.Context, client redis.UniversalClient, key, value string, ttlSec int64) error {
-	var ttl time.Duration
-	if ttlSec > 0 {
-		ttl = time.Duration(ttlSec) * time.Second
+// getStreamPage reads newest-to-oldest stream entries. The next ID is used as
+// an exclusive upper bound so entries added while paging cannot duplicate a
+// previously returned item.
+func getStreamPage(ctx context.Context, client redis.UniversalClient, key string, count int64, start string) ([]config.StreamEntry, string, bool, error) {
+	if count <= 0 {
+		count = config.DefaultSettings().StreamLoadCount
 	}
-	return client.Set(ctx, key, value, ttl).Err()
+	if start == "" {
+		start = "+"
+	} else if start != "+" && !strings.HasPrefix(start, "(") {
+		start = "(" + start
+	}
+	vals, err := client.XRevRangeN(ctx, key, start, "-", count+1).Result()
+	if err != nil {
+		return nil, "", false, err
+	}
+	hasMore := int64(len(vals)) > count
+	if hasMore {
+		vals = vals[:count]
+	}
+	entries := make([]config.StreamEntry, len(vals))
+	for i, msg := range vals {
+		fields := make(map[string]string, len(msg.Values))
+		for k, v := range msg.Values {
+			fields[k] = fmt.Sprintf("%v", v)
+		}
+		entries[i] = config.StreamEntry{ID: msg.ID, Fields: fields}
+	}
+	nextID := ""
+	if hasMore && len(entries) > 0 {
+		nextID = entries[len(entries)-1].ID
+	}
+	return entries, nextID, hasMore, nil
+}
+
+// SetStringPreserveTTL atomically updates an existing string without resetting
+// its current TTL. An expired key is not recreated.
+func SetStringPreserveTTL(ctx context.Context, client redis.UniversalClient, key, value string) error {
+	updated, err := setStringPreserveTTLScript.Run(ctx, client, []string{key}, value).Int()
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return fmt.Errorf("%w: %q", errStringKeyNotFound, key)
+	}
+	return nil
 }
 
 // HSet 设置 hash field
@@ -210,6 +304,19 @@ func SRem(ctx context.Context, client redis.UniversalClient, key, member string)
 	return client.SRem(ctx, key, member).Err()
 }
 
+// RenameSetMember atomically replaces a set member. If destination already
+// exists, Redis merges both members, matching SREM followed by SADD semantics.
+func RenameSetMember(ctx context.Context, client redis.UniversalClient, key, source, destination string) error {
+	updated, err := renameSetMemberScript.Run(ctx, client, []string{key}, source, destination).Int()
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return fmt.Errorf("%w: %q", errSetMemberNotFound, source)
+	}
+	return nil
+}
+
 // ZAdd 向 zset 添加成员
 func ZAdd(ctx context.Context, client redis.UniversalClient, key, member string, score float64) error {
 	return client.ZAdd(ctx, key, redis.Z{Score: score, Member: member}).Err()
@@ -218,4 +325,17 @@ func ZAdd(ctx context.Context, client redis.UniversalClient, key, member string,
 // ZRem 从 zset 删除成员
 func ZRem(ctx context.Context, client redis.UniversalClient, key, member string) error {
 	return client.ZRem(ctx, key, member).Err()
+}
+
+// RenameZSetMember atomically moves the source member's current score to the
+// destination member. Existing destinations are overwritten as with ZADD.
+func RenameZSetMember(ctx context.Context, client redis.UniversalClient, key, source, destination string) error {
+	updated, err := renameZSetMemberScript.Run(ctx, client, []string{key}, source, destination).Int()
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return fmt.Errorf("%w: %q", errZSetMemberNotFound, source)
+	}
+	return nil
 }

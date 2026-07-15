@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"strings"
 	"time"
 
@@ -37,6 +38,7 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	_ = cleanupStaleUpdateDirs(os.TempDir(), time.Now().Add(-updateTempMaxAge))
 	// 恢复上次窗口位置（X=-1 表示首次启动，让系统居中）
 	if a.initWindowState.X != -1 {
 		wailsruntime.WindowSetPosition(ctx, a.initWindowState.X, a.initWindowState.Y)
@@ -63,12 +65,8 @@ func (a *App) GetAppVersion() string {
 // ============================================================
 
 // ListConnections 返回所有连接配置
-func (a *App) ListConnections() []config.ConnectionConfig {
-	conns, err := config.ListConnections()
-	if err != nil {
-		return []config.ConnectionConfig{}
-	}
-	return conns
+func (a *App) ListConnections() ([]config.ConnectionConfig, error) {
+	return config.ListConnections()
 }
 
 // SaveConnection 新建或更新连接配置
@@ -77,7 +75,13 @@ func (a *App) SaveConnection(cfg config.ConnectionConfig) config.OperationResult
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
-	_ = saved
+	if a.manager.ApplyConnectionConfig(saved) {
+		return config.OperationResult{
+			Success:      true,
+			Disconnected: true,
+			Message:      "connection settings changed; reconnect required",
+		}
+	}
 	return config.OperationResult{Success: true}
 }
 
@@ -116,7 +120,10 @@ type ConnectResult struct {
 // Connect 建立活跃连接，返回连接配置中预设的 DB
 func (a *App) Connect(id string) ConnectResult {
 	cfg, err := config.GetConnection(id)
-	if err != nil || cfg == nil {
+	if err != nil {
+		return ConnectResult{Success: false, Message: err.Error()}
+	}
+	if cfg == nil {
 		return ConnectResult{Success: false, Message: "连接配置不存在"}
 	}
 	if err := a.manager.Connect(*cfg); err != nil {
@@ -170,7 +177,10 @@ func (a *App) ScanKeys(connID string, pattern string, count int64, cursor uint64
 		}
 	}
 	if count <= 0 {
-		settings, _ := config.GetSettings()
+		settings, err := config.GetSettings()
+		if err != nil {
+			return config.ScanResult{}, err
+		}
 		count = settings.KeyScanCount
 		if count <= 0 {
 			count = 100
@@ -225,13 +235,12 @@ func (a *App) SetTTL(connID, key string, ttlSec int64) config.OperationResult {
 }
 
 // DBSize 获取当前 DB 的 key 总数
-func (a *App) DBSize(connID string) int64 {
+func (a *App) DBSize(connID string) (int64, error) {
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
-		return 0
+		return 0, err
 	}
-	size, _ := redisbackend.DBSize(a.ctx, client)
-	return size
+	return redisbackend.DBSize(a.ctx, client)
 }
 
 // GetConnectionOverview 获取当前连接概览信息
@@ -264,40 +273,46 @@ func (a *App) ExecuteRedisCommand(connID, command string) (config.RedisConsoleRe
 // Value CRUD
 // ============================================================
 
-// GetValue 读取 Value（支持 cursor/offset 分页）。cursor=0, offset=0 表示第一页。
-func (a *App) GetValue(connID, key string, cursor uint64, offset int, zsetSort string) (config.KeyValue, error) {
+// GetValue 读取 Value（支持 cursor/offset/stream ID 分页）。第一页使用空 streamStart。
+func (a *App) GetValue(connID, key string, cursor uint64, offset int, zsetSort, streamStart string) (config.KeyValue, error) {
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.KeyValue{}, err
 	}
-	settings, _ := config.GetSettings()
+	settings, err := config.GetSettings()
+	if err != nil {
+		return config.KeyValue{}, err
+	}
 	// 每次读取用独立超时 context，防止大 key 阻塞整个应用
 	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
 	defer cancel()
-	return redisbackend.GetValue(ctx, client, key, settings, cursor, offset, zsetSort)
+	return redisbackend.GetValue(ctx, client, key, settings, cursor, offset, zsetSort, streamStart)
 }
 
-// SearchValue 按 pattern 搜索 key 内成员（Hash/Set/ZSet 使用 Redis glob，List 使用子串匹配）
+// SearchValue 按 pattern 搜索 key 内成员（Hash/Set 支持 * 通配符，ZSet 使用 Redis glob，List 使用子串匹配）
 // exact=true 时，Set 使用 SIsMember，Hash 使用 HGet 进行精确匹配。
-// cursor 仅在 Hash 模糊搜索时用于继续拉取下一页结果。
+// cursor 在 Hash/Set 模糊搜索时用于继续拉取下一页结果。
 func (a *App) SearchValue(connID, key, keyType, pattern string, exact bool, cursor uint64) (config.KeyValue, error) {
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.KeyValue{}, err
 	}
-	settings, _ := config.GetSettings()
+	settings, err := config.GetSettings()
+	if err != nil {
+		return config.KeyValue{}, err
+	}
 	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
 	defer cancel()
 	return redisbackend.SearchValue(ctx, client, key, keyType, pattern, settings, exact, cursor)
 }
 
 // SetString 设置 string
-func (a *App) SetString(connID, key, value string, ttlSec int64) config.OperationResult {
+func (a *App) SetString(connID, key, value string) config.OperationResult {
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
-	if err := redisbackend.SetString(a.ctx, client, key, value, ttlSec); err != nil {
+	if err := redisbackend.SetStringPreserveTTL(a.ctx, client, key, value); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
 	return config.OperationResult{Success: true}
@@ -413,6 +428,20 @@ func (a *App) SRem(connID, key, member string) config.OperationResult {
 	return config.OperationResult{Success: true}
 }
 
+// RenameSetMember 原子重命名 set 成员
+func (a *App) RenameSetMember(connID, key, source, destination string) config.OperationResult {
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+	defer cancel()
+	if err := redisbackend.RenameSetMember(ctx, client, key, source, destination); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
 // ZAdd 向 zset 添加成员
 func (a *App) ZAdd(connID, key, member string, score float64) config.OperationResult {
 	client, err := a.manager.GetClient(connID)
@@ -437,17 +466,27 @@ func (a *App) ZRem(connID, key, member string) config.OperationResult {
 	return config.OperationResult{Success: true}
 }
 
+// RenameZSetMember 原子重命名 zset 成员并保留当前 score
+func (a *App) RenameZSetMember(connID, key, source, destination string) config.OperationResult {
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+	defer cancel()
+	if err := redisbackend.RenameZSetMember(ctx, client, key, source, destination); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
 // ============================================================
 // 设置管理
 // ============================================================
 
 // GetSettings 获取全局设置
-func (a *App) GetSettings() config.AppSettings {
-	s, err := config.GetSettings()
-	if err != nil {
-		return config.DefaultSettings()
-	}
-	return s
+func (a *App) GetSettings() (config.AppSettings, error) {
+	return config.GetSettings()
 }
 
 // SaveSettings 保存全局设置

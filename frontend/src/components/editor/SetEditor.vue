@@ -79,15 +79,18 @@
     <!-- 加载更多 -->
     <div class="load-more">
       <button
-        v-if="searchResults === null && hasMore"
+        v-if="(searchResults === null && hasMore) || (searchResults !== null && searchHasMore)"
         class="btn-load-more"
         :disabled="valueLoading"
         @click="loadMore"
       >
         {{ valueLoading ? '...' : t('keyTree.loadMore') }}
       </button>
-      <span v-else-if="searchResults === null && !hasMore && totalMembers > 0" class="load-more-hint">
-        member:{{ totalMembers }}
+      <span
+        v-else-if="searchResults === null ? (!hasMore && totalMembers > 0) : (!searchHasMore && searchResults.length > 0)"
+        class="load-more-hint"
+      >
+        member:{{ searchResults === null ? totalMembers : searchResults.length }}
       </span>
     </div>
 
@@ -102,7 +105,8 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
-import { sAdd, sRem, searchValue, getValue } from '../../api/wails.js'
+import { createRequestGuard } from '../../utils/requestGuard.js'
+import { sAdd, sRem, renameSetMember, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import FloatingMessage from '../common/FloatingMessage.vue'
@@ -114,6 +118,11 @@ const workspaceStore = useWorkspaceStore()
 const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
+const requestGuard = createRequestGuard(() => ({
+  connID: workspaceStore.activeConnID,
+  db: workspaceStore.currentDB,
+  key: props.keyValue?.key || null,
+}))
 
 const rawMembers = ref([])
 const showAdd = ref(false)
@@ -137,6 +146,10 @@ function triggerAddFlash() {
 // 搜索状态
 const searchQuery   = ref('')
 const searchResults = ref(null)
+const searchAppliedQuery = ref('')
+const searchAppliedFuzzy = ref(false)
+const searchNextCursor = ref(0)
+const searchHasMore = ref(false)
 const isSearching   = ref(false)
 const fuzzySearch   = ref(false)
 const canToggleFuzzy = computed(() => searchQuery.value.trim().length > 0)
@@ -173,9 +186,11 @@ const hasMore = ref(false)
 const nextCursor = ref(0)
 const valueLoading = ref(false)
 
-async function handleConnectionFailure(error) {
+async function handleConnectionFailure(error, request = null) {
+  if (request && !requestGuard.isCurrent(request)) return true
   if (!isConnectionErrorMessage(error)) return false
-  await connectionsStore.handleConnectionFailure(workspaceStore.activeConnID, error)
+  await connectionsStore.handleConnectionFailure(request?.context.connID || workspaceStore.activeConnID, error)
+  if (request && !requestGuard.isCurrent(request)) return true
   ok.value = false
   msg.value = formatConnectionLostMessage(error)
   return true
@@ -225,11 +240,16 @@ watch(canToggleFuzzy, (enabled) => {
 })
 
 onBeforeUnmount(() => {
+  requestGuard.invalidateAll()
   persistSearchState()
 })
 
 watch(() => props.keyValue, (kv) => {
+  requestGuard.invalidateAll()
   persistSearchState(lastKey.value)
+  valueLoading.value = false
+  isSearching.value = false
+  expandSaving.value = false
 
   rawMembers.value = [...(kv?.set_val || [])]
   hasMore.value = kv?.has_more || false
@@ -252,29 +272,105 @@ watch(() => props.keyValue, (kv) => {
     lastKey.value = ''
   }
   searchResults.value = null
+  searchAppliedQuery.value = ''
+  searchAppliedFuzzy.value = false
+  searchNextCursor.value = 0
+  searchHasMore.value = false
 
   sortOrder.value = 'none'
   msg.value = ''
 }, { immediate: true })
 
 async function loadMore() {
-  if (!hasMore.value || valueLoading.value || !props.keyValue?.key) return
+  if (valueLoading.value || !props.keyValue?.key) return
+  const request = requestGuard.begin(searchResults.value !== null ? 'search' : 'load')
+  if (searchResults.value !== null) {
+    if (!searchHasMore.value) {
+      requestGuard.finish(request)
+      return
+    }
+    valueLoading.value = true
+    try {
+      const page = await fetchSetSearchPage(
+        searchAppliedQuery.value,
+        !searchAppliedFuzzy.value,
+        searchNextCursor.value,
+        request,
+      )
+      if (!page || !requestGuard.isCurrent(request)) return
+      mergeSetSearchMembers(page.members)
+      searchNextCursor.value = page.nextCursor
+      searchHasMore.value = page.hasMore
+    } catch (e) {
+      if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
+        ok.value = false
+        msg.value = e.message || String(e)
+      }
+    } finally {
+      if (requestGuard.isCurrent(request)) valueLoading.value = false
+      requestGuard.finish(request)
+    }
+    return
+  }
+  if (!hasMore.value) {
+    requestGuard.finish(request)
+    return
+  }
   valueLoading.value = true
   try {
-    const result = await getValue(workspaceStore.activeConnID, props.keyValue.key, nextCursor.value, 0, '')
+    const result = await getValue(request.context.connID, request.context.key, nextCursor.value, 0, '')
+    if (!requestGuard.isCurrent(request)) return
     if (result.set_val) {
       rawMembers.value.push(...result.set_val)
     }
     hasMore.value = result.has_more || false
     nextCursor.value = result.next_cursor || 0
   } catch (e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message || String(e)
     }
   } finally {
-    valueLoading.value = false
+    if (requestGuard.isCurrent(request)) valueLoading.value = false
+    requestGuard.finish(request)
   }
+}
+
+async function fetchSetSearchPage(pattern, exact, cursor = 0, request) {
+  let pageCursor = cursor
+  let hasMore = true
+  const members = []
+  const seenCursors = new Set([cursor])
+
+  while (hasMore && members.length === 0) {
+    const kv = await searchValue(
+      request.context.connID,
+      request.context.key,
+      'set',
+      pattern,
+      exact,
+      pageCursor,
+    )
+    if (!requestGuard.isCurrent(request)) return null
+    members.push(...(kv.set_val || []))
+    const nextCursor = kv.next_cursor || 0
+    hasMore = !!kv.has_more && nextCursor !== 0
+    if (!hasMore || seenCursors.has(nextCursor)) {
+      if (seenCursors.has(nextCursor) && nextCursor !== 0) hasMore = false
+      pageCursor = nextCursor
+      break
+    }
+    seenCursors.add(nextCursor)
+    pageCursor = nextCursor
+  }
+
+  return { members, nextCursor: pageCursor, hasMore }
+}
+
+function mergeSetSearchMembers(members, replace = false) {
+  const merged = new Set(replace ? [] : searchResults.value || [])
+  for (const member of members) merged.add(member)
+  searchResults.value = [...merged]
 }
 
 function replaceLocalMember(oldMember, newMember) {
@@ -326,23 +422,42 @@ async function executeSearch() {
     msg.value = t('keyEditor.fuzzyRequireStar')
     return
   }
+  const request = requestGuard.begin('search')
   isSearching.value = true
+  searchResults.value = []
+  searchAppliedQuery.value = ''
+  searchAppliedFuzzy.value = false
+  searchNextCursor.value = 0
+  searchHasMore.value = false
   try {
     const exact = !fuzzySearch.value
-    const kv = await searchValue(workspaceStore.activeConnID, props.keyValue.key, 'set', pattern, exact)
-    searchResults.value = kv.set_val || []
+    const page = await fetchSetSearchPage(pattern, exact, 0, request)
+    if (!page || !requestGuard.isCurrent(request)) return
+    mergeSetSearchMembers(page.members, true)
+    searchAppliedQuery.value = pattern
+    searchAppliedFuzzy.value = fuzzySearch.value
+    searchNextCursor.value = page.nextCursor
+    searchHasMore.value = page.hasMore
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
   }
-  finally { isSearching.value = false }
+  finally {
+    if (requestGuard.isCurrent(request)) isSearching.value = false
+    requestGuard.finish(request)
+  }
 }
 
 function clearSearch() {
+  requestGuard.invalidate('search')
   searchQuery.value = ''
   searchResults.value = null
+  searchAppliedQuery.value = ''
+  searchAppliedFuzzy.value = false
+  searchNextCursor.value = 0
+  searchHasMore.value = false
   fuzzySearch.value = false
   if (props.keyValue?.key) {
   workspaceStore.setEditorSearchState(props.keyValue.key, 'set', null)
@@ -360,17 +475,12 @@ function openEdit(idx, val) {
 async function saveFromModal(newVal) {
   const oldMember = editModalMember.value
   if (!oldMember) return
+  const request = requestGuard.begin(`write:rename:${oldMember}`)
   expandSaving.value = true
   try {
-    let result = await sRem(workspaceStore.activeConnID, props.keyValue.key, oldMember)
-    if (!result.success && await handleConnectionFailure(result.message)) return
-    if (!result.success) {
-      ok.value = false
-      msg.value = result.message || t('keyEditor.deleteOldFailed')
-      return
-    }
-    result = await sAdd(workspaceStore.activeConnID, props.keyValue.key, newVal)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const result = await renameSetMember(request.context.connID, request.context.key, oldMember, newVal)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
@@ -378,12 +488,13 @@ async function saveFromModal(newVal) {
       expandShow.value = false
     }
   } catch (e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
   } finally {
-    expandSaving.value = false
+    if (requestGuard.isCurrent(request)) expandSaving.value = false
+    requestGuard.finish(request)
   }
 }
 
@@ -395,35 +506,44 @@ async function copyMember(m, idx) {
 
 async function addMember() {
   if (!newMember.value.trim()) return
+  const member = newMember.value
+  const request = requestGuard.begin('write:add')
   try {
-    const result = await sAdd(workspaceStore.activeConnID, props.keyValue.key, newMember.value)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const result = await sAdd(request.context.connID, request.context.key, member)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
-      addLocalMember(newMember.value)
+      addLocalMember(member)
       newMember.value = ''
       showAdd.value = false
       triggerAddFlash()
     }
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
+  } finally {
+    requestGuard.finish(request)
   }
 }
 
 async function removeMember(m) {
+  const request = requestGuard.begin(`write:remove:${m}`)
   try {
-    const result = await sRem(workspaceStore.activeConnID, props.keyValue.key, m)
-    if (!result.success && await handleConnectionFailure(result.message)) return
+    const result = await sRem(request.context.connID, request.context.key, m)
+    if (!requestGuard.isCurrent(request)) return
+    if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.deleted') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) removeLocalMember(m)
   } catch(e) {
-    if (!(await handleConnectionFailure(e))) {
+    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
+  } finally {
+    requestGuard.finish(request)
   }
 }
 </script>

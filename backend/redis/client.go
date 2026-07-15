@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -31,8 +33,9 @@ type activeConn struct {
 
 // ClientManager 连接池管理器
 type ClientManager struct {
-	mu      sync.RWMutex
-	clients map[string]*activeConn
+	mu                sync.RWMutex
+	clients           map[string]*activeConn
+	operationVersions map[string]uint64
 }
 
 const redisConnectTimeout = 10 * time.Second
@@ -40,31 +43,27 @@ const redisConnectTimeout = 10 * time.Second
 // NewClientManager 创建连接池管理器
 func NewClientManager() *ClientManager {
 	return &ClientManager{
-		clients: make(map[string]*activeConn),
+		clients:           make(map[string]*activeConn),
+		operationVersions: make(map[string]uint64),
 	}
+}
+
+func (m *ClientManager) nextOperationVersionLocked(id string) uint64 {
+	next := m.operationVersions[id] + 1
+	if next == 0 {
+		next = 1
+	}
+	m.operationVersions[id] = next
+	return next
 }
 
 // Connect 建立连接
 func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	start := time.Now()
+	m.mu.Lock()
+	operationVersion := m.nextOperationVersionLocked(cfg.ID)
+	m.mu.Unlock()
 	config.AppendDebugLog("[connect] begin id=%s name=%s redis=%s:%d cluster=%v ssh=%v", cfg.ID, cfg.Name, cfg.Host, cfg.Port, cfg.IsCluster, cfg.SSHEnabled)
-
-	// 已存在则先关闭
-	if old, ok := m.clients[cfg.ID]; ok {
-		old.client.Close()
-		if old.sshForward != nil {
-			old.sshForward.Close()
-		}
-		if old.clusterDialer != nil {
-			old.clusterDialer.Close()
-		}
-		if old.sshClient != nil {
-			old.sshClient.Close()
-		}
-		delete(m.clients, cfg.ID)
-	}
 
 	var sshClient *gossh.Client
 	var sshForward *ssh.LocalForward
@@ -107,11 +106,12 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 	if dialer == nil && cfg.ProxyEnabled && strings.TrimSpace(cfg.ProxyURL) != "" {
 		pd, err := makeProxyDialer(cfg.ProxyURL, redisConnectTimeout)
 		if err != nil {
-			config.AppendDebugLog("[connect] proxy setup failed: %v", err)
-			return normalizeConnectError(fmt.Errorf("Proxy error: %w", err))
+			safeErr := redactProxyError(err, cfg.ProxyURL)
+			config.AppendDebugLog("[connect] proxy setup failed: %v", safeErr)
+			return normalizeConnectError(fmt.Errorf("Proxy error: %w", safeErr))
 		}
 		dialer = pd
-		config.AppendDebugLog("[connect] proxy ready url=%s", cfg.ProxyURL)
+		config.AppendDebugLog("[connect] proxy ready url=%s", redactProxyURL(cfg.ProxyURL))
 	}
 
 	var client redis.UniversalClient
@@ -146,9 +146,7 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 		config.AppendDebugLog("[connect] redis ping failed: %v", err)
 		return normalizeConnectError(fmt.Errorf("Redis ping failed: %w", err))
 	}
-	config.AppendDebugLog("[connect] success elapsed=%s", time.Since(start))
-
-	m.clients[cfg.ID] = &activeConn{
+	newConn := &activeConn{
 		client:        client,
 		sshClient:     sshClient,
 		sshForward:    sshForward,
@@ -157,27 +155,28 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 		cfg:           cfg,
 		currentDB:     cfg.DB,
 	}
+	m.mu.Lock()
+	if m.operationVersions[cfg.ID] != operationVersion {
+		m.mu.Unlock()
+		closeActiveConnection(newConn)
+		return fmt.Errorf("connection operation superseded")
+	}
+	old := m.clients[cfg.ID]
+	m.clients[cfg.ID] = newConn
+	m.mu.Unlock()
+	closeActiveConnection(old)
+	config.AppendDebugLog("[connect] success elapsed=%s", time.Since(start))
 	return nil
 }
 
 // Disconnect 断开连接
 func (m *ClientManager) Disconnect(id string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if conn, ok := m.clients[id]; ok {
-		conn.client.Close()
-		if conn.sshForward != nil {
-			conn.sshForward.Close()
-		}
-		if conn.clusterDialer != nil {
-			conn.clusterDialer.Close()
-		}
-		if conn.sshClient != nil {
-			conn.sshClient.Close()
-		}
-		delete(m.clients, id)
-	}
+	m.nextOperationVersionLocked(id)
+	conn := m.clients[id]
+	delete(m.clients, id)
+	m.mu.Unlock()
+	closeActiveConnection(conn)
 }
 
 // GetClient 获取指定连接的 Redis 客户端
@@ -216,6 +215,71 @@ func (m *ClientManager) SetCurrentDB(id string, db int) error {
 	return nil
 }
 
+// ApplyConnectionConfig updates non-transport metadata in place. Transport
+// changes invalidate the active client so it cannot keep using stale settings.
+func (m *ClientManager) ApplyConnectionConfig(cfg config.ConnectionConfig) bool {
+	m.mu.Lock()
+	m.nextOperationVersionLocked(cfg.ID)
+	conn, ok := m.clients[cfg.ID]
+	if !ok {
+		m.mu.Unlock()
+		return false
+	}
+	if sameConnectionTransport(conn.cfg, cfg) {
+		conn.cfg = cfg
+		m.mu.Unlock()
+		return false
+	}
+	delete(m.clients, cfg.ID)
+	m.mu.Unlock()
+	closeActiveConnection(conn)
+	return true
+}
+
+func sameConnectionTransport(left, right config.ConnectionConfig) bool {
+	return left.Host == right.Host &&
+		left.Port == right.Port &&
+		left.Password == right.Password &&
+		left.DB == right.DB &&
+		left.IsCluster == right.IsCluster &&
+		reflect.DeepEqual(left.ClusterAddrs, right.ClusterAddrs) &&
+		left.ProxyEnabled == right.ProxyEnabled &&
+		left.ProxyURL == right.ProxyURL &&
+		left.SSHEnabled == right.SSHEnabled &&
+		reflect.DeepEqual(left.SSH, right.SSH)
+}
+
+func closeActiveConnection(conn *activeConn) {
+	if conn == nil {
+		return
+	}
+	if conn.client != nil {
+		_ = conn.client.Close()
+	}
+	if conn.sshForward != nil {
+		_ = conn.sshForward.Close()
+	}
+	if conn.clusterDialer != nil {
+		_ = conn.clusterDialer.Close()
+	}
+	if conn.sshClient != nil {
+		_ = conn.sshClient.Close()
+	}
+}
+
+func cloneActiveConnection(conn *activeConn) *activeConn {
+	if conn == nil {
+		return nil
+	}
+	clone := *conn
+	clone.cfg.ClusterAddrs = append([]string(nil), conn.cfg.ClusterAddrs...)
+	if conn.cfg.SSH != nil {
+		sshConfig := *conn.cfg.SSH
+		clone.cfg.SSH = &sshConfig
+	}
+	return &clone
+}
+
 // IsConnected 检查连接是否存在
 func (m *ClientManager) IsConnected(id string) bool {
 	m.mu.RLock()
@@ -245,26 +309,24 @@ func (m *ClientManager) Ping(id string) error {
 // SelectDB 切换数据库（仅普通模式支持）
 func (m *ClientManager) SelectDB(id string, db int) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	conn, ok := m.clients[id]
 	if !ok {
+		m.mu.Unlock()
 		return fmt.Errorf("connection %s not found", id)
 	}
 	if conn.cfg.IsCluster {
+		m.mu.Unlock()
 		return fmt.Errorf("cluster mode does not support SELECT DB")
 	}
+	operationVersion := m.nextOperationVersionLocked(id)
+	snapshot := cloneActiveConnection(conn)
+	m.mu.Unlock()
 
-	// 从原始配置重建，只改 DB，避免旧连接池污染
-	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
-	redisAddr := joinHostPort(conn.cfg.Host, conn.cfg.Port)
-	if conn.sshForward != nil {
-		redisAddr = conn.forwardedAddr
-	} else if conn.sshClient != nil {
-		dialer = ssh.MakeContextDialer(conn.sshClient, redisConnectTimeout)
+	// 从原始配置重建，只改 DB，避免旧连接池污染。
+	opts, err := buildActiveRedisOptions(snapshot, db)
+	if err != nil {
+		return err
 	}
-
-	opts := buildRedisOptions(redisAddr, conn.cfg.Password, db, dialer)
 
 	newClient := redis.NewClient(opts)
 	ctx, cancel := context.WithTimeout(context.Background(), redisConnectTimeout)
@@ -274,10 +336,36 @@ func (m *ClientManager) SelectDB(id string, db int) error {
 		return fmt.Errorf("ping failed after SELECT: %w", err)
 	}
 
-	conn.client.Close()
+	m.mu.Lock()
+	if m.operationVersions[id] != operationVersion || m.clients[id] != conn {
+		m.mu.Unlock()
+		newClient.Close()
+		return fmt.Errorf("select DB operation superseded")
+	}
+	oldClient := conn.client
 	conn.client = newClient
 	conn.currentDB = db
+	conn.cfg.DB = db
+	m.mu.Unlock()
+	_ = oldClient.Close()
 	return nil
+}
+
+func buildActiveRedisOptions(conn *activeConn, db int) (*redis.Options, error) {
+	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
+	redisAddr := joinHostPort(conn.cfg.Host, conn.cfg.Port)
+	if conn.sshForward != nil {
+		redisAddr = conn.forwardedAddr
+	} else if conn.sshClient != nil {
+		dialer = ssh.MakeContextDialer(conn.sshClient, redisConnectTimeout)
+	} else if conn.cfg.ProxyEnabled && strings.TrimSpace(conn.cfg.ProxyURL) != "" {
+		proxyDialer, err := makeProxyDialer(conn.cfg.ProxyURL, redisConnectTimeout)
+		if err != nil {
+			return nil, normalizeConnectError(fmt.Errorf("Proxy error: %w", redactProxyError(err, conn.cfg.ProxyURL)))
+		}
+		dialer = proxyDialer
+	}
+	return buildRedisOptions(redisAddr, conn.cfg.Password, db, dialer), nil
 }
 
 // TestConnection 测试连通性（不持久化，不保存连接池）
@@ -332,11 +420,12 @@ func TestConnection(cfg config.ConnectionConfig) error {
 	if dialer == nil && cfg.ProxyEnabled && strings.TrimSpace(cfg.ProxyURL) != "" {
 		pd, err := makeProxyDialer(cfg.ProxyURL, redisConnectTimeout)
 		if err != nil {
-			config.AppendDebugLog("[test] proxy setup failed: %v", err)
-			return normalizeConnectError(fmt.Errorf("Proxy error: %w", err))
+			safeErr := redactProxyError(err, cfg.ProxyURL)
+			config.AppendDebugLog("[test] proxy setup failed: %v", safeErr)
+			return normalizeConnectError(fmt.Errorf("Proxy error: %w", safeErr))
 		}
 		dialer = pd
-		config.AppendDebugLog("[test] proxy ready url=%s", cfg.ProxyURL)
+		config.AppendDebugLog("[test] proxy ready url=%s", redactProxyURL(cfg.ProxyURL))
 	}
 
 	var client redis.UniversalClient
@@ -370,20 +459,15 @@ func TestConnection(cfg config.ConnectionConfig) error {
 // DisconnectAll 关闭所有连接（应用退出时调用）
 func (m *ClientManager) DisconnectAll() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
+	connections := make([]*activeConn, 0, len(m.clients))
 	for id, conn := range m.clients {
-		conn.client.Close()
-		if conn.sshForward != nil {
-			conn.sshForward.Close()
-		}
-		if conn.clusterDialer != nil {
-			conn.clusterDialer.Close()
-		}
-		if conn.sshClient != nil {
-			conn.sshClient.Close()
-		}
+		m.nextOperationVersionLocked(id)
+		connections = append(connections, conn)
 		delete(m.clients, id)
+	}
+	m.mu.Unlock()
+	for _, conn := range connections {
+		closeActiveConnection(conn)
 	}
 }
 
@@ -396,7 +480,7 @@ func normalizeHost(host string) string {
 }
 
 func joinHostPort(host string, port int) string {
-	return fmt.Sprintf("%s:%d", normalizeHost(host), port)
+	return net.JoinHostPort(normalizeHost(host), strconv.Itoa(port))
 }
 
 func normalizeAddrs(addrs []string) []string {
@@ -492,6 +576,30 @@ func makeProxyDialer(rawURL string, timeout time.Duration) (func(ctx context.Con
 	default:
 		return nil, fmt.Errorf("unsupported proxy scheme: %s", parsed.Scheme)
 	}
+}
+
+func redactProxyURL(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "***"
+	}
+	redacted := strings.ToLower(parsed.Scheme) + "://"
+	if parsed.User != nil {
+		redacted += "***@"
+	}
+	return redacted + parsed.Host
+}
+
+func redactProxyError(err error, rawURL string) error {
+	if err == nil {
+		return nil
+	}
+	message := err.Error()
+	trimmedURL := strings.TrimSpace(rawURL)
+	if trimmedURL != "" {
+		message = strings.ReplaceAll(message, trimmedURL, redactProxyURL(trimmedURL))
+	}
+	return errors.New(message)
 }
 
 func basicProxyAuth(username string, password string) string {
