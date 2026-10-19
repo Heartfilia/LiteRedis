@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"LiteRedis/backend/config"
+	"LiteRedis/backend/localapi"
 	redisbackend "LiteRedis/backend/redis"
+	sshbackend "LiteRedis/backend/ssh"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -15,6 +17,8 @@ import (
 type App struct {
 	ctx             context.Context
 	manager         *redisbackend.ClientManager
+	registry        *localapi.KeyRegistry
+	apiServer       *localapi.Server
 	initWindowState config.WindowState
 }
 
@@ -29,8 +33,11 @@ type VersionInfo struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
+	registry := localapi.NewKeyRegistry()
 	return &App{
-		manager: redisbackend.NewClientManager(),
+		manager:   redisbackend.NewClientManager(),
+		registry:  registry,
+		apiServer: localapi.NewServer(registry),
 	}
 }
 
@@ -39,6 +46,16 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	_ = cleanupStaleUpdateDirs(os.TempDir(), time.Now().Add(-updateTempMaxAge))
+	// 启动本地数据提取 API（默认开启，失败不影响主功能）
+	if settings, err := config.GetSettings(); err == nil && settings.LocalAPIEnabled {
+		port := settings.LocalAPIPort
+		if port <= 0 {
+			port = config.DefaultSettings().LocalAPIPort
+		}
+		if err := a.apiServer.Start(port); err != nil {
+			config.AppendDebugLog("[localapi] start failed: %v", err)
+		}
+	}
 	// 恢复上次窗口位置（X=-1 表示首次启动，让系统居中）
 	if a.initWindowState.X != -1 {
 		wailsruntime.WindowSetPosition(ctx, a.initWindowState.X, a.initWindowState.Y)
@@ -53,6 +70,7 @@ func (a *App) shutdown(ctx context.Context) {
 	_ = config.SaveWindowState(config.WindowState{X: x, Y: y, Width: w, Height: h})
 
 	a.manager.DisconnectAll()
+	a.apiServer.Stop()
 }
 
 // GetAppVersion 返回当前构建版本
@@ -76,6 +94,8 @@ func (a *App) SaveConnection(cfg config.ConnectionConfig) config.OperationResult
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
 	if a.manager.ApplyConnectionConfig(saved) {
+		// 传输层变更导致断开，已发布快照一并清除
+		a.registry.UnpublishConn(saved.ID)
 		return config.OperationResult{
 			Success:      true,
 			Disconnected: true,
@@ -96,6 +116,7 @@ func (a *App) ReorderConnections(items []config.ConnectionOrderItem) config.Oper
 func (a *App) DeleteConnection(id string) config.OperationResult {
 	// 先断开连接
 	a.manager.Disconnect(id)
+	a.registry.UnpublishConn(id)
 	if err := config.DeleteConnection(id); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
@@ -108,6 +129,14 @@ func (a *App) TestConnection(cfg config.ConnectionConfig) config.OperationResult
 		return config.OperationResult{Success: false, Message: err.Error() + "\nDebug log: " + config.DebugLogPath()}
 	}
 	return config.OperationResult{Success: true, Message: "连接成功\nDebug log: " + config.DebugLogPath()}
+}
+
+// ForgetSSHHostFingerprint 删除指定 SSH 主机的已记录指纹（服务器换钥后重置用）
+func (a *App) ForgetSSHHostFingerprint(host string, port int) config.OperationResult {
+	if err := sshbackend.ForgetKnownHost(host, port); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	return config.OperationResult{Success: true, Message: "已重置 SSH 主机指纹，下次连接将重新记录"}
 }
 
 // ConnectResult 连接结果，包含初始 DB
@@ -135,6 +164,7 @@ func (a *App) Connect(id string) ConnectResult {
 // Disconnect 断开连接
 func (a *App) Disconnect(id string) config.OperationResult {
 	a.manager.Disconnect(id)
+	a.registry.UnpublishConn(id)
 	return config.OperationResult{Success: true}
 }
 
@@ -156,6 +186,8 @@ func (a *App) SelectDB(id string, db int) config.OperationResult {
 	if err := a.manager.SelectDB(id, db); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
+	// DB 上下文变化，旧 DB 的快照不再有效
+	a.registry.UnpublishConn(id)
 	return config.OperationResult{Success: true}
 }
 
@@ -207,6 +239,7 @@ func (a *App) DeleteKey(connID string, key string) config.OperationResult {
 	if err := redisbackend.DeleteKey(a.ctx, client, key); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
+	a.registry.Unpublish(connID, key)
 	return config.OperationResult{Success: true}
 }
 
@@ -219,6 +252,7 @@ func (a *App) RenameKey(connID, oldKey, newKey string) config.OperationResult {
 	if err := redisbackend.RenameKey(a.ctx, client, oldKey, newKey); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
+	a.registry.Unpublish(connID, oldKey)
 	return config.OperationResult{Success: true}
 }
 
@@ -492,6 +526,50 @@ func (a *App) GetSettings() (config.AppSettings, error) {
 // SaveSettings 保存全局设置
 func (a *App) SaveSettings(s config.AppSettings) config.OperationResult {
 	if err := config.SaveSettings(s); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	// 本地 API 开关/端口变化时重启服务
+	if err := a.apiServer.Apply(s); err != nil {
+		config.AppendDebugLog("[localapi] apply settings failed: %v", err)
+		return config.OperationResult{Success: false, Message: "设置已保存，但本地 API 服务启动失败: " + err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
+// ============================================================
+// 本地数据提取 API
+// ============================================================
+
+// PublishKeyValue 前端上报提取数据（点击「浏览器解析」时写入唯一槽位）
+func (a *App) PublishKeyValue(connID string, kv config.KeyValue, db int, nonce string) config.OperationResult {
+	// 记录连接名（展示用）
+	connName := ""
+	if cfg, _, err := a.manager.GetConnectionState(connID); err == nil {
+		connName = cfg.Name
+	}
+	if err := a.registry.Publish(connID, kv.Key, kv, db, connName, nonce); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
+// LocalAPIInfo 本地 API 运行信息
+type LocalAPIInfo struct {
+	Running bool   `json:"running"`
+	Port    int    `json:"port"`
+	Token   string `json:"token"`
+	Error   string `json:"error,omitempty"`
+}
+
+// GetLocalAPIInfo 获取本地 API 服务状态与 token
+func (a *App) GetLocalAPIInfo() LocalAPIInfo {
+	info := a.apiServer.Info()
+	return LocalAPIInfo{Running: info.Running, Port: info.Port, Token: info.Token}
+}
+
+// RegenerateLocalAPIToken 换发本地 API token（旧 token 立即失效）
+func (a *App) RegenerateLocalAPIToken() config.OperationResult {
+	if err := a.apiServer.RegenerateToken(); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
 	return config.OperationResult{Success: true}

@@ -48,6 +48,20 @@ provide('openSettings', () => { showSettings.value = true })
 onMounted(() => {
   connectionsStore.loadConnections()
   settingsStore.load()
+  // 屏蔽原生右键菜单（输入框/可编辑区域保留，编辑器行首的自定义菜单另行处理）
+  document.addEventListener('contextmenu', suppressContextMenu)
+})
+
+function suppressContextMenu(e) {
+  const target = e.target
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+    return
+  }
+  e.preventDefault()
+}
+
+onBeforeUnmount(() => {
+  document.removeEventListener('contextmenu', suppressContextMenu)
 })
 
 let toastTimer = null

@@ -133,6 +133,13 @@
                 <input v-model="form.ssh.passphrase" type="password" :placeholder="t('connManager.sshPassphrasePlaceholder')" />
               </div>
             </div>
+            <div class="form-row ssh-fingerprint-row" v-if="form.ssh.host">
+              <button type="button" class="btn-secondary btn-fingerprint-reset" :disabled="resettingFingerprint" @click="handleResetFingerprint">
+                {{ resettingFingerprint ? '...' : t('connManager.sshResetFingerprint') }}
+              </button>
+              <span class="fingerprint-hint">{{ t('connManager.sshResetFingerprintHint') }}</span>
+            </div>
+            <div v-if="fingerprintMsg" :class="['test-msg', fingerprintOk ? 'ok' : 'err']">{{ fingerprintMsg }}</div>
           </div>
         </template>
       </div>
@@ -204,6 +211,7 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { formatDebugMessage } from '../../utils/debug.js'
+import { forgetSSHHostFingerprint } from '../../api/wails.js'
 const props = defineProps({
   connection: { type: Object, default: null },
 })
@@ -421,6 +429,26 @@ function normalizeIconColor(value) {
   return /^#[0-9a-fA-F]{6}$/.test(color) ? color : ''
 }
 
+const resettingFingerprint = ref(false)
+const fingerprintMsg = ref('')
+const fingerprintOk = ref(false)
+
+async function handleResetFingerprint() {
+  if (!form.ssh.host) return
+  fingerprintMsg.value = ''
+  resettingFingerprint.value = true
+  try {
+    const result = await forgetSSHHostFingerprint(form.ssh.host, form.ssh.port || 22)
+    fingerprintOk.value = !!result.success
+    fingerprintMsg.value = (result.success ? '✓ ' : '✗ ') + (result.message || '')
+  } catch (e) {
+    fingerprintOk.value = false
+    fingerprintMsg.value = '✗ ' + (e.message || String(e))
+  } finally {
+    resettingFingerprint.value = false
+  }
+}
+
 async function handleTest() {
   testMsg.value = ''
   testing.value = true
@@ -543,6 +571,9 @@ textarea { resize: vertical; font-family: monospace; }
 .proxy-panel { background: #f9fafb; padding: 12px; border-radius: 6px; margin-top: 8px; border: 1px solid #e5e7eb; }
 .ssh-section { border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 4px; }
 .ssh-panel { background: #f9fafb; padding: 12px; border-radius: 6px; margin-top: 8px; border: 1px solid #e5e7eb; }
+.ssh-fingerprint-row { align-items: center; gap: 10px; }
+.btn-fingerprint-reset { white-space: nowrap; }
+.fingerprint-hint { font-size: 12px; color: #6b7280; }
 .icon-color-section { border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 4px; }
 .icon-color-card {
   display: flex;
@@ -741,6 +772,10 @@ textarea { resize: vertical; font-family: monospace; }
 
 .connection-form.theme-dark .icon-preview-subtitle,
 .connection-form.theme-dark .field-hint {
+  color: #94a3b8;
+}
+
+.connection-form.theme-dark .fingerprint-hint {
   color: #94a3b8;
 }
 

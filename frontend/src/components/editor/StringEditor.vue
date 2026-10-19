@@ -11,6 +11,13 @@
       >
         {{ saving ? t('keyEditor.saving') : t('keyEditor.save') }}
       </button>
+      <button
+        class="btn-action btn-extract"
+        :title="t('keyEditor.browserExtract')"
+        :disabled="extracting"
+        @click="handleBrowserExtract"
+        @contextmenu.prevent
+      >🌐</button>
     </div>
   </div>
 </template>
@@ -21,6 +28,7 @@ import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
+import { openBrowserExtract } from '../../services/browserExtract.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
 import { setString } from '../../api/wails.js'
@@ -96,7 +104,7 @@ watch(() => props.keyValue, (kv) => {
   localVal.value = kv?.string_val || ''
   originalVal.value = kv?.string_val || ''
   msg.value = ''
-})
+}, { immediate: true })
 
 onBeforeUnmount(() => {
   requestGuard.invalidateAll()
@@ -109,6 +117,26 @@ async function copyValue() {
   if (result) {
     copied.value = true
     setTimeout(() => { copied.value = false }, 1500)
+  }
+}
+
+const extracting = ref(false)
+async function handleBrowserExtract() {
+  extracting.value = true
+  try {
+    const opened = await openBrowserExtract({
+      key: props.keyValue?.key,
+      type: 'string',
+      position: '0',
+      data: { string_val: originalVal.value },
+      totalCount: 1,
+      hasMore: false,
+    })
+    ok.value = opened
+    msg.value = opened ? t('keyEditor.extractOpened') : t('keyEditor.extractFailed')
+    setTimeout(() => { msg.value = '' }, 3000)
+  } finally {
+    extracting.value = false
   }
 }
 

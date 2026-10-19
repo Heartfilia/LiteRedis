@@ -1,5 +1,6 @@
 <template>
   <div class="stream-editor" :class="`theme-${settingsStore.themeMode || 'light'}`">
+    <FloatingMessage :message="msg" :success="ok" />
     <div class="toolbar">
       <span class="count">{{ entries.length }} / {{ totalEntries }} {{ t('settings.unitItem') }}</span>
       <button v-if="hasMore" class="btn-load-more" :disabled="valueLoading" @click="loadMore">
@@ -9,7 +10,7 @@
     <div class="stream-wrap">
       <div v-for="(entry, idx) in displayEntries" :key="entry.id" class="stream-entry">
         <div class="entry-header">
-          <span class="entry-num">{{ idx + 1 }}</span>
+          <span class="entry-num" @click="openExtractMenu($event, entry.id)" @contextmenu.prevent="openExtractMenu($event, entry.id)">{{ idx + 1 }}</span>
           <span class="entry-id">{{ entry.id }}</span>
           <button class="btn-entry-copy" :class="{ copied: copiedEntry === entry.id }" @click="copyEntry(entry)">
             {{ copiedEntry === entry.id ? '✓ ' + t('keyEditor.copied') : t('keyEditor.copy') }}
@@ -24,11 +25,21 @@
         </div>
       </div>
     </div>
+    <ExtractMenu
+      :visible="extractMenu.visible"
+      :x="extractMenu.x"
+      :y="extractMenu.y"
+      :theme="settingsStore.themeMode || 'light'"
+      :show-copy="settingsStore.debugMode"
+      @open="menuOpen"
+      @copy="menuCopy"
+      @close="extractMenu.visible = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onBeforeUnmount, watch } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -37,7 +48,10 @@ import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
 import { mergeStreamEntries } from '../../utils/streamPagination.js'
 import { isConnectionErrorMessage } from '../../utils/connection.js'
+import { openBrowserExtract, copyExtractLink } from '../../services/browserExtract.js'
 import { getValue } from '../../api/wails.js'
+import FloatingMessage from '../common/FloatingMessage.vue'
+import ExtractMenu from '../common/ExtractMenu.vue'
 import './editorShared.css'
 
 const props = defineProps({ keyValue: Object })
@@ -57,6 +71,8 @@ const hasMore = ref(false)
 const nextStreamID = ref('')
 const totalCount = ref(-1)
 const valueLoading = ref(false)
+const msg = ref('')
+const ok = ref(true)
 let copyTimer = null
 
 const displayEntries = computed(() => entries.value)
@@ -71,6 +87,43 @@ watch(() => props.keyValue, kv => {
   valueLoading.value = false
   copiedEntry.value = null
 }, { immediate: true })
+
+// —— 浏览器解析：右键行首序号，按 entry ID 定位提取（返回 fields JSON） ——
+const extractMenu = reactive({ visible: false, x: 0, y: 0, position: '' })
+function openExtractMenu(e, id) {
+  extractMenu.x = e.clientX
+  extractMenu.y = e.clientY
+  extractMenu.position = id
+  extractMenu.visible = true
+}
+async function menuOpen() {
+  extractMenu.visible = false
+  const opened = await openBrowserExtract({
+    key: props.keyValue?.key,
+    type: 'stream',
+    position: extractMenu.position,
+    data: { stream_val: entries.value.map(e => ({ id: e.id, fields: e.fields })), },
+    totalCount: totalCount.value,
+    hasMore: hasMore.value,
+  })
+  ok.value = opened
+  msg.value = opened ? t('keyEditor.extractOpened') : t('keyEditor.extractFailed')
+  setTimeout(() => { msg.value = '' }, 3000)
+}
+async function menuCopy() {
+  extractMenu.visible = false
+  const copied = await copyExtractLink({
+    key: props.keyValue?.key,
+    type: 'stream',
+    position: extractMenu.position,
+    data: { stream_val: entries.value.map(e => ({ id: e.id, fields: e.fields })), },
+    totalCount: totalCount.value,
+    hasMore: hasMore.value,
+  })
+  ok.value = copied
+  msg.value = copied ? t('keyEditor.linkCopied') : t('keyEditor.extractFailed')
+  setTimeout(() => { msg.value = '' }, 3000)
+}
 
 onBeforeUnmount(() => {
   requestGuard.invalidateAll()

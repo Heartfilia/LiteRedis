@@ -53,7 +53,7 @@ func NewSSHTunnelWithConfig(host string, port int, user string, password string,
 	clientConfig := &gossh.ClientConfig{
 		User:            user,
 		Auth:            authMethods,
-		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
+		HostKeyCallback: tofuHostKeyCallback,
 		Timeout:         timeout,
 	}
 

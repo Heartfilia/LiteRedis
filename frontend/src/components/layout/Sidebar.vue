@@ -232,8 +232,13 @@
               </svg>
             </span>
           </a>
-          <a class="sidebar-link-icon sidebar-link-json" :title="t('sidebar.jsonParser')" @click="openJSONParser()">
-            <span class="sidebar-link-glyph" aria-hidden="true">{}</span>
+          <a class="sidebar-link-icon sidebar-link-share" :title="t('sidebar.quickShare')" @click="openQuickShare()">
+            <span class="sidebar-link-glyph" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" width="12" height="12" aria-hidden="true">
+                <path d="M2 2L13 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M2 2l7 20 4-9 9-4-20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
           </a>
         </div>
         <div class="footer-actions">
@@ -421,8 +426,8 @@ function openGitHub() {
   BrowserOpenURL('https://github.com/Heartfilia/LiteRedis')
 }
 
-function openJSONParser() {
-  BrowserOpenURL('https://json.litetools.top')
+function openQuickShare() {
+  BrowserOpenURL('https://share.litetools.top')
 }
 
 function showToast(message, ok = false) {
@@ -832,12 +837,7 @@ async function disconnectConn(id) {
   color: #2563eb;
   background: rgba(219, 234, 254, 0.76);
 }
-.sidebar-link-json {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-}
+.sidebar-link-share { color: inherit; }
 .footer-actions {
   display: flex;
   align-items: center;

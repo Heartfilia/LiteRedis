@@ -34,6 +34,10 @@ export function ExecuteRedisCommand(arg1, arg2) {
   return window['go']['main']['App']['ExecuteRedisCommand'](arg1, arg2);
 }
 
+export function ForgetSSHHostFingerprint(arg1, arg2) {
+  return window['go']['main']['App']['ForgetSSHHostFingerprint'](arg1, arg2);
+}
+
 export function GetAppVersion() {
   return window['go']['main']['App']['GetAppVersion']();
 }
@@ -44,6 +48,10 @@ export function GetConnectionOverview(arg1) {
 
 export function GetKeyInfo(arg1, arg2) {
   return window['go']['main']['App']['GetKeyInfo'](arg1, arg2);
+}
+
+export function GetLocalAPIInfo() {
+  return window['go']['main']['App']['GetLocalAPIInfo']();
 }
 
 export function GetSettings() {
@@ -86,8 +94,16 @@ export function PingConnection(arg1) {
   return window['go']['main']['App']['PingConnection'](arg1);
 }
 
+export function PublishKeyValue(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['PublishKeyValue'](arg1, arg2, arg3, arg4);
+}
+
 export function RPush(arg1, arg2, arg3) {
   return window['go']['main']['App']['RPush'](arg1, arg2, arg3);
+}
+
+export function RegenerateLocalAPIToken() {
+  return window['go']['main']['App']['RegenerateLocalAPIToken']();
 }
 
 export function RenameKey(arg1, arg2, arg3) {

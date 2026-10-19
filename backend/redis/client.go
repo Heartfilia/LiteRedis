@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -199,7 +200,8 @@ func (m *ClientManager) GetConnectionState(id string) (config.ConnectionConfig, 
 	if !ok {
 		return config.ConnectionConfig{}, 0, fmt.Errorf("connection %s not found or not connected", id)
 	}
-	return conn.cfg, conn.currentDB, nil
+	// 深拷贝，避免暴露共享的 ClusterAddrs / SSH 指针
+	return cloneActiveConnection(conn).cfg, conn.currentDB, nil
 }
 
 func (m *ClientManager) SetCurrentDB(id string, db int) error {
@@ -288,11 +290,13 @@ func (m *ClientManager) IsConnected(id string) bool {
 	return ok
 }
 
-// Ping 检测现有连接是否仍可用
+// Ping 检测现有连接是否仍可用。
+// 在 RLock 持有期间执行，避免与 SelectDB/Disconnect 并发时打到旧 client 或已关闭 client。
 func (m *ClientManager) Ping(id string) error {
 	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	conn, ok := m.clients[id]
-	m.mu.RUnlock()
 	if !ok {
 		return fmt.Errorf("connection %s not found or not connected", id)
 	}
@@ -500,6 +504,55 @@ func normalizeAddrs(addrs []string) []string {
 	return result
 }
 
+const maxProxyResponseHeaderSize = 8192
+
+// proxyBufferedConn 先回放代理响应头之后被 bufio 缓冲的字节，再透传底层连接
+type proxyBufferedConn struct {
+	net.Conn
+	pending []byte
+}
+
+func (c *proxyBufferedConn) Read(p []byte) (int, error) {
+	if len(c.pending) > 0 {
+		n := copy(p, c.pending)
+		c.pending = c.pending[n:]
+		return n, nil
+	}
+	return c.Conn.Read(p)
+}
+
+// readHTTPConnectResponse 从 reader 读取完整 HTTP 响应头（到 \r\n\r\n），
+// 超过 maxProxyResponseHeaderSize 视为恶意响应。
+func readHTTPConnectResponse(reader *bufio.Reader) (string, error) {
+	var buf []byte
+	for {
+		b, err := reader.ReadByte()
+		if err != nil {
+			return "", fmt.Errorf("read proxy response: %w", err)
+		}
+		buf = append(buf, b)
+		if len(buf) > maxProxyResponseHeaderSize {
+			return "", fmt.Errorf("proxy response header exceeds %d bytes", maxProxyResponseHeaderSize)
+		}
+		if len(buf) >= 4 && string(buf[len(buf)-4:]) == "\r\n\r\n" {
+			return string(buf), nil
+		}
+	}
+}
+
+// checkHTTPConnectResponse 校验 CONNECT 响应状态行（如 "HTTP/1.1 200 Connection established"）
+func checkHTTPConnectResponse(resp string) error {
+	statusLine := resp
+	if idx := strings.Index(resp, "\r\n"); idx >= 0 {
+		statusLine = resp[:idx]
+	}
+	fields := strings.Fields(statusLine)
+	if len(fields) < 2 || !strings.HasPrefix(strings.ToUpper(fields[0]), "HTTP/") || fields[1] != "200" {
+		return fmt.Errorf("http proxy connect failed: %s", strings.TrimSpace(statusLine))
+	}
+	return nil
+}
+
 func makeProxyDialer(rawURL string, timeout time.Duration) (func(ctx context.Context, network, addr string) (net.Conn, error), error) {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
@@ -518,7 +571,20 @@ func makeProxyDialer(rawURL string, timeout time.Duration) (func(ctx context.Con
 			if err != nil {
 				return nil, err
 			}
-			targetConn := conn
+			// 按 ctx 截止时间设置 deadline，防止代理不应答时 Read 永久挂起
+			deadline := time.Time{}
+			if d, ok := ctx.Deadline(); ok {
+				deadline = d
+			} else if timeout > 0 {
+				deadline = time.Now().Add(timeout)
+			}
+			if !deadline.IsZero() {
+				if err := conn.SetDeadline(deadline); err != nil {
+					conn.Close()
+					return nil, err
+				}
+			}
+
 			connectHost := addr
 			authHeader := ""
 			if parsed.User != nil {
@@ -527,21 +593,35 @@ func makeProxyDialer(rawURL string, timeout time.Duration) (func(ctx context.Con
 				authHeader = "Proxy-Authorization: Basic " + basicProxyAuth(username, password) + "\r\n"
 			}
 			req := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\n%s\r\n", connectHost, connectHost, authHeader)
-			if _, err := targetConn.Write([]byte(req)); err != nil {
-				targetConn.Close()
+			if _, err := conn.Write([]byte(req)); err != nil {
+				conn.Close()
 				return nil, err
 			}
-			buf := make([]byte, 4096)
-			n, err := targetConn.Read(buf)
+
+			reader := bufio.NewReader(conn)
+			resp, err := readHTTPConnectResponse(reader)
 			if err != nil {
-				targetConn.Close()
+				conn.Close()
+				return nil, fmt.Errorf("http proxy connect failed: %w", err)
+			}
+			if err := checkHTTPConnectResponse(resp); err != nil {
+				conn.Close()
 				return nil, err
 			}
-			if !strings.Contains(string(buf[:n]), " 200 ") {
-				targetConn.Close()
-				return nil, fmt.Errorf("http proxy connect failed: %s", strings.TrimSpace(string(buf[:n])))
+
+			if !deadline.IsZero() {
+				_ = conn.SetDeadline(time.Time{})
 			}
-			return targetConn, nil
+			// bufio 可能已缓冲响应头之后的字节（异常代理行为），回放避免丢数据
+			if n := reader.Buffered(); n > 0 {
+				pending, err := reader.Peek(n)
+				if err != nil {
+					conn.Close()
+					return nil, err
+				}
+				return &proxyBufferedConn{Conn: conn, pending: append([]byte(nil), pending...)}, nil
+			}
+			return conn, nil
 		}, nil
 	case "socks5", "socks5h":
 		var auth *proxy.Auth

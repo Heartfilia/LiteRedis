@@ -51,7 +51,7 @@
         </thead>
         <tbody>
           <tr v-for="(m, idx) in displayMembers" :key="m.member">
-            <td class="num-cell">{{ idx + 1 }}</td>
+            <td class="num-cell" @click="openExtractMenu($event, rawMembers.findIndex(x => x.member === m.member))" @contextmenu.prevent="openExtractMenu($event, rawMembers.findIndex(x => x.member === m.member))">{{ idx + 1 }}</td>
             <td class="score-cell" :style="{ width: scoreWidth + 'px' }">
               <span v-if="editingMember !== m.member" class="score-text" @click="startEdit(m)">{{ m.score }}</span>
               <input v-else v-model.number="editScore" type="number" step="any"
@@ -104,11 +104,21 @@
     </div>
 
     <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" @close="expandShow = false" @save="saveFromModal" />
+    <ExtractMenu
+      :visible="extractMenu.visible"
+      :x="extractMenu.x"
+      :y="extractMenu.y"
+      :theme="settingsStore.themeMode || 'light'"
+      :show-copy="settingsStore.debugMode"
+      @open="menuOpen"
+      @copy="menuCopy"
+      @close="extractMenu.visible = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -119,7 +129,9 @@ import { zAdd, zRem, renameZSetMember, searchValue, getValue } from '../../api/w
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import FloatingMessage from '../common/FloatingMessage.vue'
+import ExtractMenu from '../common/ExtractMenu.vue'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
+import { openBrowserExtract, copyExtractLink } from '../../services/browserExtract.js'
 import './editorShared.css'
 
 const props = defineProps({ keyValue: Object })
@@ -300,6 +312,43 @@ watch(() => props.keyValue, (kv) => {
   scoreSortOrder.value = 'asc'
   msg.value = ''
 }, { immediate: true })
+
+// —— 浏览器解析：右键行首序号，按成员反查快照下标定位提取（返回 member） ——
+const extractMenu = reactive({ visible: false, x: 0, y: 0, position: '' })
+function openExtractMenu(e, position) {
+  extractMenu.x = e.clientX
+  extractMenu.y = e.clientY
+  extractMenu.position = position
+  extractMenu.visible = true
+}
+async function menuOpen() {
+  extractMenu.visible = false
+  const opened = await openBrowserExtract({
+    key: props.keyValue?.key,
+    type: 'zset',
+    position: extractMenu.position,
+    data: { zset_val: rawMembers.value.map(m => ({ member: m.member, score: m.score })), },
+    totalCount: totalMemberCount.value,
+    hasMore: hasMore.value,
+  })
+  ok.value = opened
+  msg.value = opened ? t('keyEditor.extractOpened') : t('keyEditor.extractFailed')
+  setTimeout(() => { msg.value = '' }, 3000)
+}
+async function menuCopy() {
+  extractMenu.visible = false
+  const copied = await copyExtractLink({
+    key: props.keyValue?.key,
+    type: 'zset',
+    position: extractMenu.position,
+    data: { zset_val: rawMembers.value.map(m => ({ member: m.member, score: m.score })), },
+    totalCount: totalMemberCount.value,
+    hasMore: hasMore.value,
+  })
+  ok.value = copied
+  msg.value = copied ? t('keyEditor.linkCopied') : t('keyEditor.extractFailed')
+  setTimeout(() => { msg.value = '' }, 3000)
+}
 
 async function loadMore() {
   if (valueLoading.value || !props.keyValue?.key) return

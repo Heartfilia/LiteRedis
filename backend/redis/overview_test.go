@@ -48,3 +48,57 @@ func TestExecuteRedisCommandCanStoreEmptyString(t *testing.T) {
 		t.Fatalf("stored value = %q, err=%v", value, err)
 	}
 }
+
+func TestMergeClusterNodeInfosAggregates(t *testing.T) {
+	nodes := []map[string]string{
+		{
+			"redis_version":               "7.2.0",
+			"used_memory":                 "1000",
+			"instantaneous_ops_per_sec":   "120",
+			"connected_clients":           "5",
+			"uptime_in_seconds":           "86400",
+			"used_memory_human":           "1000B", // 应被忽略，不进入合并结果
+			"role":                        "master",
+		},
+		{
+			"redis_version":             "7.0.0", // 只取第一个节点
+			"used_memory":               "2000",
+			"instantaneous_ops_per_sec": "80",
+			"connected_clients":         "3",
+			"uptime_in_seconds":         "172800",
+		},
+	}
+
+	got := mergeClusterNodeInfos(nodes)
+	if got["role"] != "cluster" {
+		t.Errorf("role = %q, want cluster", got["role"])
+	}
+	if got["redis_version"] != "7.2.0" {
+		t.Errorf("redis_version = %q, want first node's 7.2.0", got["redis_version"])
+	}
+	if got["used_memory"] != "3000" {
+		t.Errorf("used_memory = %q, want summed 3000", got["used_memory"])
+	}
+	if got["instantaneous_ops_per_sec"] != "200" {
+		t.Errorf("ops = %q, want summed 200", got["instantaneous_ops_per_sec"])
+	}
+	if got["connected_clients"] != "8" {
+		t.Errorf("clients = %q, want summed 8", got["connected_clients"])
+	}
+	if got["uptime_in_seconds"] != "172800" {
+		t.Errorf("uptime = %q, want max 172800", got["uptime_in_seconds"])
+	}
+	if _, ok := got["used_memory_human"]; ok {
+		t.Error("used_memory_human should not be set so the summary bytes are used")
+	}
+}
+
+func TestMergeClusterNodeInfosHandlesMissingFields(t *testing.T) {
+	got := mergeClusterNodeInfos([]map[string]string{{}})
+	if got["role"] != "cluster" {
+		t.Errorf("role = %q, want cluster", got["role"])
+	}
+	if got["used_memory"] != "0" {
+		t.Errorf("used_memory = %q, want 0", got["used_memory"])
+	}
+}

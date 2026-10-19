@@ -17,6 +17,8 @@ export namespace config {
 	    watermark_opacity: number;
 	    watermark_density: number;
 	    language: string;
+	    local_api_enabled: boolean;
+	    local_api_port: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
@@ -40,6 +42,8 @@ export namespace config {
 	        this.watermark_opacity = source["watermark_opacity"];
 	        this.watermark_density = source["watermark_density"];
 	        this.language = source["language"];
+	        this.local_api_enabled = source["local_api_enabled"];
+	        this.local_api_port = source["local_api_port"];
 	    }
 	}
 	export class SSHConfig {
@@ -407,6 +411,24 @@ export namespace main {
 	        this.success = source["success"];
 	        this.message = source["message"];
 	        this.init_db = source["init_db"];
+	    }
+	}
+	export class LocalAPIInfo {
+	    running: boolean;
+	    port: number;
+	    token: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LocalAPIInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.running = source["running"];
+	        this.port = source["port"];
+	        this.token = source["token"];
+	        this.error = source["error"];
 	    }
 	}
 	export class UpdateResult {

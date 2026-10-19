@@ -13,6 +13,7 @@ export const saveConnection = (cfg) => callGo('SaveConnection', cfg)
 export const reorderConnections = (items) => callGo('ReorderConnections', items)
 export const deleteConnection = (id) => callGo('DeleteConnection', id)
 export const testConnection = (cfg) => callGo('TestConnection', cfg)
+export const forgetSSHHostFingerprint = (host, port) => callGo('ForgetSSHHostFingerprint', host, port)
 export const connect = (id) => callGo('Connect', id)
 export const disconnect = (id) => callGo('Disconnect', id)
 export const isConnected = (id) => callGo('IsConnected', id)
@@ -20,6 +21,11 @@ export const pingConnection = (id) => callGo('PingConnection', id)
 export const selectDB = (id, db) => callGo('SelectDB', id, db)
 export const getConnectionOverview = (id) => callGo('GetConnectionOverview', id)
 export const executeRedisCommand = (id, command) => callGo('ExecuteRedisCommand', id, command)
+
+// ===== 本地数据提取 API =====
+export const publishKeyValue = (connID, kv, db, nonce) => callGo('PublishKeyValue', connID, kv, db, nonce)
+export const getLocalAPIInfo = () => callGo('GetLocalAPIInfo')
+export const regenerateLocalAPIToken = () => callGo('RegenerateLocalAPIToken')
 
 // ===== Key 操作 =====
 export const scanKeys = (connID, pattern, count, cursor) => callGo('ScanKeys', connID, pattern, count, cursor)

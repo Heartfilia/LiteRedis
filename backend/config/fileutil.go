@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 )
 
-// atomicWriteFile 使用临时文件 + rename 写盘，兼容 Windows 对覆盖写的限制。
-func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+// AtomicWriteFile 使用临时文件 + rename 写盘，兼容 Windows 对覆盖写的限制。
+func AtomicWriteFile(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 

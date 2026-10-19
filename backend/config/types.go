@@ -58,6 +58,8 @@ type AppSettings struct {
 	WatermarkOpacity   int    `json:"watermark_opacity"`    // 水印透明度 0-100
 	WatermarkDensity   int    `json:"watermark_density"`    // 水印密度 1-5
 	Language           string `json:"language"`             // 界面语言，默认 zh
+	LocalAPIEnabled    bool   `json:"local_api_enabled"`    // 本地数据提取 API 服务开关，默认 true
+	LocalAPIPort       int    `json:"local_api_port"`       // 本地 API 服务端口，默认 64201，仅监听 127.0.0.1
 }
 
 // DefaultSettings 返回默认设置
@@ -79,6 +81,8 @@ func DefaultSettings() AppSettings {
 		WatermarkOpacity:   12,
 		WatermarkDensity:   3,
 		Language:           "zh",
+		LocalAPIEnabled:    true,
+		LocalAPIPort:       64201,
 	}
 }
 

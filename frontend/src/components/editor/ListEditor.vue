@@ -44,7 +44,11 @@
 
     <div class="list-wrap">
       <div v-for="(item, idx) in displayItems" :key="idx" class="list-item">
-        <span class="idx-badge">
+        <span
+          class="idx-badge"
+          @click="openExtractMenu($event, displayOriginalIndices[idx] >= 0 ? displayOriginalIndices[idx] : rawItems.indexOf(item))"
+          @contextmenu.prevent="openExtractMenu($event, displayOriginalIndices[idx] >= 0 ? displayOriginalIndices[idx] : rawItems.indexOf(item))"
+        >
           {{ (searchResults !== null || sortOrder !== 'none') ? '—' : (idx + 1) }}
         </span>
         <span
@@ -99,11 +103,21 @@
     </div>
 
     <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" @close="expandShow = false" @save="saveFromModal" />
+    <ExtractMenu
+      :visible="extractMenu.visible"
+      :x="extractMenu.x"
+      :y="extractMenu.y"
+      :theme="settingsStore.themeMode || 'light'"
+      :show-copy="settingsStore.debugMode"
+      @open="menuOpen"
+      @copy="menuCopy"
+      @close="extractMenu.visible = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -114,7 +128,9 @@ import { lPush, rPush, lSet, lRem, searchValue, getValue } from '../../api/wails
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import FloatingMessage from '../common/FloatingMessage.vue'
+import ExtractMenu from '../common/ExtractMenu.vue'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
+import { openBrowserExtract, copyExtractLink } from '../../services/browserExtract.js'
 import './editorShared.css'
 
 const props = defineProps({ keyValue: Object })
@@ -269,6 +285,43 @@ watch(() => props.keyValue, (kv) => {
   msg.value = ''
   editingIdx.value = -1
 }, { immediate: true })
+
+// —— 浏览器解析：右键行首序号，按原始索引定位提取 ——
+const extractMenu = reactive({ visible: false, x: 0, y: 0, position: '' })
+function openExtractMenu(e, position) {
+  extractMenu.x = e.clientX
+  extractMenu.y = e.clientY
+  extractMenu.position = position
+  extractMenu.visible = true
+}
+async function menuOpen() {
+  extractMenu.visible = false
+  const opened = await openBrowserExtract({
+    key: props.keyValue?.key,
+    type: 'list',
+    position: extractMenu.position,
+    data: { list_val: [...rawItems.value], },
+    totalCount: totalItemCount.value,
+    hasMore: hasMore.value,
+  })
+  ok.value = opened
+  msg.value = opened ? t('keyEditor.extractOpened') : t('keyEditor.extractFailed')
+  setTimeout(() => { msg.value = '' }, 3000)
+}
+async function menuCopy() {
+  extractMenu.visible = false
+  const copied = await copyExtractLink({
+    key: props.keyValue?.key,
+    type: 'list',
+    position: extractMenu.position,
+    data: { list_val: [...rawItems.value], },
+    totalCount: totalItemCount.value,
+    hasMore: hasMore.value,
+  })
+  ok.value = copied
+  msg.value = copied ? t('keyEditor.linkCopied') : t('keyEditor.extractFailed')
+  setTimeout(() => { msg.value = '' }, 3000)
+}
 
 async function loadMore() {
   if (valueLoading.value || !props.keyValue?.key) return

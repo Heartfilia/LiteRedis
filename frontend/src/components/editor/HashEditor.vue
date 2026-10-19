@@ -253,7 +253,7 @@
         </thead>
         <tbody>
           <tr v-for="([field, val], idx) in displayEntries" :key="field">
-            <td class="num-cell">{{ idx + 1 }}</td>
+            <td class="num-cell" @click="openExtractMenu($event, field)" @contextmenu.prevent="openExtractMenu($event, field)">{{ idx + 1 }}</td>
             <td class="field-cell" :style="fieldColumnStyle">{{ field }}</td>
             <td class="value-cell" :style="valueColumnStyle">
               <span v-if="editingField !== field" class="value-text">
@@ -303,11 +303,21 @@
     </div>
 
     <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" @close="expandShow = false" @save="saveFromModal" />
+    <ExtractMenu
+      :visible="extractMenu.visible"
+      :x="extractMenu.x"
+      :y="extractMenu.y"
+      :theme="settingsStore.themeMode || 'light'"
+      :show-copy="settingsStore.debugMode"
+      @open="menuOpen"
+      @copy="menuCopy"
+      @close="extractMenu.visible = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -318,7 +328,9 @@ import { hSet, hDel, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import FloatingMessage from '../common/FloatingMessage.vue'
+import ExtractMenu from '../common/ExtractMenu.vue'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
+import { openBrowserExtract, copyExtractLink } from '../../services/browserExtract.js'
 import './editorShared.css'
 
 const INT32_MIN = -2147483648
@@ -595,6 +607,43 @@ watch(() => props.keyValue, (kv) => {
   msg.value = ''
   resetCalcPanelState()
 }, { immediate: true })
+
+// —— 浏览器解析：右键行首序号，按 field 名定位提取 ——
+const extractMenu = reactive({ visible: false, x: 0, y: 0, position: '' })
+function openExtractMenu(e, field) {
+  extractMenu.x = e.clientX
+  extractMenu.y = e.clientY
+  extractMenu.position = field
+  extractMenu.visible = true
+}
+async function menuOpen() {
+  extractMenu.visible = false
+  const opened = await openBrowserExtract({
+    key: props.keyValue?.key,
+    type: 'hash',
+    position: extractMenu.position,
+    data: { hash_val: { ...rawHashVal.value }, },
+    totalCount: totalFieldCount.value,
+    hasMore: hasMore.value,
+  })
+  ok.value = opened
+  msg.value = opened ? t('keyEditor.extractOpened') : t('keyEditor.extractFailed')
+  setTimeout(() => { msg.value = '' }, 3000)
+}
+async function menuCopy() {
+  extractMenu.visible = false
+  const copied = await copyExtractLink({
+    key: props.keyValue?.key,
+    type: 'hash',
+    position: extractMenu.position,
+    data: { hash_val: { ...rawHashVal.value }, },
+    totalCount: totalFieldCount.value,
+    hasMore: hasMore.value,
+  })
+  ok.value = copied
+  msg.value = copied ? t('keyEditor.linkCopied') : t('keyEditor.extractFailed')
+  setTimeout(() => { msg.value = '' }, 3000)
+}
 
 async function loadMore() {
   if (valueLoading.value || !props.keyValue?.key) return

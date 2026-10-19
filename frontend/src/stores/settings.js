@@ -32,6 +32,8 @@ export const useSettingsStore = defineStore('settings', {
     watermarkOpacity: 12,
     watermarkDensity: 3,
     language: 'zh',
+    localApiEnabled: true,
+    localApiPort: 64201,
   }),
 
   actions: {
@@ -78,6 +80,8 @@ export const useSettingsStore = defineStore('settings', {
         this.watermarkOpacity = s.watermark_opacity || 12
         this.watermarkDensity = s.watermark_density || 3
         this.language = s.language || 'zh'
+        this.localApiEnabled = s.local_api_enabled !== false
+        this.localApiPort = s.local_api_port || 64201
         setLanguage(this.language)
         this.loaded = true
         this.applyTheme()
@@ -105,6 +109,8 @@ export const useSettingsStore = defineStore('settings', {
         watermark_opacity: values.watermarkOpacity,
         watermark_density: values.watermarkDensity,
         language: values.language,
+        local_api_enabled: values.localApiEnabled,
+        local_api_port: values.localApiPort,
       }
       const result = await saveSettings(payload)
       if (result.success) {

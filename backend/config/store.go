@@ -25,7 +25,7 @@ func init() {
 		dir = os.TempDir()
 	}
 	appDir := filepath.Join(dir, "LiteRedis")
-	if err := os.MkdirAll(appDir, 0755); err != nil {
+	if err := os.MkdirAll(appDir, 0700); err != nil {
 		// fallback to temp
 		appDir = os.TempDir()
 	}
@@ -56,6 +56,12 @@ func loadStore() (*ConfigStore, error) {
 	if store.Settings.KeyScanCount == 0 || store.Settings.SearchHistoryLimit == 0 {
 		store.Settings = DefaultSettings()
 	}
+	// 旧配置缺少本地 API 字段（port 未配置过为 0）：按默认开启处理；
+	// 之后用户显式关闭会持久化 enabled=false，不会再被覆盖
+	if store.Settings.LocalAPIPort == 0 {
+		store.Settings.LocalAPIEnabled = true
+		store.Settings.LocalAPIPort = DefaultSettings().LocalAPIPort
+	}
 	ensureConnectionOrder(&store)
 	return &store, nil
 }
@@ -73,7 +79,7 @@ func backupCorruptStore(data []byte) (string, error) {
 	} else if !os.IsNotExist(err) {
 		return "", err
 	}
-	if err := atomicWriteFile(backupPath, data, 0600); err != nil {
+	if err := AtomicWriteFile(backupPath, data, 0600); err != nil {
 		return "", err
 	}
 	return backupPath, nil
@@ -86,7 +92,7 @@ func saveStore(store *ConfigStore) error {
 	if err != nil {
 		return err
 	}
-	return atomicWriteFile(configPath, data, 0600)
+	return AtomicWriteFile(configPath, data, 0600)
 }
 
 func secureConfigPermissions(path string) error {
@@ -334,6 +340,10 @@ func SaveSettings(s AppSettings) error {
 	}
 	if s.Language == "" {
 		s.Language = "zh"
+	}
+	// 本地 API：端口范围 1024-65535，非法回退默认；enabled 是独立开关不在此强制
+	if s.LocalAPIPort < 1024 || s.LocalAPIPort > 65535 {
+		s.LocalAPIPort = defaults.LocalAPIPort
 	}
 	store.Settings = s
 	return saveStore(store)

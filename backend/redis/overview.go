@@ -18,12 +18,21 @@ type ConsoleStateUpdater interface {
 }
 
 func GetConnectionOverview(ctx context.Context, client redis.UniversalClient, cfg config.ConnectionConfig, currentDB int) (config.RedisConnectionOverview, error) {
-	info, err := client.Info(ctx).Result()
-	if err != nil {
-		return config.RedisConnectionOverview{}, err
+	var infoMap map[string]string
+	if clusterClient, ok := client.(*redis.ClusterClient); ok {
+		var err error
+		infoMap, err = aggregateClusterInfo(ctx, clusterClient)
+		if err != nil {
+			return config.RedisConnectionOverview{}, err
+		}
+	} else {
+		info, err := client.Info(ctx).Result()
+		if err != nil {
+			return config.RedisConnectionOverview{}, err
+		}
+		infoMap = parseInfoText(info)
 	}
 
-	infoMap := parseInfoText(info)
 	totalKeys, err := DBSize(ctx, client)
 	if err != nil {
 		return config.RedisConnectionOverview{}, err
@@ -54,6 +63,71 @@ func GetConnectionOverview(ctx context.Context, client redis.UniversalClient, cf
 	}
 
 	return overview, nil
+}
+
+// aggregateClusterInfo 汇总集群全部主节点的 INFO，保证概览与 TotalKeys 同口径：
+// used_memory / instantaneous_ops_per_sec / connected_clients 求和，
+// redis_version 取任一节点，uptime_in_seconds 取最大，role 固定 cluster。
+// 不设置 used_memory_human，让上层回退到按求和字节数格式化。
+func aggregateClusterInfo(ctx context.Context, client *redis.ClusterClient) (map[string]string, error) {
+	var (
+		nodeInfos []map[string]string
+		firstErr  error
+		nodes     int
+	)
+	err := client.ForEachMaster(ctx, func(ctx context.Context, master *redis.Client) error {
+		info, err := master.Info(ctx).Result()
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			return nil
+		}
+		nodeInfos = append(nodeInfos, parseInfoText(info))
+		nodes++
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if nodes == 0 {
+		if firstErr != nil {
+			return nil, firstErr
+		}
+		return nil, fmt.Errorf("cluster has no reachable master nodes")
+	}
+	return mergeClusterNodeInfos(nodeInfos), nil
+}
+
+// mergeClusterNodeInfos 汇总多个节点的 INFO map：
+// used_memory / instantaneous_ops_per_sec / connected_clients 求和，
+// redis_version 取第一个非空值，uptime_in_seconds 取最大，role 固定 cluster。
+func mergeClusterNodeInfos(nodeInfos []map[string]string) map[string]string {
+	merged := map[string]string{
+		"role": "cluster",
+	}
+	var (
+		sumUsedMemory    int64
+		sumOpsPerSec     int64
+		sumConnected     int64
+		maxUptimeSeconds int64
+	)
+	for _, nodeInfo := range nodeInfos {
+		if merged["redis_version"] == "" {
+			merged["redis_version"] = nodeInfo["redis_version"]
+		}
+		sumUsedMemory += parseInt64(nodeInfo["used_memory"])
+		sumOpsPerSec += parseInt64(nodeInfo["instantaneous_ops_per_sec"])
+		sumConnected += parseInt64(nodeInfo["connected_clients"])
+		if uptime := parseInt64(nodeInfo["uptime_in_seconds"]); uptime > maxUptimeSeconds {
+			maxUptimeSeconds = uptime
+		}
+	}
+	merged["used_memory"] = strconv.FormatInt(sumUsedMemory, 10)
+	merged["instantaneous_ops_per_sec"] = strconv.FormatInt(sumOpsPerSec, 10)
+	merged["connected_clients"] = strconv.FormatInt(sumConnected, 10)
+	merged["uptime_in_seconds"] = strconv.FormatInt(maxUptimeSeconds, 10)
+	return merged
 }
 
 func ExecuteRedisCommand(ctx context.Context, client redis.UniversalClient, command string) config.RedisConsoleResult {

@@ -268,6 +268,53 @@
           </select>
         </div>
       </div>
+
+      <div class="setting-item local-api-item" v-if="settingsStore.debugMode">
+        <label>
+          <span class="label-text">{{ t('settings.localApi') }}</span>
+          <span class="label-hint">{{ t('settings.localApiHint') }}</span>
+        </label>
+        <div class="local-api-block">
+          <div class="local-api-row">
+            <span class="local-api-name">{{ t('settings.localApiEnabled') }}</span>
+            <input v-model="form.localApiEnabled" type="checkbox" class="check-input" />
+          </div>
+          <div class="local-api-row" v-if="form.localApiEnabled">
+            <span class="local-api-name">{{ t('settings.localApiPort') }}</span>
+            <input
+              v-model.number="form.localApiPort"
+              class="local-api-port"
+              type="number"
+              min="1024"
+              max="65535"
+            />
+          </div>
+          <div class="local-api-row" v-if="form.localApiEnabled">
+            <span class="local-api-name">{{ t('settings.localApiStatus') }}</span>
+            <span :class="['local-api-status', localApiInfo.running ? 'running' : 'stopped']">
+              {{ localApiInfo.running ? t('settings.localApiRunning') : t('settings.localApiStopped') }}
+              <template v-if="localApiInfo.running">· 127.0.0.1:{{ localApiInfo.port }}</template>
+              <template v-else-if="localApiInfo.error">· {{ t('settings.localApiError') }}: {{ localApiInfo.error }}</template>
+            </span>
+          </div>
+          <div class="local-api-row" v-if="form.localApiEnabled && localApiInfo.token">
+            <span class="local-api-name">{{ t('settings.localApiToken') }}</span>
+            <span class="local-api-token-box">
+              <code class="local-api-token">{{ localApiInfo.token }}</code>
+              <button type="button" class="local-api-btn" @click="copyToken">
+                {{ tokenCopied ? t('settings.localApiCopied') : t('settings.localApiCopyToken') }}
+              </button>
+              <button type="button" class="local-api-btn" @click="regenerateToken">
+                {{ t('settings.localApiRegenerate') }}
+              </button>
+            </span>
+          </div>
+          <div class="local-api-example" v-if="form.localApiEnabled && localApiInfo.running">
+            <span class="local-api-name">{{ t('settings.localApiDocs') }}</span>
+            <code class="local-api-curl">curl -H "Authorization: Bearer {{ localApiInfo.token }}" "http://127.0.0.1:{{ localApiInfo.port }}/api/&lt;connID&gt;/&lt;key&gt;?selector=&lt;field&gt;"</code>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- floating toast -->
@@ -319,7 +366,9 @@
 import { ref, reactive, onBeforeUnmount, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
-import { getAppVersion, checkLatestRelease, startUpdate } from '../../api/wails.js'
+import { getAppVersion, checkLatestRelease, startUpdate, getLocalAPIInfo, regenerateLocalAPIToken } from '../../api/wails.js'
+import { refreshLocalAPIRuntime } from '../../services/browserExtract.js'
+import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 
@@ -345,6 +394,8 @@ const form = reactive({
   watermarkOpacity: 12,
   watermarkDensity: 3,
   language: 'zh',
+  localApiEnabled: true,
+  localApiPort: 64201,
 })
 
 const saving = ref(false)
@@ -381,6 +432,7 @@ onMounted(async () => {
   } catch {
     appVersion.value = 'dev'
   }
+  await refreshLocalAPIInfo()
 })
 
 onBeforeUnmount(() => {
@@ -389,6 +441,7 @@ onBeforeUnmount(() => {
   if (saveFlashTimer) clearTimeout(saveFlashTimer)
   if (errorFlashTimer) clearTimeout(errorFlashTimer)
   if (messageTimer) clearTimeout(messageTimer)
+  if (tokenCopiedTimer) clearTimeout(tokenCopiedTimer)
 })
 
 function syncFromStore() {
@@ -408,6 +461,8 @@ function syncFromStore() {
   form.watermarkOpacity = settingsStore.watermarkOpacity
   form.watermarkDensity = settingsStore.watermarkDensity
   form.language = settingsStore.language
+  form.localApiEnabled = settingsStore.localApiEnabled
+  form.localApiPort = settingsStore.localApiPort
 }
 
 function reset() {
@@ -427,6 +482,8 @@ function reset() {
   form.watermarkOpacity = 12
   form.watermarkDensity = 3
   form.language = 'zh'
+  form.localApiEnabled = true
+  form.localApiPort = 64201
   resetCountFieldTouched()
 }
 
@@ -553,6 +610,8 @@ async function doSave() {
     if (result.success) {
       setLanguage(form.language)
       triggerSaveFlash()
+      await refreshLocalAPIInfo()
+      refreshLocalAPIRuntime()
       setTimeout(() => { msg.value = '' }, 3000)
     } else {
       triggerErrorFlash()
@@ -564,6 +623,46 @@ async function doSave() {
   } finally {
     saving.value = false
   }
+}
+
+// —— 本地数据提取 API ——
+const localApiInfo = reactive({ running: false, port: 0, token: '', error: '' })
+const tokenCopied = ref(false)
+let tokenCopiedTimer = null
+
+async function refreshLocalAPIInfo() {
+  try {
+    const info = await getLocalAPIInfo()
+    localApiInfo.running = !!info.running
+    localApiInfo.port = info.port || 0
+    localApiInfo.token = info.token || ''
+    localApiInfo.error = info.error || ''
+  } catch {
+    localApiInfo.running = false
+  }
+}
+
+async function copyToken() {
+  const result = await copyToClipboard(localApiInfo.token)
+  if (!result) return
+  tokenCopied.value = true
+  if (tokenCopiedTimer) clearTimeout(tokenCopiedTimer)
+  tokenCopiedTimer = setTimeout(() => {
+    tokenCopied.value = false
+    tokenCopiedTimer = null
+  }, 1500)
+}
+
+async function regenerateToken() {
+  if (!confirm(t('settings.localApiRegenConfirm'))) return
+  const result = await regenerateLocalAPIToken()
+  if (!result.success) {
+    ok.value = false
+    msg.value = result.message || t('settings.saveErr')
+    triggerErrorFlash()
+  }
+  refreshLocalAPIRuntime()
+  await refreshLocalAPIInfo()
 }
 
 async function handleVersionClick() {
@@ -794,6 +893,57 @@ function openRelease() {
   width: 16px !important;
   height: 16px;
   accent-color: #3b82f6;
+}
+.local-api-item { flex-direction: column; align-items: stretch; gap: 8px; }
+.local-api-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(203, 213, 225, 0.8);
+  border-radius: 10px;
+  background: rgba(249, 250, 251, 0.8);
+}
+.local-api-row { display: flex; align-items: center; gap: 10px; }
+.local-api-name { font-size: 12px; color: #6b7280; min-width: 72px; }
+.local-api-port {
+  width: 96px;
+  padding: 5px 8px;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+}
+.local-api-status { font-size: 12px; }
+.local-api-status.running { color: #16a34a; }
+.local-api-status.stopped { color: #94a3b8; }
+.local-api-token-box { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.local-api-token {
+  font-size: 11px;
+  padding: 3px 6px;
+  background: rgba(226, 232, 240, 0.8);
+  border-radius: 6px;
+  word-break: break-all;
+}
+.local-api-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  color: #374151;
+}
+.local-api-btn:hover { border-color: #3b82f6; color: #3b82f6; }
+.local-api-example { display: flex; flex-direction: column; gap: 4px; }
+.local-api-curl {
+  font-size: 11px;
+  padding: 6px 8px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #cbd5e1;
+  border-radius: 8px;
+  word-break: break-all;
+  line-height: 1.5;
 }
 .input-unit input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
 .unit {
@@ -1080,6 +1230,24 @@ function openRelease() {
   background: rgba(15, 23, 42, 0.72);
   box-shadow: 0 8px 18px rgba(2, 6, 23, 0.18);
 }
+
+.settings-panel.theme-dark .local-api-block {
+  border-color: rgba(51, 65, 85, 0.9);
+  background: rgba(30, 41, 59, 0.72);
+}
+.settings-panel.theme-dark .local-api-name { color: #94a3b8; }
+.settings-panel.theme-dark .local-api-port {
+  border-color: rgba(51, 65, 85, 0.9);
+  background: rgba(15, 23, 42, 0.94);
+  color: #e2e8f0;
+}
+.settings-panel.theme-dark .local-api-token { background: rgba(51, 65, 85, 0.9); color: #cbd5e1; }
+.settings-panel.theme-dark .local-api-btn {
+  background: rgba(15, 23, 42, 0.94);
+  border-color: rgba(51, 65, 85, 0.9);
+  color: #cbd5e1;
+}
+.settings-panel.theme-dark .local-api-btn:hover { border-color: #3b82f6; color: #60a5fa; }
 
 .settings-panel.theme-dark .label-text {
   color: #e2e8f0;

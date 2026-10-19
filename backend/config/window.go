@@ -26,7 +26,7 @@ func init() {
 		dir = os.TempDir()
 	}
 	appDir := filepath.Join(dir, "LiteRedis")
-	_ = os.MkdirAll(appDir, 0755)
+	_ = os.MkdirAll(appDir, 0700)
 	windowPath = filepath.Join(appDir, "window.json")
 }
 
@@ -60,5 +60,5 @@ func SaveWindowState(ws WindowState) error {
 	if err != nil {
 		return err
 	}
-	return atomicWriteFile(windowPath, data, 0644)
+	return AtomicWriteFile(windowPath, data, 0644)
 }

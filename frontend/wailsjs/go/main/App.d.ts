@@ -19,11 +19,15 @@ export function Disconnect(arg1:string):Promise<config.OperationResult>;
 
 export function ExecuteRedisCommand(arg1:string,arg2:string):Promise<config.RedisConsoleResult>;
 
+export function ForgetSSHHostFingerprint(arg1:string,arg2:number):Promise<config.OperationResult>;
+
 export function GetAppVersion():Promise<string>;
 
 export function GetConnectionOverview(arg1:string):Promise<config.RedisConnectionOverview>;
 
 export function GetKeyInfo(arg1:string,arg2:string):Promise<config.RedisKey>;
+
+export function GetLocalAPIInfo():Promise<main.LocalAPIInfo>;
 
 export function GetSettings():Promise<config.AppSettings>;
 
@@ -45,7 +49,11 @@ export function ListConnections():Promise<Array<config.ConnectionConfig>>;
 
 export function PingConnection(arg1:string):Promise<config.OperationResult>;
 
+export function PublishKeyValue(arg1:string,arg2:config.KeyValue,arg3:number,arg4:string):Promise<config.OperationResult>;
+
 export function RPush(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
+
+export function RegenerateLocalAPIToken():Promise<config.OperationResult>;
 
 export function RenameKey(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
