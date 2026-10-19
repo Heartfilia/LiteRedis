@@ -105,6 +105,16 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 		config.AppendDebugLog("[connect] ssh ready")
 	}
 	if dialer == nil && cfg.ProxyEnabled && strings.TrimSpace(cfg.ProxyURL) != "" {
+		if sshClient != nil {
+			// SSH 与代理互斥：redisAddr 已被改写为本机转发端口，走代理必然错连
+			if sshForward != nil {
+				sshForward.Close()
+			}
+			sshClient.Close()
+			err := fmt.Errorf("SSH 隧道与代理不可同时启用，请二选一")
+			config.AppendDebugLog("[connect] %v", err)
+			return normalizeConnectError(err)
+		}
 		pd, err := makeProxyDialer(cfg.ProxyURL, redisConnectTimeout)
 		if err != nil {
 			safeErr := redactProxyError(err, cfg.ProxyURL)
@@ -293,18 +303,23 @@ func (m *ClientManager) IsConnected(id string) bool {
 // Ping 检测现有连接是否仍可用。
 // 在 RLock 持有期间执行，避免与 SelectDB/Disconnect 并发时打到旧 client 或已关闭 client。
 func (m *ClientManager) Ping(id string) error {
+	// 快照模式：锁内只取 client 引用，网络调用在锁外执行，
+	// 避免 5s ping 阻塞 Disconnect/SelectDB/DisconnectAll。
+	// 若 ping 期间 client 被并发关闭，得到 "client closed" 类错误，
+	// 按不可达处理——语义上等价于健康检查失败，无害。
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	conn, ok := m.clients[id]
 	if !ok {
+		m.mu.RUnlock()
 		return fmt.Errorf("connection %s not found or not connected", id)
 	}
+	client := conn.client
+	m.mu.RUnlock()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := conn.client.Ping(ctx).Err(); err != nil {
+	if err := client.Ping(ctx).Err(); err != nil {
 		return normalizeConnectError(fmt.Errorf("Redis ping failed: %w", err))
 	}
 	return nil
@@ -422,6 +437,10 @@ func TestConnection(cfg config.ConnectionConfig) error {
 		config.AppendDebugLog("[test] ssh ready")
 	}
 	if dialer == nil && cfg.ProxyEnabled && strings.TrimSpace(cfg.ProxyURL) != "" {
+		if sshClient != nil {
+			// SSH 与代理互斥：redisAddr 已被改写为本机转发端口，走代理必然错连
+			return normalizeConnectError(fmt.Errorf("SSH 隧道与代理不可同时启用，请二选一"))
+		}
 		pd, err := makeProxyDialer(cfg.ProxyURL, redisConnectTimeout)
 		if err != nil {
 			safeErr := redactProxyError(err, cfg.ProxyURL)

@@ -22,11 +22,10 @@ import (
 
 const requestTimeout = 5 * time.Second
 
-// corsAllowedOrigins 允许跨源读取的站点白名单（浏览器端 fetch json.litetools.top 场景）。
-// 故意不开放 *：避免任意网页读取本地快照数据。
+// corsAllowedOrigins 允许跨源读取的站点白名单（浏览器端 fetch 场景）。
+// 故意不开放 *：避免任意网页读取本地快照数据；也不放行明文 http 源。
 var corsAllowedOrigins = []string{
 	"https://json.litetools.top",
-	"http://json.litetools.top",
 }
 
 // Server 本地数据提取 API。只监听 127.0.0.1，只读，数据来自 KeyRegistry（UI 已加载快照）。

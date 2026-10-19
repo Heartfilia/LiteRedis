@@ -1,6 +1,7 @@
 <template>
   <div class="string-editor" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <FloatingMessage :message="msg" :success="ok" />
+    <div v-if="props.keyValue?.truncated" class="truncated-hint">⚠️ {{ t('keyEditor.stringTruncated') }}</div>
     <textarea v-model="localVal" rows="10" :disabled="saving" />
     <div class="editor-actions">
       <button class="btn-action" :class="{ copied }" @click="copyValue">{{ copied ? '✓ ' + t('keyEditor.copied') : t('keyEditor.copy') }}</button>
@@ -182,6 +183,14 @@ async function save() {
 }
 .string-editor.theme-dark {
   color: #e2e8f0;
+}
+.truncated-hint {
+  font-size: 12px;
+  color: #b45309;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 6px;
+  padding: 5px 10px;
 }
 textarea {
   flex: 1; resize: none; padding: 10px 12px;

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"LiteRedis/backend/config"
 
@@ -60,6 +61,21 @@ return 1
 
 // GetValue 读取 key 的值（按类型分支），支持 cursor/offset 分页。
 // cursor=0, offset=0 表示第一页。loadCount 控制每次加载条数（≤0 取默认）。
+// maxStringValueBytes string 全量 GET 的字节上限，超过即截断展示，防止大 key 打爆内存
+const maxStringValueBytes = 5 << 20 // 5MB
+
+// truncateUTF8Safe 按字节截断并回退到最后一个完整 UTF-8 字符边界
+func truncateUTF8Safe(s string, limit int) string {
+	if len(s) <= limit {
+		return s
+	}
+	s = s[:limit]
+	for len(s) > 0 && !utf8.ValidString(s) {
+		s = s[:len(s)-1]
+	}
+	return s
+}
+
 func GetValue(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings, cursor uint64, offset int, zsetSort, streamStart string) (config.KeyValue, error) {
 	keyInfo, err := GetKeyInfo(ctx, client, key)
 	if err != nil {
@@ -101,6 +117,11 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		val, err := client.Get(ctx, key).Result()
 		if err != nil && err != redis.Nil {
 			return kv, err
+		}
+		if len(val) > maxStringValueBytes {
+			val = truncateUTF8Safe(val, maxStringValueBytes)
+			kv.Truncated = true
+			config.AppendDebugLog("[value] string key truncated to %d bytes: %s", maxStringValueBytes, key)
 		}
 		kv.StringVal = val
 		kv.HasMore = false

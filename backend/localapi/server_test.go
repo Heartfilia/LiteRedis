@@ -536,7 +536,7 @@ func TestCorsHeadersOnErrorResponse(t *testing.T) {
 
 	// 401 错误响应也必须带 CORS 头（网站提示项①）
 	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/info/badpayload", nil)
-	req.Header.Set("Origin", "http://json.litetools.top")
+	req.Header.Set("Origin", "https://json.litetools.top")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -545,8 +545,20 @@ func TestCorsHeadersOnErrorResponse(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
-	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "http://json.litetools.top" {
-		t.Fatalf("error response ACAO = %q, want http origin", got)
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "https://json.litetools.top" {
+		t.Fatalf("error response ACAO = %q, want https origin", got)
+	}
+
+	// 明文 http 源不再放行
+	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/health", nil)
+	req.Header.Set("Origin", "http://json.litetools.top")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("http origin should not be whitelisted, got ACAO %q", got)
 	}
 
 	// 405 也带

@@ -169,12 +169,18 @@ export const useConnectionsStore = defineStore('connections', {
         return { success: false, message: 'connecting' }
       }
       this.connectingIds.add(id)
+      let timedOut = false
       try {
-        // 前端兜底超时：防止 Go 的 Connect 在网络异常时永久卡住
+        // 前端兜底超时：防止 Go 的 Connect 在网络异常时永久卡住。
+        // 超时后补一次 disconnect，回收后端可能仍会成功建立的孤儿连接
+        //（Go 侧 Connect 不会因前端放弃而中止）。
         const result = await Promise.race([
           connect(id),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000)
+            setTimeout(() => {
+              timedOut = true
+              reject(new Error('Connection timeout after 15 seconds'))
+            }, 15000)
           ),
         ])
         if (result.success) {
@@ -183,6 +189,9 @@ export const useConnectionsStore = defineStore('connections', {
         }
         return result
       } catch (e) {
+        if (timedOut) {
+          try { await disconnect(id) } catch (_) { /* 尽力回收即可 */ }
+        }
         return { success: false, message: e.message || String(e) }
       } finally {
         this.connectingIds.delete(id)

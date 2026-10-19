@@ -221,6 +221,7 @@ export namespace config {
 	    next_offset: number;
 	    next_stream_id?: string;
 	    total_count: number;
+	    truncated?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new KeyValue(source);
@@ -242,6 +243,7 @@ export namespace config {
 	        this.next_offset = source["next_offset"];
 	        this.next_stream_id = source["next_stream_id"];
 	        this.total_count = source["total_count"];
+	        this.truncated = source["truncated"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

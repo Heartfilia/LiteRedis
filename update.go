@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/mod/semver"
@@ -100,7 +101,15 @@ func (a *App) CheckLatestRelease() VersionInfo {
 	return info
 }
 
+// updateMu 防止双击"更新"并发触发两次下载与安装
+var updateMu sync.Mutex
+
 func (a *App) StartUpdate() UpdateResult {
+	if !updateMu.TryLock() {
+		return UpdateResult{Success: false, Message: "更新正在进行中，请稍候"}
+	}
+	defer updateMu.Unlock()
+
 	release, err := fetchLatestRelease(a.ctx, AppVersion)
 	if err != nil {
 		return UpdateResult{Success: false, Message: err.Error()}

@@ -128,6 +128,7 @@ type KeyValue struct {
 	NextOffset   int               `json:"next_offset"`              // List/ZSet 下一页 offset
 	NextStreamID string            `json:"next_stream_id,omitempty"` // Stream 下一页的排他起始 ID
 	TotalCount   int64             `json:"total_count"`              // 总元素数（-1 表示未知）
+	Truncated    bool              `json:"truncated,omitempty"`      // string 值超限被截断
 }
 
 // CreateKeyRequest 新建 key 请求
