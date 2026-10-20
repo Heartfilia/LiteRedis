@@ -1,6 +1,9 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -175,4 +178,100 @@ func TestScheduleUpdateCleanup(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("scheduled update directory was not removed")
+}
+
+func TestPickAssetPrefersPortableWindowsExe(t *testing.T) {
+	assets := []ReleaseAsset{
+		{Name: "LiteRedis-amd64-installer.exe"},
+		{Name: "LiteRedis.exe"},
+	}
+	got := pickAssetForPlatform(assets, "windows", "amd64")
+	if got == nil || got.Name != "LiteRedis.exe" {
+		t.Fatalf("portable windows asset = %#v", got)
+	}
+	if got := pickAssetForPlatform([]ReleaseAsset{{Name: "LiteRedis-amd64-installer.exe"}}, "windows", "amd64"); got == nil {
+		t.Fatal("installer fallback was not selected")
+	}
+}
+
+func TestExtractTarGzBinary(t *testing.T) {
+	archivePath := filepath.Join(t.TempDir(), "pkg.tar.gz")
+	payload := []byte("new binary")
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	if err := tw.WriteHeader(&tar.Header{Name: "LiteRedis", Mode: 0755, Size: int64(len(payload)), Typeflag: tar.TypeReg}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(archivePath, buf.Bytes(), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	target := filepath.Join(t.TempDir(), "LiteRedis.new")
+	if err := extractTarGzBinary(archivePath, "LiteRedis", target); err != nil {
+		t.Fatalf("extract failed: %v", err)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("extracted payload = %q", got)
+	}
+	if err := extractTarGzBinary(archivePath, "Missing", filepath.Join(t.TempDir(), "x")); err == nil {
+		t.Fatal("missing member was accepted")
+	}
+}
+
+func TestPercentOf(t *testing.T) {
+	if got := percentOf(5, 10); got != 50 {
+		t.Fatalf("percentOf(5,10) = %v", got)
+	}
+	if got := percentOf(20, 10); got != 100 {
+		t.Fatalf("percentOf overflow = %v", got)
+	}
+	if got := percentOf(1, 0); got != 0 {
+		t.Fatalf("percentOf unknown total = %v", got)
+	}
+}
+
+func TestDownloadFileWithProgress(t *testing.T) {
+	payload := bytes.Repeat([]byte("x"), 300*1024)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(payload)))
+		_, _ = w.Write(payload)
+	}))
+	defer server.Close()
+
+	target := filepath.Join(t.TempDir(), "asset.bin")
+	var updates []UpdateProgress
+	err := downloadFileWithProgress(context.Background(), server.URL, target, 0, func(p UpdateProgress) {
+		updates = append(updates, p)
+	})
+	if err != nil {
+		t.Fatalf("download failed: %v", err)
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Size() != int64(len(payload)) {
+		t.Fatalf("downloaded size = %d", info.Size())
+	}
+	if len(updates) == 0 {
+		t.Fatal("no progress reported")
+	}
+	last := updates[len(updates)-1]
+	if last.Percent != 100 || last.Received != int64(len(payload)) || last.Total != int64(len(payload)) {
+		t.Fatalf("final progress = %#v", last)
+	}
 }

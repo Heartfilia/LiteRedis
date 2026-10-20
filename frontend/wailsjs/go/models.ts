@@ -439,6 +439,7 @@ export namespace main {
 	    release_url?: string;
 	    asset_name?: string;
 	    asset_path?: string;
+	    needs_restart?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new UpdateResult(source);

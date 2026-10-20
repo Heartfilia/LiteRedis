@@ -336,7 +336,7 @@
           :title="hasUpdate ? t('settings.updateNow') : t('settings.checkUpdate')"
           @click="handleVersionClick"
         >
-          {{ hasUpdate ? t('settings.updateNow') : `${t('settings.version')} ${appVersion}` }}
+          {{ updating ? `${t('settings.updating')} ${updatePercent}%` : (hasUpdate ? t('settings.updateNow') : `${t('settings.version')} ${appVersion}`) }}
         </button>
         <span
           v-if="hasUpdate"
@@ -370,7 +370,7 @@ import { getAppVersion, checkLatestRelease, startUpdate, getLocalAPIInfo, regene
 import { refreshLocalAPIRuntime } from '../../services/browserExtract.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
-import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
+import { BrowserOpenURL, EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime.js'
 
 const { t, setLanguage } = useI18n()
 
@@ -401,6 +401,7 @@ const form = reactive({
 const saving = ref(false)
 const checkingUpdate = ref(false)
 const updating = ref(false)
+const updatePercent = ref(0)
 const appVersion = ref('dev')
 const hasUpdate = ref(false)
 const msg = ref('')
@@ -433,9 +434,11 @@ onMounted(async () => {
     appVersion.value = 'dev'
   }
   await refreshLocalAPIInfo()
+  EventsOn('update:progress', handleUpdateProgress)
 })
 
 onBeforeUnmount(() => {
+  EventsOff('update:progress')
   requestGuard.invalidateAll()
   if (titleTapTimer) clearTimeout(titleTapTimer)
   if (saveFlashTimer) clearTimeout(saveFlashTimer)
@@ -724,9 +727,24 @@ async function checkUpdate() {
   }
 }
 
+function handleUpdateProgress(progress) {
+  if (!progress || !updating.value) return
+  updatePercent.value = Math.max(0, Math.min(100, Math.round(progress.percent || 0)))
+  clearMessageTimer()
+  ok.value = true
+  if (progress.stage === 'download') {
+    msg.value = t('settings.updateDownloading').replace('{percent}', updatePercent.value)
+  } else if (progress.stage === 'verify') {
+    msg.value = t('settings.updateVerifying')
+  } else if (progress.stage === 'install') {
+    msg.value = t('settings.updateInstalling')
+  }
+}
+
 async function installUpdate() {
   const request = requestGuard.begin('update')
   updating.value = true
+  updatePercent.value = 0
   clearMessageTimer()
   msg.value = ''
   try {
@@ -734,7 +752,11 @@ async function installUpdate() {
     if (!requestGuard.isCurrent(request)) return
     ok.value = !!result.success
     msg.value = result.message || (result.success ? t('settings.updateStarted') : t('settings.updateFailed'))
-    if (result.success) hasUpdate.value = false
+    if (result.success) {
+      hasUpdate.value = false
+      // 自动安装成功后应用会自行退出并重启，不再自动清除提示
+      clearMessageTimer()
+    }
   } catch (e) {
     if (!requestGuard.isCurrent(request)) return
     ok.value = false

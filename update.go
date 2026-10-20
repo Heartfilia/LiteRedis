@@ -1,7 +1,9 @@
 package main
 
 import (
+	"archive/tar"
 	"bufio"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -17,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/mod/semver"
 )
 
@@ -25,6 +28,7 @@ const (
 	updateCleanupDelay    = 30 * time.Minute
 	updateTempMaxAge      = 24 * time.Hour
 	updateTempPrefix      = "literedis-update-"
+	updateProgressEvent   = "update:progress"
 )
 
 type ReleaseAsset struct {
@@ -43,11 +47,20 @@ type ReleaseInfo struct {
 }
 
 type UpdateResult struct {
-	Success    bool   `json:"success"`
-	Message    string `json:"message,omitempty"`
-	ReleaseURL string `json:"release_url,omitempty"`
-	AssetName  string `json:"asset_name,omitempty"`
-	AssetPath  string `json:"asset_path,omitempty"`
+	Success      bool   `json:"success"`
+	Message      string `json:"message,omitempty"`
+	ReleaseURL   string `json:"release_url,omitempty"`
+	AssetName    string `json:"asset_name,omitempty"`
+	AssetPath    string `json:"asset_path,omitempty"`
+	NeedsRestart bool   `json:"needs_restart,omitempty"`
+}
+
+// UpdateProgress 通过 update:progress 事件推送给前端
+type UpdateProgress struct {
+	Stage    string  `json:"stage"`
+	Percent  float64 `json:"percent"`
+	Received int64   `json:"received"`
+	Total    int64   `json:"total"`
 }
 
 func normalizeVersion(v string) string {
@@ -110,6 +123,13 @@ func (a *App) StartUpdate() UpdateResult {
 	}
 	defer updateMu.Unlock()
 
+	emit := func(progress UpdateProgress) {
+		if a.ctx == nil {
+			return
+		}
+		wailsruntime.EventsEmit(a.ctx, updateProgressEvent, progress)
+	}
+
 	release, err := fetchLatestRelease(a.ctx, AppVersion)
 	if err != nil {
 		return UpdateResult{Success: false, Message: err.Error()}
@@ -137,13 +157,15 @@ func (a *App) StartUpdate() UpdateResult {
 	}()
 
 	targetPath := filepath.Join(saveDir, asset.Name)
-	if err := downloadFile(a.ctx, asset.BrowserDownloadURL, targetPath); err != nil {
+	emit(UpdateProgress{Stage: "download", Percent: 0, Total: asset.Size})
+	if err := downloadFileWithProgress(a.ctx, asset.BrowserDownloadURL, targetPath, asset.Size, emit); err != nil {
 		return UpdateResult{Success: false, Message: err.Error(), ReleaseURL: release.HTMLURL, AssetName: asset.Name}
 	}
 	checksumPath := filepath.Join(saveDir, checksumAsset.Name)
 	if err := downloadFile(a.ctx, checksumAsset.BrowserDownloadURL, checksumPath); err != nil {
 		return UpdateResult{Success: false, Message: "校验文件下载失败: " + err.Error(), ReleaseURL: release.HTMLURL, AssetName: asset.Name}
 	}
+	emit(UpdateProgress{Stage: "verify", Percent: 100})
 	manifest, err := os.ReadFile(checksumPath)
 	if err != nil {
 		return UpdateResult{Success: false, Message: err.Error(), ReleaseURL: release.HTMLURL, AssetName: asset.Name}
@@ -152,18 +174,41 @@ func (a *App) StartUpdate() UpdateResult {
 		return UpdateResult{Success: false, Message: "更新包校验失败: " + err.Error(), ReleaseURL: release.HTMLURL, AssetName: asset.Name}
 	}
 
-	if err := openInstaller(targetPath); err != nil {
-		return UpdateResult{Success: false, Message: err.Error(), ReleaseURL: release.HTMLURL, AssetName: asset.Name, AssetPath: targetPath}
+	emit(UpdateProgress{Stage: "install", Percent: 100})
+	message, needsRestart, installErr := installDownloadedUpdate(targetPath, *asset)
+	if installErr != nil {
+		// 自动安装失败时退回旧行为：打开安装包让用户手动完成
+		if err := openInstaller(targetPath); err != nil {
+			return UpdateResult{Success: false, Message: "自动安装失败: " + installErr.Error(), ReleaseURL: release.HTMLURL, AssetName: asset.Name, AssetPath: targetPath}
+		}
+		cleanup = false
+		scheduleUpdateCleanup(saveDir, updateCleanupDelay)
+		return UpdateResult{
+			Success:    true,
+			Message:    "自动安装失败（" + installErr.Error() + "），已为你打开安装包，请手动完成安装",
+			ReleaseURL: release.HTMLURL,
+			AssetName:  asset.Name,
+			AssetPath:  targetPath,
+		}
 	}
-	cleanup = false
-	scheduleUpdateCleanup(saveDir, updateCleanupDelay)
+
+	if needsRestart {
+		// 给前端一点时间展示"正在重启"，随后由更新程序接管启动
+		go func() {
+			time.Sleep(600 * time.Millisecond)
+			if a.ctx != nil {
+				wailsruntime.Quit(a.ctx)
+			}
+		}()
+	}
 
 	return UpdateResult{
-		Success:    true,
-		Message:    "更新包已下载并打开，请完成安装后重启应用",
-		ReleaseURL: release.HTMLURL,
-		AssetName:  asset.Name,
-		AssetPath:  targetPath,
+		Success:      true,
+		Message:      message,
+		ReleaseURL:   release.HTMLURL,
+		AssetName:    asset.Name,
+		AssetPath:    targetPath,
+		NeedsRestart: needsRestart,
 	}
 }
 
@@ -232,29 +277,42 @@ func pickAsset(assets []ReleaseAsset) *ReleaseAsset {
 }
 
 func pickAssetForPlatform(assets []ReleaseAsset, goos, goarch string) *ReleaseAsset {
-	var generic *ReleaseAsset
+	var generic, archMatch, universal, portable *ReleaseAsset
 	for i := range assets {
 		name := strings.ToLower(assets[i].Name)
 		if !assetMatchesOS(name, goos) {
 			continue
 		}
-		if strings.Contains(name, "universal") {
-			return &assets[i]
+		// Windows 优先选裸 exe：可以原地替换实现静默更新，NSIS 安装包作为兜底
+		if goos == "windows" && !strings.Contains(name, "installer") && portable == nil {
+			portable = &assets[i]
 		}
-		if assetMatchesArch(name, goarch) {
-			return &assets[i]
+		if strings.Contains(name, "universal") && universal == nil {
+			universal = &assets[i]
+		}
+		if assetMatchesArch(name, goarch) && archMatch == nil {
+			archMatch = &assets[i]
 		}
 		if !containsArchitectureToken(name) && generic == nil {
 			generic = &assets[i]
 		}
 	}
-	return generic
+	switch {
+	case goos == "windows" && portable != nil:
+		return portable
+	case universal != nil:
+		return universal
+	case archMatch != nil:
+		return archMatch
+	default:
+		return generic
+	}
 }
 
 func assetMatchesOS(name, goos string) bool {
 	switch goos {
 	case "windows":
-		return strings.Contains(name, "installer") && strings.HasSuffix(name, ".exe")
+		return strings.HasSuffix(name, ".exe")
 	case "darwin":
 		return strings.HasSuffix(name, ".dmg")
 	case "linux":
@@ -378,6 +436,127 @@ func downloadFileWithTimeout(ctx context.Context, url, target string, timeout ti
 	defer f.Close()
 	_, err = io.Copy(f, resp.Body)
 	return err
+}
+
+// downloadFileWithProgress 下载更新包并按 ~5 次/秒节流上报进度
+func downloadFileWithProgress(ctx context.Context, url, target string, total int64, emit func(UpdateProgress)) error {
+	client := &http.Client{Timeout: updateDownloadTimeout}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "LiteRedis-updater")
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download failed: %s", resp.Status)
+	}
+	if total <= 0 {
+		total = resp.ContentLength
+	}
+
+	f, err := os.Create(target)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	writer := &progressWriter{total: total, emit: emit}
+	if _, err := io.Copy(io.MultiWriter(f, writer), resp.Body); err != nil {
+		return err
+	}
+	if emit != nil {
+		emit(UpdateProgress{Stage: "download", Percent: 100, Received: writer.received, Total: total})
+	}
+	return nil
+}
+
+type progressWriter struct {
+	total    int64
+	received int64
+	lastEmit time.Time
+	emit     func(UpdateProgress)
+}
+
+func (w *progressWriter) Write(p []byte) (int, error) {
+	w.received += int64(len(p))
+	if w.emit != nil && time.Since(w.lastEmit) >= 200*time.Millisecond {
+		w.lastEmit = time.Now()
+		w.emit(UpdateProgress{Stage: "download", Percent: percentOf(w.received, w.total), Received: w.received, Total: w.total})
+	}
+	return len(p), nil
+}
+
+func percentOf(received, total int64) float64 {
+	if total <= 0 {
+		return 0
+	}
+	percent := float64(received) / float64(total) * 100
+	if percent > 100 {
+		return 100
+	}
+	return percent
+}
+
+// copyFile 以 0644 权限复制文件（用于跨分区放置待替换的可执行文件）
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		_ = os.Remove(dst)
+		return err
+	}
+	return out.Close()
+}
+
+// extractTarGzBinary 从 tar.gz 中取出指定名称的文件到 dst
+func extractTarGzBinary(archivePath, memberName, dst string) error {
+	f, err := os.Open(archivePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	defer gz.Close()
+
+	reader := tar.NewReader(gz)
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if header.Typeflag != tar.TypeReg || filepath.Base(header.Name) != memberName {
+			continue
+		}
+		out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(out, reader); err != nil {
+			out.Close()
+			_ = os.Remove(dst)
+			return err
+		}
+		return out.Close()
+	}
+	return fmt.Errorf("压缩包中未找到 %s", memberName)
 }
 
 func cleanupStaleUpdateDirs(root string, cutoff time.Time) error {
