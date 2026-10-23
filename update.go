@@ -153,6 +153,10 @@ func (a *App) CheckLatestRelease() VersionInfo {
 	release, err := fetchLatestRelease(a.ctx, AppVersion)
 	if err != nil {
 		info.Error = err.Error()
+		// 说明本次是否经过代理，方便排查"到底有没有走代理"
+		if proxy := updateProxyHint(); proxy != "" {
+			info.Error += "（已通过代理 " + proxy + " 访问）"
+		}
 		return info
 	}
 	info.Latest = normalizeVersion(release.TagName)
@@ -288,36 +292,71 @@ func fetchLatestRelease(ctx context.Context, currentVersion string) (ReleaseInfo
 	return release, nil
 }
 
-// newUpdateHTTPClient 按应用设置决定是否走代理，仅作用于 GitHub 访问与安装包下载
+// newUpdateHTTPClient 按应用设置决定是否走代理，仅作用于 GitHub 检查与安装包下载
 func newUpdateHTTPClient(timeout time.Duration) (*http.Client, error) {
-	client := &http.Client{Timeout: timeout}
 	settings, err := config.GetSettings()
 	if err != nil {
+		settings = config.AppSettings{}
+	}
+	return buildUpdateHTTPClient(settings, timeout)
+}
+
+// buildUpdateHTTPClient 便于单测覆盖的纯函数版本
+func buildUpdateHTTPClient(settings config.AppSettings, timeout time.Duration) (*http.Client, error) {
+	client := &http.Client{Timeout: timeout}
+	if !settings.ProxyEnabled {
 		return client, nil
 	}
-	if !settings.ProxyEnabled || strings.TrimSpace(settings.ProxyURL) == "" {
-		return client, nil
+	proxyURL := strings.TrimSpace(settings.ProxyURL)
+	if proxyURL == "" {
+		// 开关打开却没填地址，直接报错，避免静默直连让用户以为代理生效了
+		return nil, fmt.Errorf("已启用应用包更新代理，但代理地址为空")
 	}
 	// 拨号超时单独限制，别把 15 分钟的下载超时当成建连超时
 	dialTimeout := timeout
 	if dialTimeout <= 0 || dialTimeout > 30*time.Second {
 		dialTimeout = 30 * time.Second
 	}
-	dialer, err := redisbackend.NewProxyDialer(settings.ProxyURL, dialTimeout)
+	dialer, err := redisbackend.NewProxyDialer(proxyURL, dialTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("代理配置无效: %w", err)
 	}
-	if dialer != nil {
-		client.Transport = &http.Transport{
-			DialContext:       dialer,
-			ForceAttemptHTTP2: true,
-		}
+	if dialer == nil {
+		return client, nil
+	}
+	config.AppendDebugLog("[update] using proxy %s", redisbackend.RedactProxyURL(proxyURL))
+	client.Transport = &http.Transport{
+		DialContext:       dialer,
+		ForceAttemptHTTP2: true,
 	}
 	return client, nil
 }
 
+// updateProxyHint 返回脱敏后的代理地址，用于在错误信息里说明本次是否走了代理
+func updateProxyHint() string {
+	settings, err := config.GetSettings()
+	if err != nil || !settings.ProxyEnabled {
+		return ""
+	}
+	proxyURL := strings.TrimSpace(settings.ProxyURL)
+	if proxyURL == "" {
+		return ""
+	}
+	return redisbackend.RedactProxyURL(proxyURL)
+}
+
+// releaseCacheKey 把代理配置并入缓存键，切换代理后不会命中旧结果
+func releaseCacheKey(apiURL string) string {
+	settings, err := config.GetSettings()
+	if err != nil || !settings.ProxyEnabled {
+		return apiURL + "|direct"
+	}
+	return apiURL + "|proxy:" + strings.TrimSpace(settings.ProxyURL)
+}
+
 func fetchGitHubReleaseJSON(ctx context.Context, apiURL string, target any) error {
-	cached, hasCached := loadReleaseCache(apiURL)
+	cacheKey := releaseCacheKey(apiURL)
+	cached, hasCached := loadReleaseCache(cacheKey)
 	// 短时间内重复检查直接用缓存，完全不消耗 GitHub 配额
 	if hasCached && time.Since(cached.storedAt) < updateReleaseCacheTTL {
 		return json.Unmarshal(cached.body, target)
@@ -345,7 +384,7 @@ func fetchGitHubReleaseJSON(ctx context.Context, apiURL string, target any) erro
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotModified && hasCached {
-		storeReleaseCache(apiURL, cached.body, cached.etag)
+		storeReleaseCache(cacheKey, cached.body, cached.etag)
 		return json.Unmarshal(cached.body, target)
 	}
 	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
@@ -360,7 +399,7 @@ func fetchGitHubReleaseJSON(ctx context.Context, apiURL string, target any) erro
 	if err != nil {
 		return err
 	}
-	storeReleaseCache(apiURL, body, resp.Header.Get("ETag"))
+	storeReleaseCache(cacheKey, body, resp.Header.Get("ETag"))
 	return json.Unmarshal(body, target)
 }
 

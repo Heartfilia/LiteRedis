@@ -15,6 +15,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"LiteRedis/backend/config"
+	redisbackend "LiteRedis/backend/redis"
 )
 
 func TestCompareSemver(t *testing.T) {
@@ -312,7 +315,7 @@ func TestFetchGitHubReleaseJSONCachesResponses(t *testing.T) {
 	}
 
 	// 过期后用 If-None-Match 重新校验，304 也要返回缓存内容
-	expireReleaseCacheForTest(server.URL)
+	expireReleaseCacheForTest(releaseCacheKey(server.URL))
 	var third ReleaseInfo
 	if err := fetchGitHubReleaseJSON(context.Background(), server.URL, &third); err != nil {
 		t.Fatalf("revalidate fetch: %v", err)
@@ -339,7 +342,49 @@ func TestFetchGitHubReleaseJSONRateLimitedMessage(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "过于频繁") {
 		t.Fatalf("rate limit error = %v", err)
 	}
-	if _, ok := loadReleaseCache(server.URL); ok {
+	if _, ok := loadReleaseCache(releaseCacheKey(server.URL)); ok {
 		t.Fatal("failed response should not be cached")
+	}
+}
+
+func TestBuildUpdateHTTPClientProxyModes(t *testing.T) {
+	cases := []struct {
+		name      string
+		settings  config.AppSettings
+		wantErr   bool
+		wantProxy bool
+	}{
+		{name: "未开启代理", settings: config.AppSettings{}, wantErr: false, wantProxy: false},
+		{name: "开启但地址为空", settings: config.AppSettings{ProxyEnabled: true}, wantErr: true},
+		{name: "地址非法", settings: config.AppSettings{ProxyEnabled: true, ProxyURL: "://bad"}, wantErr: true},
+		{name: "http 代理", settings: config.AppSettings{ProxyEnabled: true, ProxyURL: "http://127.0.0.1:7890"}, wantProxy: true},
+		{name: "socks5 代理", settings: config.AppSettings{ProxyEnabled: true, ProxyURL: "socks5://127.0.0.1:1080"}, wantProxy: true},
+	}
+	for _, test := range cases {
+		client, err := buildUpdateHTTPClient(test.settings, 5*time.Second)
+		if test.wantErr {
+			if err == nil {
+				t.Fatalf("%s: expected error", test.name)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", test.name, err)
+		}
+		hasProxy := client.Transport != nil
+		if hasProxy != test.wantProxy {
+			t.Fatalf("%s: transport set = %v, want %v", test.name, hasProxy, test.wantProxy)
+		}
+	}
+}
+
+func TestUpdateProxyHintRedactsCredentials(t *testing.T) {
+	settings := config.AppSettings{ProxyEnabled: true, ProxyURL: "http://user:secret@127.0.0.1:7890"}
+	if !settings.ProxyEnabled {
+		t.Fatal("sanity")
+	}
+	redacted := redisbackend.RedactProxyURL(settings.ProxyURL)
+	if strings.Contains(redacted, "secret") {
+		t.Fatalf("password leaked: %s", redacted)
 	}
 }

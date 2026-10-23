@@ -604,6 +604,11 @@ func checkHTTPConnectResponse(resp string) error {
 	return nil
 }
 
+// RedactProxyURL 去掉 URL 中的账号密码，用于日志与错误提示
+func RedactProxyURL(rawURL string) string {
+	return redactProxyURL(rawURL)
+}
+
 // NewProxyDialer 供更新模块等其他调用方复用同一套代理拨号实现
 func NewProxyDialer(rawURL string, timeout time.Duration) (func(ctx context.Context, network, addr string) (net.Conn, error), error) {
 	return makeProxyDialer(rawURL, timeout)
