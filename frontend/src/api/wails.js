@@ -20,6 +20,9 @@ export const isConnected = (id) => callGo('IsConnected', id)
 export const pingConnection = (id) => callGo('PingConnection', id)
 export const selectDB = (id, db) => callGo('SelectDB', id, db)
 export const getConnectionOverview = (id) => callGo('GetConnectionOverview', id)
+export const getConnectionDB = (connID) => callGo('GetConnectionDB', connID)
+export const scanMemoryReport = (connID, pattern, maxKeys) => callGo('ScanMemoryReport', connID, pattern, maxKeys)
+export const cancelMemoryScan = () => callGo('CancelMemoryScan')
 export const executeRedisCommand = (id, command) => callGo('ExecuteRedisCommand', id, command)
 
 // ===== 本地数据提取 API =====

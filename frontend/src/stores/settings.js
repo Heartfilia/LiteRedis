@@ -34,6 +34,8 @@ export const useSettingsStore = defineStore('settings', {
     language: 'zh',
     localApiEnabled: true,
     localApiPort: 64201,
+    proxyEnabled: false,
+    proxyUrl: '',
   }),
 
   actions: {
@@ -82,6 +84,8 @@ export const useSettingsStore = defineStore('settings', {
         this.language = s.language || 'zh'
         this.localApiEnabled = s.local_api_enabled !== false
         this.localApiPort = s.local_api_port || 64201
+        this.proxyEnabled = !!s.proxy_enabled
+        this.proxyUrl = s.proxy_url || ''
         setLanguage(this.language)
         this.loaded = true
         this.applyTheme()
@@ -111,6 +115,8 @@ export const useSettingsStore = defineStore('settings', {
         language: values.language,
         local_api_enabled: values.localApiEnabled,
         local_api_port: values.localApiPort,
+        proxy_enabled: values.proxyEnabled,
+        proxy_url: values.proxyUrl,
       }
       const result = await saveSettings(payload)
       if (result.success) {

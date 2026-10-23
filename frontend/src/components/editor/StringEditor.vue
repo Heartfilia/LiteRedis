@@ -4,6 +4,11 @@
     <div v-if="props.keyValue?.truncated" class="truncated-hint">⚠️ {{ t('keyEditor.stringTruncated') }}</div>
     <textarea v-model="localVal" rows="10" :disabled="saving" />
     <div class="editor-actions">
+      <button
+        class="btn-action btn-json"
+        :disabled="saving || (!formatApplied && !localVal.trim())"
+        @click="toggleJson"
+      >{{ formatApplied ? t('keyEditor.jsonRestore') : t('keyEditor.jsonFormat') }}</button>
       <button class="btn-action" :class="{ copied }" @click="copyValue">{{ copied ? '✓ ' + t('keyEditor.copied') : t('keyEditor.copy') }}</button>
       <button
         :class="[isDirty ? 'btn-primary' : 'btn-action', { 'success-flash': saveFlashing, 'error-flash': errorFlashing }]"
@@ -13,6 +18,7 @@
         {{ saving ? t('keyEditor.saving') : t('keyEditor.save') }}
       </button>
       <button
+        v-if="settingsStore.localApiEnabled"
         class="btn-action btn-extract"
         :title="t('keyEditor.browserExtract')"
         :disabled="extracting"
@@ -56,6 +62,7 @@ const copied = ref(false)
 const saveFlashing = ref(false)
 const errorFlashing = ref(false)
 const originalVal = ref(props.keyValue?.string_val || '')
+const formatApplied = ref(false)
 const isDirty = computed(() => localVal.value !== originalVal.value)
 let saveFlashTimer = null
 let errorFlashTimer = null
@@ -104,6 +111,7 @@ watch(() => props.keyValue, (kv) => {
   saving.value = false
   localVal.value = kv?.string_val || ''
   originalVal.value = kv?.string_val || ''
+  formatApplied.value = false
   msg.value = ''
 }, { immediate: true })
 
@@ -112,6 +120,46 @@ onBeforeUnmount(() => {
   if (saveFlashTimer) clearTimeout(saveFlashTimer)
   if (errorFlashTimer) clearTimeout(errorFlashTimer)
 })
+
+const JSON_FORMAT_LIMIT = 2 * 1024 * 1024
+
+function formatJson() {
+  if (localVal.value.length > JSON_FORMAT_LIMIT) {
+    ok.value = false
+    msg.value = t('keyEditor.jsonTooLarge')
+    setTimeout(() => { msg.value = '' }, 3000)
+    return
+  }
+  try {
+    const parsed = JSON.parse(localVal.value)
+    localVal.value = JSON.stringify(parsed, null, 2)
+    formatApplied.value = true
+    ok.value = true
+    msg.value = t('keyEditor.jsonFormatted')
+    setTimeout(() => { msg.value = '' }, 1800)
+  } catch (e) {
+    ok.value = false
+    msg.value = t('keyEditor.jsonInvalid')
+    setTimeout(() => { msg.value = '' }, 2600)
+  }
+}
+
+// 恢复成该 key 在 Redis 中的原始 value（未保存的改动会被丢弃）
+function restoreJson() {
+  localVal.value = originalVal.value
+  formatApplied.value = false
+  ok.value = true
+  msg.value = t('keyEditor.jsonRestored')
+  setTimeout(() => { msg.value = '' }, 1800)
+}
+
+function toggleJson() {
+  if (formatApplied.value) {
+    restoreJson()
+    return
+  }
+  formatJson()
+}
 
 async function copyValue() {
   const result = await copyToClipboard(localVal.value)
@@ -154,6 +202,8 @@ async function save() {
     msg.value = result.success ? t('keyEditor.saveSuccess') : (result.message || t('keyEditor.saveFailed'))
     if (result.success) {
       originalVal.value = value
+      // 保存后格式化内容已成为“原始值”，按钮回到「格式化」
+      formatApplied.value = false
       triggerSaveFlash()
     } else {
       triggerErrorFlash()

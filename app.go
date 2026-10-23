@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"LiteRedis/backend/config"
@@ -20,6 +22,16 @@ type App struct {
 	registry        *localapi.KeyRegistry
 	apiServer       *localapi.Server
 	initWindowState config.WindowState
+
+	memoryScanMu     sync.Mutex
+	memoryScanCancel context.CancelFunc
+}
+
+// MemoryScanProgress 内存体检进度，通过 memory:progress 事件推送
+type MemoryScanProgress struct {
+	Scanned int64   `json:"scanned"`
+	Total   int64   `json:"total"`
+	Percent float64 `json:"percent"`
 }
 
 type VersionInfo struct {
@@ -48,10 +60,7 @@ func (a *App) startup(ctx context.Context) {
 	_ = cleanupStaleUpdateDirs(os.TempDir(), time.Now().Add(-updateTempMaxAge))
 	// 启动本地数据提取 API（默认开启，失败不影响主功能）
 	if settings, err := config.GetSettings(); err == nil && settings.LocalAPIEnabled {
-		port := settings.LocalAPIPort
-		if port <= 0 {
-			port = config.DefaultSettings().LocalAPIPort
-		}
+		port := config.EffectiveLocalAPIPort(settings.LocalAPIPort)
 		if err := a.apiServer.Start(port); err != nil {
 			config.AppendDebugLog("[localapi] start failed: %v", err)
 		}
@@ -293,6 +302,98 @@ func (a *App) GetConnectionOverview(connID string) (config.RedisConnectionOvervi
 }
 
 // ExecuteRedisCommand 在当前连接上执行 Redis 命令
+// GetConnectionDB 返回连接当前选中的 DB（集群模式固定为 0），供界面展示扫描范围
+func (a *App) GetConnectionDB(connID string) (int, error) {
+	_, db, err := a.manager.GetConnectionState(connID)
+	if err != nil {
+		return 0, err
+	}
+	return db, nil
+}
+
+// ScanMemoryReport 对流式扫描 key 并生成内存体检报告
+func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (config.MemoryReport, error) {
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return config.MemoryReport{}, err
+	}
+	cfg, db, err := a.manager.GetConnectionState(connID)
+	if err != nil {
+		return config.MemoryReport{}, err
+	}
+	if cfg.IsCluster && !cfg.AllowClusterScan {
+		normalized := strings.TrimSpace(pattern)
+		if normalized == "" || normalized == "*" || strings.ContainsAny(normalized, "*?[") {
+			return config.MemoryReport{}, errors.New("该集群连接未开启通配扫描，请填写精确或前缀明确的 pattern")
+		}
+	}
+
+	a.memoryScanMu.Lock()
+	if a.memoryScanCancel != nil {
+		a.memoryScanMu.Unlock()
+		return config.MemoryReport{}, errors.New("已有体检任务在执行，请先取消")
+	}
+	ctx, cancel := context.WithCancel(a.ctx)
+	a.memoryScanCancel = cancel
+	a.memoryScanMu.Unlock()
+	defer func() {
+		cancel()
+		a.memoryScanMu.Lock()
+		a.memoryScanCancel = nil
+		a.memoryScanMu.Unlock()
+	}()
+
+	lastEmit := time.Time{}
+	onProgress := func(scanned, total int64) {
+		if a.ctx == nil || time.Since(lastEmit) < 200*time.Millisecond {
+			return
+		}
+		lastEmit = time.Now()
+		percent := 0.0
+		if total > 0 {
+			percent = float64(scanned) / float64(total) * 100
+			if percent > 100 {
+				percent = 100
+			}
+		}
+		wailsruntime.EventsEmit(a.ctx, "memory:progress", MemoryScanProgress{
+			Scanned: scanned,
+			Total:   total,
+			Percent: percent,
+		})
+	}
+
+	report, err := redisbackend.ScanMemory(ctx, client, pattern, maxKeys, onProgress)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return config.MemoryReport{}, errors.New("体检已取消")
+		}
+		return config.MemoryReport{}, err
+	}
+	report.ConnID = connID
+	report.DB = db
+	if a.ctx != nil {
+		wailsruntime.EventsEmit(a.ctx, "memory:progress", MemoryScanProgress{
+			Scanned: report.ScannedKeys,
+			Total:   report.TotalKeys,
+			Percent: 100,
+		})
+	}
+	return report, nil
+}
+
+// CancelMemoryScan 取消正在执行的体检任务
+func (a *App) CancelMemoryScan() config.OperationResult {
+	a.memoryScanMu.Lock()
+	cancel := a.memoryScanCancel
+	a.memoryScanMu.Unlock()
+	if cancel == nil {
+		return config.OperationResult{Success: false, Message: "当前没有正在执行的体检"}
+	}
+	cancel()
+	return config.OperationResult{Success: true}
+}
+
 func (a *App) ExecuteRedisCommand(connID, command string) (config.RedisConsoleResult, error) {
 	client, err := a.manager.GetClient(connID)
 	if err != nil {

@@ -60,6 +60,12 @@ func GetConnectionOverview(ctx context.Context, client redis.UniversalClient, cf
 		UsedMemoryBytes:  usedMemoryBytes,
 		UptimeDays:       uptimeDays,
 		UptimeHuman:      formatUptime(infoMap["uptime_in_seconds"]),
+		MaxMemoryBytes:   parseInt64(infoMap["maxmemory"]),
+		KeyspaceHits:     parseInt64(infoMap["keyspace_hits"]),
+		KeyspaceMisses:   parseInt64(infoMap["keyspace_misses"]),
+		EvictedKeys:      parseInt64(infoMap["evicted_keys"]),
+		BlockedClients:   parseInt64(infoMap["blocked_clients"]),
+		HitRate:          hitRate(parseInt64(infoMap["keyspace_hits"]), parseInt64(infoMap["keyspace_misses"])),
 	}
 
 	return overview, nil
@@ -110,6 +116,11 @@ func mergeClusterNodeInfos(nodeInfos []map[string]string) map[string]string {
 		sumUsedMemory    int64
 		sumOpsPerSec     int64
 		sumConnected     int64
+		sumHits          int64
+		sumMisses        int64
+		sumEvicted       int64
+		sumBlocked       int64
+		sumMaxMemory     int64
 		maxUptimeSeconds int64
 	)
 	for _, nodeInfo := range nodeInfos {
@@ -119,6 +130,11 @@ func mergeClusterNodeInfos(nodeInfos []map[string]string) map[string]string {
 		sumUsedMemory += parseInt64(nodeInfo["used_memory"])
 		sumOpsPerSec += parseInt64(nodeInfo["instantaneous_ops_per_sec"])
 		sumConnected += parseInt64(nodeInfo["connected_clients"])
+		sumHits += parseInt64(nodeInfo["keyspace_hits"])
+		sumMisses += parseInt64(nodeInfo["keyspace_misses"])
+		sumEvicted += parseInt64(nodeInfo["evicted_keys"])
+		sumBlocked += parseInt64(nodeInfo["blocked_clients"])
+		sumMaxMemory += parseInt64(nodeInfo["maxmemory"])
 		if uptime := parseInt64(nodeInfo["uptime_in_seconds"]); uptime > maxUptimeSeconds {
 			maxUptimeSeconds = uptime
 		}
@@ -126,8 +142,22 @@ func mergeClusterNodeInfos(nodeInfos []map[string]string) map[string]string {
 	merged["used_memory"] = strconv.FormatInt(sumUsedMemory, 10)
 	merged["instantaneous_ops_per_sec"] = strconv.FormatInt(sumOpsPerSec, 10)
 	merged["connected_clients"] = strconv.FormatInt(sumConnected, 10)
+	merged["keyspace_hits"] = strconv.FormatInt(sumHits, 10)
+	merged["keyspace_misses"] = strconv.FormatInt(sumMisses, 10)
+	merged["evicted_keys"] = strconv.FormatInt(sumEvicted, 10)
+	merged["blocked_clients"] = strconv.FormatInt(sumBlocked, 10)
+	merged["maxmemory"] = strconv.FormatInt(sumMaxMemory, 10)
 	merged["uptime_in_seconds"] = strconv.FormatInt(maxUptimeSeconds, 10)
 	return merged
+}
+
+// hitRate 返回命中率（0~1），没有读写时返回 0
+func hitRate(hits, misses int64) float64 {
+	total := hits + misses
+	if total <= 0 {
+		return 0
+	}
+	return float64(hits) / float64(total)
 }
 
 func ExecuteRedisCommand(ctx context.Context, client redis.UniversalClient, command string) config.RedisConsoleResult {

@@ -188,6 +188,34 @@
         </div>
       </div>
 
+      <div class="section-title mt">{{ t('settings.proxy') }}</div>
+
+      <div class="setting-item">
+        <label>
+          <span class="label-text">{{ t('settings.proxyEnabled') }}</span>
+          <span class="label-hint">{{ t('settings.proxyEnabledHint') }}</span>
+        </label>
+        <input v-model="form.proxyEnabled" type="checkbox" class="check-input" />
+      </div>
+
+      <template v-if="form.proxyEnabled">
+        <div class="setting-item">
+          <label>
+            <span class="label-text">{{ t('settings.proxyUrl') }}</span>
+            <span class="label-hint">{{ t('settings.proxyUrlHint') }}</span>
+          </label>
+          <div class="input-unit proxy-url-wrap">
+            <input
+              v-model.trim="form.proxyUrl"
+              type="text"
+              class="proxy-url-input"
+              spellcheck="false"
+              placeholder="http://127.0.0.1:7890"
+            />
+          </div>
+        </div>
+      </template>
+
       <div class="section-title mt">{{ t('settings.watermark') }}</div>
 
       <div class="setting-item">
@@ -288,6 +316,9 @@
               min="1024"
               max="65535"
             />
+          </div>
+          <div class="local-api-row" v-if="form.localApiEnabled && appVersion === 'dev'">
+            <span class="local-api-name">{{ t('settings.localApiDevPortHint') }}</span>
           </div>
           <div class="local-api-row" v-if="form.localApiEnabled">
             <span class="local-api-name">{{ t('settings.localApiStatus') }}</span>
@@ -396,6 +427,8 @@ const form = reactive({
   language: 'zh',
   localApiEnabled: true,
   localApiPort: 64201,
+  proxyEnabled: false,
+  proxyUrl: '',
 })
 
 const saving = ref(false)
@@ -466,6 +499,8 @@ function syncFromStore() {
   form.language = settingsStore.language
   form.localApiEnabled = settingsStore.localApiEnabled
   form.localApiPort = settingsStore.localApiPort
+  form.proxyEnabled = settingsStore.proxyEnabled
+  form.proxyUrl = settingsStore.proxyUrl
 }
 
 function reset() {
@@ -487,6 +522,8 @@ function reset() {
   form.language = 'zh'
   form.localApiEnabled = true
   form.localApiPort = 64201
+  form.proxyEnabled = false
+  form.proxyUrl = ''
   resetCountFieldTouched()
 }
 
@@ -606,6 +643,12 @@ async function doSave() {
     }
     for (const field of COUNT_FIELDS) {
       normalizeCountField(field)
+    }
+    if (form.proxyEnabled && !/^(https?|socks5h?):\/\/\S+$/i.test(String(form.proxyUrl || '').trim())) {
+      ok.value = false
+      msg.value = t('settings.proxyUrlInvalid')
+      triggerErrorFlash()
+      return
     }
     const result = await settingsStore.save({ ...form })
     ok.value = result.success
@@ -780,6 +823,16 @@ function openRelease() {
   min-height: 0;
   background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.94) 100%);
   overflow: hidden;
+  /* 避免误触 ctrl+A 把整个设置面板文字选中（输入框单独放开） */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.settings-panel input,
+.settings-panel textarea,
+.settings-panel select,
+.settings-panel option {
+  user-select: text;
+  -webkit-user-select: text;
 }
 .settings-header {
   display: flex;
@@ -835,6 +888,11 @@ function openRelease() {
   box-shadow: 0 4px 12px rgba(148, 163, 184, 0.06);
 }
 .section-title.mt { margin-top: 24px; }
+.proxy-url-wrap { width: 320px; max-width: 58%; }
+.input-unit input.proxy-url-input {
+  width: 100%;
+  text-align: left;
+}
 
 .setting-item {
   display: flex;

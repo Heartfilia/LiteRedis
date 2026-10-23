@@ -49,6 +49,7 @@ type Info struct {
 	Token   string `json:"token"`
 	Error   string `json:"error,omitempty"`
 }
+
 func NewServer(registry *KeyRegistry) *Server {
 	return &Server{registry: registry, token: loadPersistedToken()}
 }
@@ -168,11 +169,7 @@ func (s *Server) Apply(settings config.AppSettings) error {
 	if !settings.LocalAPIEnabled {
 		return nil
 	}
-	port := settings.LocalAPIPort
-	if port <= 0 {
-		port = config.DefaultSettings().LocalAPIPort
-	}
-	return s.Start(port)
+	return s.Start(config.EffectiveLocalAPIPort(settings.LocalAPIPort))
 }
 
 var (

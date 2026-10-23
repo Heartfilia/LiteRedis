@@ -95,13 +95,13 @@
               </svg>
             </button>
             <button
-              v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id) && !conn.is_cluster"
-              class="btn-tiny btn-conn-action btn-overview"
-              :title="t('sidebar.connectionOverview')"
-              @click.stop="openOverview(conn)"
+              v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
+              class="btn-tiny btn-conn-action btn-diagnose"
+              :title="t('sidebar.diagnostics')"
+              @click.stop="openDiagMenu($event, conn)"
             >
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M4 6.5h7v5H4zM13 6.5h7v5h-7zM4 12.5h7V18H4zM13 12.5h7V18h-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <path d="M3 12h3.4l2.2-5.6 3.7 11.2 2.3-5.6H21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
             <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
@@ -188,16 +188,16 @@
                   </svg>
                 </button>
                 <button
-                  v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id) && !conn.is_cluster"
-                  class="btn-tiny btn-conn-action btn-overview"
-                  :title="t('sidebar.connectionOverview')"
-                  @click.stop="openOverview(conn)"
+                  v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
+                  class="btn-tiny btn-conn-action btn-diagnose"
+                  :title="t('sidebar.diagnostics')"
+                  @click.stop="openDiagMenu($event, conn)"
                 >
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M4 6.5h7v5H4zM13 6.5h7v5h-7zM4 12.5h7V18H4zM13 12.5h7V18h-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                    <path d="M3 12h3.4l2.2-5.6 3.7 11.2 2.3-5.6H21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </button>
-                <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
+            <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
                 <button class="btn-tiny btn-conn-action" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="M4 20h4l9.5-9.5-4-4L4 16v4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
@@ -289,17 +289,55 @@
       </div>
     </div>
 
-    <!-- 右键菜单 -->
-    <div
-      v-if="ctxMenu.visible"
-      class="ctx-menu"
-      :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
-      @click.stop
-    >
-      <div class="ctx-item" @click="openEdit(ctxMenu.conn); ctxMenu.visible = false">{{ t('sidebar.edit') }}</div>
-      <div class="ctx-divider" />
-      <div class="ctx-item ctx-danger" @click="removeConnection(ctxMenu.conn.id); ctxMenu.visible = false">{{ t('sidebar.delete') }}</div>
-    </div>
+    <!-- 右键菜单：必须 Teleport 到 body，否则会被 .sidebar-layer 的 will-change 层叠上下文困住 -->
+    <Teleport to="body">
+      <div
+        v-if="ctxMenu.visible"
+        class="ctx-menu"
+        :class="'theme-' + resolvedThemeMode"
+        :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
+        @click.stop
+      >
+        <div class="ctx-item" @click="openEdit(ctxMenu.conn); ctxMenu.visible = false">{{ t('sidebar.edit') }}</div>
+        <div class="ctx-divider" />
+        <div class="ctx-item ctx-danger" @click="removeConnection(ctxMenu.conn.id); ctxMenu.visible = false">{{ t('sidebar.delete') }}</div>
+      </div>
+    </Teleport>
+
+    <!-- 诊断菜单：概览 / 内存体检 / 后续监控 -->
+    <Teleport to="body">
+      <div
+        v-if="diagMenu.visible"
+        class="ctx-menu diag-menu"
+        :class="'theme-' + resolvedThemeMode"
+        :style="{ top: diagMenu.y + 'px', left: diagMenu.x + 'px' }"
+        @click.stop
+      >
+        <div
+          v-if="diagMenu.conn && !diagMenu.conn.is_cluster"
+          class="ctx-item diag-item"
+          @click="pickDiag('overview')"
+        >
+          <svg class="diag-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 6.5h7v5H4zM13 6.5h7v5h-7zM4 12.5h7V18H4zM13 12.5h7V18h-7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          </svg>
+          <span>{{ t('sidebar.connectionOverview') }}</span>
+        </div>
+        <div class="ctx-item diag-item" @click="pickDiag('memory')">
+          <svg class="diag-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 12h3.4l2.2-5.6 3.7 11.2 2.3-5.6H21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>{{ t('sidebar.memoryDoctor') }}</span>
+        </div>
+        <div class="ctx-item diag-item" @click="pickDiag('monitor')">
+          <svg class="diag-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 19V5M4 19h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M7 15.5l3.6-4.2 3 2.6L20 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>{{ t('sidebar.realtimeMonitor') }}</span>
+        </div>
+      </div>
+    </Teleport>
 
     <Teleport to="body">
       <Transition name="toast">
@@ -313,6 +351,20 @@
       :connection-name="overviewConn.name || t('sidebar.unnamed')"
       @close="overviewConn = null"
     />
+
+    <MemoryDoctorModal
+      v-if="memoryConn"
+      :conn-id="memoryConn.id"
+      :connection-name="memoryConn.name || t('sidebar.unnamed')"
+      @close="memoryConn = null"
+    />
+
+    <RealtimeMonitorModal
+      v-if="monitorConn"
+      :conn-id="monitorConn.id"
+      :connection-name="monitorConn.name || t('sidebar.unnamed')"
+      @close="monitorConn = null"
+    />
   </div>
 </template>
 
@@ -325,6 +377,8 @@ import { useI18n } from '../../i18n/index.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import ConnectionOverviewModal from '../connections/ConnectionOverviewModal.vue'
+import MemoryDoctorModal from '../connections/MemoryDoctorModal.vue'
+import RealtimeMonitorModal from '../connections/RealtimeMonitorModal.vue'
 import { formatDebugMessage } from '../../utils/debug.js'
 
 const props = defineProps({
@@ -360,6 +414,9 @@ const connectedConnections = computed(() =>
 )
 const hasConnections = computed(() => connectionsStore.connections.length > 0)
 const overviewConn = ref(null)
+const memoryConn = ref(null)
+const diagMenu = ref({ visible: false, x: 0, y: 0, conn: null })
+const monitorConn = ref(null)
 
 function connectionStateClass(id) {
   if (connectionsStore.isConnecting(id)) return 'connecting'
@@ -406,9 +463,34 @@ function showCtxMenu(e, conn) {
   ctxMenu.value = { visible: true, x: e.clientX, y: e.clientY, conn }
 }
 function closeCtxMenu() { ctxMenu.value.visible = false }
-onMounted(() => document.addEventListener('click', closeCtxMenu))
+
+// 诊断入口：把概览/体检收进同一个按钮，避免连接行按钮过多挤占名字宽度
+function openDiagMenu(e, conn) {
+  ctxMenu.value.visible = false
+  const rect = e.currentTarget.getBoundingClientRect()
+  diagMenu.value = { visible: true, x: rect.right + 6, y: rect.top - 4, conn }
+}
+function closeDiagMenu() { diagMenu.value.visible = false }
+function pickDiag(kind) {
+  const conn = diagMenu.value.conn
+  diagMenu.value.visible = false
+  if (!conn) return
+  if (kind === 'overview') {
+    openOverview(conn)
+  } else if (kind === 'monitor') {
+    monitorConn.value = conn
+  } else {
+    openMemory(conn)
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', closeCtxMenu)
+  document.addEventListener('click', closeDiagMenu)
+})
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeCtxMenu)
+  document.removeEventListener('click', closeDiagMenu)
   if (toastTimer) clearTimeout(toastTimer)
   if (dragExpandTimer) clearTimeout(dragExpandTimer)
 })
@@ -420,6 +502,10 @@ function openEdit(conn) {
 
 function openOverview(conn) {
   overviewConn.value = conn
+}
+
+function openMemory(conn) {
+  memoryConn.value = conn
 }
 
 function openGitHub() {
@@ -1126,7 +1212,24 @@ async function disconnectConn(id) {
   color: #3b82f6;
   font-weight: 500;
 }
-.conn-actions { display: none; gap: 2px; }
+/* 悬浮覆盖：悬停时按钮不再参与布局，避免把连接名挤窄 */
+.conn-actions {
+  display: none;
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  gap: 2px;
+  padding: 2px 3px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.14);
+  z-index: 2;
+}
+.sidebar.theme-dark .conn-actions {
+  background: rgba(30, 41, 59, 0.96);
+  box-shadow: 0 2px 10px rgba(2, 6, 23, 0.5);
+}
 .conn-item:hover .conn-actions { display: flex; }
 .conn-item.connecting .conn-actions { display: flex; }
 .btn-conn-action,
@@ -1362,6 +1465,28 @@ async function disconnectConn(id) {
 }
 
 /* ===== 右键菜单 ===== */
+.diag-menu {
+  min-width: 168px;
+  padding: 5px 0;
+}
+
+.diag-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diag-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  opacity: 0.72;
+}
+
+.diag-item:hover .diag-icon {
+  opacity: 1;
+}
+
 .ctx-menu {
   position: fixed;
   z-index: 2000;
@@ -1384,25 +1509,25 @@ async function disconnectConn(id) {
 .ctx-danger { color: #e53e3e; }
 .ctx-danger:hover { background: #fff5f5; color: #e53e3e; }
 .ctx-divider { height: 1px; background: #eee; margin: 3px 0; }
-.sidebar.theme-dark .ctx-menu {
+.ctx-menu.theme-dark {
   background: rgba(15, 23, 42, 0.98);
   border-color: rgba(71, 85, 105, 0.92);
   box-shadow: 0 18px 40px rgba(2, 6, 23, 0.48);
 }
-.sidebar.theme-dark .ctx-item {
+.ctx-menu.theme-dark .ctx-item {
   color: #e2e8f0;
 }
-.sidebar.theme-dark .ctx-item:hover {
+.ctx-menu.theme-dark .ctx-item:hover {
   background: rgba(30, 41, 59, 0.92);
 }
-.sidebar.theme-dark .ctx-danger {
+.ctx-menu.theme-dark .ctx-danger {
   color: #fca5a5;
 }
-.sidebar.theme-dark .ctx-danger:hover {
+.ctx-menu.theme-dark .ctx-danger:hover {
   background: rgba(127, 29, 29, 0.56);
   color: #fecaca;
 }
-.sidebar.theme-dark .ctx-divider {
+.ctx-menu.theme-dark .ctx-divider {
   background: rgba(51, 65, 85, 0.88);
 }
 

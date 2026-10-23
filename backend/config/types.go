@@ -60,6 +60,57 @@ type AppSettings struct {
 	Language           string `json:"language"`             // 界面语言，默认 zh
 	LocalAPIEnabled    bool   `json:"local_api_enabled"`    // 本地数据提取 API 服务开关，默认 true
 	LocalAPIPort       int    `json:"local_api_port"`       // 本地 API 服务端口，默认 64201，仅监听 127.0.0.1
+	// 应用包更新代理：仅用于访问 GitHub 与下载安装包，不影响数据库连接
+	ProxyEnabled bool   `json:"proxy_enabled"` // 代理开关
+	ProxyURL     string `json:"proxy_url"`     // http://host:port 或 socks5://host:port
+}
+
+const (
+	// LocalAPIPortProd 正式版默认的本地 API 端口
+	LocalAPIPortProd = 64201
+	// LocalAPIPortDev 开发版默认端口，避免与同时运行的正式版抢占同一端口
+	LocalAPIPortDev = 64202
+)
+
+var (
+	defaultLocalAPIPort = LocalAPIPortProd
+	devBuild            bool
+)
+
+// SetDevBuild 由 main 在启动时按构建类型调用，决定默认端口与端口互让规则
+func SetDevBuild(isDev bool) {
+	devBuild = isDev
+	if isDev {
+		defaultLocalAPIPort = LocalAPIPortDev
+	} else {
+		defaultLocalAPIPort = LocalAPIPortProd
+	}
+}
+
+// IsDevBuild 当前是否为开发构建
+func IsDevBuild() bool {
+	return devBuild
+}
+
+// DefaultLocalAPIPort 返回当前构建的默认端口
+func DefaultLocalAPIPort() int {
+	return defaultLocalAPIPort
+}
+
+// EffectiveLocalAPIPort 计算实际监听端口：
+// 未配置时用默认值；64201 归正式版、64202 归开发版，
+// 两个构建互相让开，避免同时运行时抢占同一端口。
+func EffectiveLocalAPIPort(configured int) int {
+	if configured <= 0 {
+		configured = defaultLocalAPIPort
+	}
+	if devBuild && configured == LocalAPIPortProd {
+		return LocalAPIPortDev
+	}
+	if !devBuild && configured == LocalAPIPortDev {
+		return LocalAPIPortProd
+	}
+	return configured
 }
 
 // DefaultSettings 返回默认设置
@@ -82,7 +133,9 @@ func DefaultSettings() AppSettings {
 		WatermarkDensity:   3,
 		Language:           "zh",
 		LocalAPIEnabled:    true,
-		LocalAPIPort:       64201,
+		LocalAPIPort:       defaultLocalAPIPort,
+		ProxyEnabled:       false,
+		ProxyURL:           "",
 	}
 }
 
@@ -187,6 +240,65 @@ type RedisConnectionOverview struct {
 	UsedMemoryBytes  int64  `json:"used_memory_bytes"`
 	UptimeDays       int64  `json:"uptime_days"`
 	UptimeHuman      string `json:"uptime_human"`
+	// 以下字段供实时监控面板使用
+	MaxMemoryBytes int64   `json:"max_memory_bytes"`
+	KeyspaceHits   int64   `json:"keyspace_hits"`
+	KeyspaceMisses int64   `json:"keyspace_misses"`
+	EvictedKeys    int64   `json:"evicted_keys"`
+	BlockedClients int64   `json:"blocked_clients"`
+	HitRate        float64 `json:"hit_rate"`
+}
+
+// MemoryKeyInfo 内存体检中的单个 key 明细
+type MemoryKeyInfo struct {
+	Key  string `json:"key"`
+	Type string `json:"type"`
+	Size int64  `json:"size"`
+	// Len 元素数量（string 为字节长度），仅服务端不支持内存查询时使用
+	Len int64 `json:"len,omitempty"`
+	TTL int64 `json:"ttl"`
+}
+
+// Weight 用于大 key 排序：有元素数时按元素数，否则按字节数
+func (k MemoryKeyInfo) Weight() int64 {
+	if k.Len > 0 {
+		return k.Len
+	}
+	return k.Size
+}
+
+// MemoryPrefixStat 按 key 前缀聚合的内存占用
+type MemoryPrefixStat struct {
+	Prefix string `json:"prefix"`
+	Keys   int64  `json:"keys"`
+	Bytes  int64  `json:"bytes"`
+}
+
+// MemoryTypeStat 按数据类型聚合的内存占用
+type MemoryTypeStat struct {
+	Type  string `json:"type"`
+	Keys  int64  `json:"keys"`
+	Bytes int64  `json:"bytes"`
+}
+
+// MemoryReport 内存体检结果
+type MemoryReport struct {
+	ConnID          string `json:"conn_id"`
+	DB              int    `json:"db"`
+	Pattern         string `json:"pattern"`
+	ScannedKeys     int64  `json:"scanned_keys"`
+	TotalKeys       int64  `json:"total_keys"`
+	TotalBytes      int64  `json:"total_bytes"`
+	AvgKeyBytes     int64  `json:"avg_key_bytes"`
+	NoTTLKeys       int64  `json:"no_ttl_keys"`
+	Truncated       bool   `json:"truncated"`
+	SizeUnavailable bool   `json:"size_unavailable"`
+	// SizeSource 大小来源：memory（MEMORY USAGE）/ debug（DEBUG OBJECT）/ length（元素数量）
+	SizeSource string             `json:"size_source,omitempty"`
+	ElapsedMs  int64              `json:"elapsed_ms"`
+	BigKeys    []MemoryKeyInfo    `json:"big_keys"`
+	Prefixes   []MemoryPrefixStat `json:"prefixes"`
+	Types      []MemoryTypeStat   `json:"types"`
 }
 
 // RedisConsoleResult Redis Console 执行结果

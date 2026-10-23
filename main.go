@@ -18,6 +18,9 @@ const minAppWidth = 1220
 const minAppHeight = 720
 
 func main() {
+	// 开发版默认换一个端口，避免和同时运行的正式版抢 64201
+	config.SetDevBuild(AppVersion == "dev")
+
 	// Create an instance of the app structure
 	app := NewApp()
 

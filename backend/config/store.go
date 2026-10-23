@@ -253,7 +253,10 @@ func GetSettings() (AppSettings, error) {
 	if err != nil {
 		return DefaultSettings(), err
 	}
-	return store.Settings, nil
+	settings := store.Settings
+	// 端口按构建类型归一化：开发版用 64202、正式版用 64201，两个版本共享同一份配置也不会撞端口
+	settings.LocalAPIPort = EffectiveLocalAPIPort(settings.LocalAPIPort)
+	return settings, nil
 }
 
 // SaveSettings 保存全局设置

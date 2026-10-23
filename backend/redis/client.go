@@ -572,6 +572,11 @@ func checkHTTPConnectResponse(resp string) error {
 	return nil
 }
 
+// NewProxyDialer 供更新模块等其他调用方复用同一套代理拨号实现
+func NewProxyDialer(rawURL string, timeout time.Duration) (func(ctx context.Context, network, addr string) (net.Conn, error), error) {
+	return makeProxyDialer(rawURL, timeout)
+}
+
 func makeProxyDialer(rawURL string, timeout time.Duration) (func(ctx context.Context, network, addr string) (net.Conn, error), error) {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {

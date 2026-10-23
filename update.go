@@ -19,6 +19,9 @@ import (
 	"sync"
 	"time"
 
+	"LiteRedis/backend/config"
+	redisbackend "LiteRedis/backend/redis"
+
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/mod/semver"
 )
@@ -236,8 +239,39 @@ func fetchLatestRelease(ctx context.Context, currentVersion string) (ReleaseInfo
 	return release, nil
 }
 
+// newUpdateHTTPClient 按应用设置决定是否走代理，仅作用于 GitHub 访问与安装包下载
+func newUpdateHTTPClient(timeout time.Duration) (*http.Client, error) {
+	client := &http.Client{Timeout: timeout}
+	settings, err := config.GetSettings()
+	if err != nil {
+		return client, nil
+	}
+	if !settings.ProxyEnabled || strings.TrimSpace(settings.ProxyURL) == "" {
+		return client, nil
+	}
+	// 拨号超时单独限制，别把 15 分钟的下载超时当成建连超时
+	dialTimeout := timeout
+	if dialTimeout <= 0 || dialTimeout > 30*time.Second {
+		dialTimeout = 30 * time.Second
+	}
+	dialer, err := redisbackend.NewProxyDialer(settings.ProxyURL, dialTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("代理配置无效: %w", err)
+	}
+	if dialer != nil {
+		client.Transport = &http.Transport{
+			DialContext:       dialer,
+			ForceAttemptHTTP2: true,
+		}
+	}
+	return client, nil
+}
+
 func fetchGitHubReleaseJSON(ctx context.Context, apiURL string, target any) error {
-	client := &http.Client{Timeout: 12 * time.Second}
+	client, err := newUpdateHTTPClient(12 * time.Second)
+	if err != nil {
+		return err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return err
@@ -250,6 +284,10 @@ func fetchGitHubReleaseJSON(ctx context.Context, apiURL string, target any) erro
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
+		// 未认证的 GitHub API 每个 IP 每小时只有 60 次配额
+		return fmt.Errorf("GitHub API 请求过于频繁（每个 IP 每小时 60 次），请稍后再试")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("github api status %s", resp.Status)
 	}
@@ -414,7 +452,10 @@ func downloadFile(ctx context.Context, url, target string) error {
 }
 
 func downloadFileWithTimeout(ctx context.Context, url, target string, timeout time.Duration) error {
-	client := &http.Client{Timeout: timeout}
+	client, err := newUpdateHTTPClient(timeout)
+	if err != nil {
+		return err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
@@ -440,7 +481,10 @@ func downloadFileWithTimeout(ctx context.Context, url, target string, timeout ti
 
 // downloadFileWithProgress 下载更新包并按 ~5 次/秒节流上报进度
 func downloadFileWithProgress(ctx context.Context, url, target string, total int64, emit func(UpdateProgress)) error {
-	client := &http.Client{Timeout: updateDownloadTimeout}
+	client, err := newUpdateHTTPClient(updateDownloadTimeout)
+	if err != nil {
+		return err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err

@@ -289,6 +289,8 @@ watch(() => props.keyValue, (kv) => {
 // —— 浏览器解析：右键行首序号，按原始索引定位提取 ——
 const extractMenu = reactive({ visible: false, x: 0, y: 0, position: '' })
 function openExtractMenu(e, position) {
+  // 本地数据提取 API 关闭时不再弹出浏览器入口
+  if (!settingsStore.localApiEnabled) return
   extractMenu.x = e.clientX
   extractMenu.y = e.clientY
   extractMenu.position = position

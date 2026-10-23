@@ -52,13 +52,13 @@ func TestExecuteRedisCommandCanStoreEmptyString(t *testing.T) {
 func TestMergeClusterNodeInfosAggregates(t *testing.T) {
 	nodes := []map[string]string{
 		{
-			"redis_version":               "7.2.0",
-			"used_memory":                 "1000",
-			"instantaneous_ops_per_sec":   "120",
-			"connected_clients":           "5",
-			"uptime_in_seconds":           "86400",
-			"used_memory_human":           "1000B", // 应被忽略，不进入合并结果
-			"role":                        "master",
+			"redis_version":             "7.2.0",
+			"used_memory":               "1000",
+			"instantaneous_ops_per_sec": "120",
+			"connected_clients":         "5",
+			"uptime_in_seconds":         "86400",
+			"used_memory_human":         "1000B", // 应被忽略，不进入合并结果
+			"role":                      "master",
 		},
 		{
 			"redis_version":             "7.0.0", // 只取第一个节点
@@ -100,5 +100,61 @@ func TestMergeClusterNodeInfosHandlesMissingFields(t *testing.T) {
 	}
 	if got["used_memory"] != "0" {
 		t.Errorf("used_memory = %q, want 0", got["used_memory"])
+	}
+}
+
+func TestHitRate(t *testing.T) {
+	if got := hitRate(0, 0); got != 0 {
+		t.Fatalf("empty hitRate = %v", got)
+	}
+	if got := hitRate(9, 1); got != 0.9 {
+		t.Fatalf("hitRate(9,1) = %v", got)
+	}
+	if got := hitRate(0, 5); got != 0 {
+		t.Fatalf("hitRate(0,5) = %v", got)
+	}
+}
+
+func TestMergeClusterNodeInfosSumsMonitorFields(t *testing.T) {
+	merged := mergeClusterNodeInfos([]map[string]string{
+		{
+			"used_memory":               "100",
+			"connected_clients":         "3",
+			"keyspace_hits":             "10",
+			"keyspace_misses":           "5",
+			"evicted_keys":              "1",
+			"blocked_clients":           "2",
+			"maxmemory":                 "1000",
+			"instantaneous_ops_per_sec": "7",
+			"uptime_in_seconds":         "30",
+		},
+		{
+			"used_memory":               "200",
+			"connected_clients":         "4",
+			"keyspace_hits":             "20",
+			"keyspace_misses":           "5",
+			"evicted_keys":              "2",
+			"blocked_clients":           "0",
+			"maxmemory":                 "2000",
+			"instantaneous_ops_per_sec": "8",
+			"uptime_in_seconds":         "60",
+		},
+	})
+	want := map[string]string{
+		"used_memory":               "300",
+		"connected_clients":         "7",
+		"keyspace_hits":             "30",
+		"keyspace_misses":           "10",
+		"evicted_keys":              "3",
+		"blocked_clients":           "2",
+		"maxmemory":                 "3000",
+		"instantaneous_ops_per_sec": "15",
+		"uptime_in_seconds":         "60",
+		"role":                      "cluster",
+	}
+	for key, value := range want {
+		if merged[key] != value {
+			t.Fatalf("merged[%s] = %q, want %q", key, merged[key], value)
+		}
 	}
 }
