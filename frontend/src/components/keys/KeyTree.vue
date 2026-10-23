@@ -64,6 +64,19 @@
         </template>
       </div>
 
+      <div v-if="workspaceStore.selectionMode" class="batch-bar">
+        <span class="batch-info">{{ t('keyTree.selectedCount').replace('{n}', workspaceStore.selectedKeys.length) }}</span>
+        <button class="batch-btn" :disabled="!workspaceStore.selectedKeys.length" @click="batchDelete">
+          {{ t('keyTree.batchDelete') }}
+        </button>
+        <button class="batch-btn" :disabled="!workspaceStore.selectedKeys.length" @click="batchTTL">
+          {{ t('keyTree.batchTTL') }}
+        </button>
+        <button class="batch-btn ghost" @click="workspaceStore.toggleSelectionMode()">
+          {{ t('keyTree.cancelSelection') }}
+        </button>
+      </div>
+
       <!-- DB 选择 + Key 统计 -->
       <div class="db-bar">
         <div class="db-bar-side db-bar-left">
@@ -73,6 +86,18 @@
                 <option v-for="i in 16" :key="i-1" :value="i-1">{{ i-1 }}</option>
               </select>
             </template>
+            <button
+              class="tree-bulk-btn"
+              :class="{ active: workspaceStore.selectionMode }"
+              type="button"
+              :title="t('keyTree.multiSelect')"
+              @click="workspaceStore.toggleSelectionMode()"
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M8 12l2.5 2.5L16 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
             <div v-if="showTreeExpandControls" class="tree-bulk-controls" aria-label="tree bulk controls">
               <button
                 class="tree-bulk-btn"
@@ -160,6 +185,31 @@ const showBottomLoadMore = computed(() =>
   !workspaceStore.keepPrevSearch &&
   !!session.value?.hasMore
 )
+
+async function batchDelete() {
+  const count = workspaceStore.selectedKeys.length
+  if (!count) return
+  if (!window.confirm(t('keyTree.batchDeleteConfirm').replace('{n}', count))) return
+  const result = await workspaceStore.batchDeleteSelected()
+  if (result?.success) {
+    connectionsStore.showGlobalToast(t('keyTree.batchDeleteOk').replace('{n}', result.affected), true)
+  }
+}
+
+async function batchTTL() {
+  if (!workspaceStore.selectedKeys.length) return
+  const input = window.prompt(t('keyTree.batchTTLPrompt'), '3600')
+  if (input === null) return
+  const ttl = Number(String(input).trim())
+  if (!Number.isFinite(ttl) || ttl === 0 || ttl < -1) {
+    connectionsStore.showGlobalToast(t('keyTree.batchTTLInvalid'), false)
+    return
+  }
+  const result = await workspaceStore.batchSetTTLSelected(Math.trunc(ttl))
+  if (result?.success) {
+    connectionsStore.showGlobalToast(t('keyTree.batchTTLOk').replace('{n}', result.affected), true)
+  }
+}
 
 async function switchDB(db) {
   await workspaceStore.switchDB(parseInt(db))
@@ -509,6 +559,10 @@ function collapseVisibleTree() {
   background: rgba(239, 246, 255, 0.72);
   opacity: 1;
 }
+.tree-bulk-btn.active {
+  background: rgba(96, 165, 250, 0.18);
+  color: #2563eb;
+}
 .tree-bulk-btn:active {
   opacity: 1;
 }
@@ -521,6 +575,43 @@ function collapseVisibleTree() {
   background: rgba(30, 41, 59, 0.9);
   opacity: 1;
 }
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  margin: 0 8px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(147, 197, 253, 0.6);
+  background: rgba(239, 246, 255, 0.9);
+  font-size: 12px;
+  color: #1e40af;
+}
+.batch-info { flex: 1; min-width: 0; font-weight: 600; }
+.batch-btn {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(147, 197, 253, 0.8);
+  background: #fff;
+  color: #1d4ed8;
+  font-size: 12px;
+  cursor: pointer;
+}
+.batch-btn:hover:not(:disabled) { background: rgba(219, 234, 254, 0.9); }
+.batch-btn:disabled { opacity: 0.5; cursor: default; }
+.batch-btn.ghost { background: transparent; color: #64748b; border-color: rgba(203, 213, 225, 0.9); }
+.key-tree.theme-dark .batch-bar {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(30, 58, 95, 0.55);
+  color: #bfdbfe;
+}
+.key-tree.theme-dark .batch-btn {
+  border-color: rgba(59, 130, 246, 0.55);
+  background: rgba(15, 23, 42, 0.8);
+  color: #bfdbfe;
+}
+.key-tree.theme-dark .batch-btn.ghost { color: #94a3b8; border-color: rgba(71, 85, 105, 0.9); }
 .key-count {
   font-size: 11px;
   color: #64748b;

@@ -411,6 +411,57 @@ func DeleteKey(ctx context.Context, client redis.UniversalClient, key string) er
 	return client.Del(ctx, key).Err()
 }
 
+// batchKeyChunk 批量操作的单个分片大小，避免一次命令参数过多
+const batchKeyChunk = 200
+
+// DeleteKeys 批量删除 key，返回实际删除数量
+func DeleteKeys(ctx context.Context, client redis.UniversalClient, keys []string) (int, error) {
+	total := 0
+	for start := 0; start < len(keys); start += batchKeyChunk {
+		end := start + batchKeyChunk
+		if end > len(keys) {
+			end = len(keys)
+		}
+		deleted, err := client.Unlink(ctx, keys[start:end]...).Result()
+		if err != nil {
+			return total, err
+		}
+		total += int(deleted)
+	}
+	return total, nil
+}
+
+// SetKeysTTL 批量设置过期时间；ttlSec < 0 表示移除过期时间（PERSIST）
+func SetKeysTTL(ctx context.Context, client redis.UniversalClient, keys []string, ttlSec int64) (int, error) {
+	applied := 0
+	ttl := time.Duration(ttlSec) * time.Second
+	for start := 0; start < len(keys); start += batchKeyChunk {
+		end := start + batchKeyChunk
+		if end > len(keys) {
+			end = len(keys)
+		}
+		chunk := keys[start:end]
+		pipe := client.Pipeline()
+		cmds := make([]*redis.BoolCmd, len(chunk))
+		for i, key := range chunk {
+			if ttlSec < 0 {
+				cmds[i] = pipe.Persist(ctx, key)
+			} else {
+				cmds[i] = pipe.Expire(ctx, key, ttl)
+			}
+		}
+		if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
+			return applied, err
+		}
+		for _, cmd := range cmds {
+			if ok, err := cmd.Result(); err == nil && ok {
+				applied++
+			}
+		}
+	}
+	return applied, nil
+}
+
 // RenameKey 重命名 key
 func RenameKey(ctx context.Context, client redis.UniversalClient, oldKey, newKey string) error {
 	return client.Rename(ctx, oldKey, newKey).Err()

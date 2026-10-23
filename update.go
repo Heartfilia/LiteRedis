@@ -32,7 +32,52 @@ const (
 	updateTempMaxAge      = 24 * time.Hour
 	updateTempPrefix      = "literedis-update-"
 	updateProgressEvent   = "update:progress"
+	// updateReleaseCacheTTL 缓存 GitHub Release 响应，避免重复点击把 60 次/小时的配额打满
+	updateReleaseCacheTTL = 2 * time.Minute
+	updateReleaseMaxBytes = 4 << 20
 )
+
+type cachedReleaseResponse struct {
+	body     []byte
+	etag     string
+	storedAt time.Time
+}
+
+var releaseResponseCache = struct {
+	sync.Mutex
+	entries map[string]cachedReleaseResponse
+}{entries: make(map[string]cachedReleaseResponse)}
+
+func loadReleaseCache(apiURL string) (cachedReleaseResponse, bool) {
+	releaseResponseCache.Lock()
+	defer releaseResponseCache.Unlock()
+	entry, ok := releaseResponseCache.entries[apiURL]
+	return entry, ok
+}
+
+func storeReleaseCache(apiURL string, body []byte, etag string) {
+	releaseResponseCache.Lock()
+	defer releaseResponseCache.Unlock()
+	releaseResponseCache.entries[apiURL] = cachedReleaseResponse{body: body, etag: etag, storedAt: time.Now()}
+}
+
+func resetReleaseCacheForTest() {
+	releaseResponseCache.Lock()
+	defer releaseResponseCache.Unlock()
+	releaseResponseCache.entries = make(map[string]cachedReleaseResponse)
+}
+
+// expireReleaseCacheForTest 把某条缓存标记为过期，用于验证 ETag 重新校验路径
+func expireReleaseCacheForTest(apiURL string) {
+	releaseResponseCache.Lock()
+	defer releaseResponseCache.Unlock()
+	entry, ok := releaseResponseCache.entries[apiURL]
+	if !ok {
+		return
+	}
+	entry.storedAt = time.Now().Add(-updateReleaseCacheTTL - time.Second)
+	releaseResponseCache.entries[apiURL] = entry
+}
 
 type ReleaseAsset struct {
 	Name               string `json:"name"`
@@ -140,7 +185,11 @@ func (a *App) StartUpdate() UpdateResult {
 
 	asset := pickAsset(release.Assets)
 	if asset == nil {
-		return UpdateResult{Success: false, Message: "未找到适合当前平台的更新包", ReleaseURL: release.HTMLURL}
+		message := "未找到适合当前平台的更新包"
+		if runtime.GOOS == "darwin" && runtime.GOARCH == "amd64" {
+			message = "当前版本暂未提供 macOS Intel 安装包，请到发布页手动下载或使用 Apple Silicon 设备"
+		}
+		return UpdateResult{Success: false, Message: message, ReleaseURL: release.HTMLURL}
 	}
 	checksumAsset := pickChecksumAsset(release.Assets)
 	if checksumAsset == nil {
@@ -268,6 +317,12 @@ func newUpdateHTTPClient(timeout time.Duration) (*http.Client, error) {
 }
 
 func fetchGitHubReleaseJSON(ctx context.Context, apiURL string, target any) error {
+	cached, hasCached := loadReleaseCache(apiURL)
+	// 短时间内重复检查直接用缓存，完全不消耗 GitHub 配额
+	if hasCached && time.Since(cached.storedAt) < updateReleaseCacheTTL {
+		return json.Unmarshal(cached.body, target)
+	}
+
 	client, err := newUpdateHTTPClient(12 * time.Second)
 	if err != nil {
 		return err
@@ -278,12 +333,21 @@ func fetchGitHubReleaseJSON(ctx context.Context, apiURL string, target any) erro
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", "LiteRedis-updater")
+	// 有缓存时带上 ETag，未变化会返回 304，省流量也省配额
+	if hasCached && cached.etag != "" {
+		req.Header.Set("If-None-Match", cached.etag)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotModified && hasCached {
+		storeReleaseCache(apiURL, cached.body, cached.etag)
+		return json.Unmarshal(cached.body, target)
+	}
 	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
 		// 未认证的 GitHub API 每个 IP 每小时只有 60 次配额
 		return fmt.Errorf("GitHub API 请求过于频繁（每个 IP 每小时 60 次），请稍后再试")
@@ -291,7 +355,13 @@ func fetchGitHubReleaseJSON(ctx context.Context, apiURL string, target any) erro
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("github api status %s", resp.Status)
 	}
-	return json.NewDecoder(resp.Body).Decode(target)
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, updateReleaseMaxBytes))
+	if err != nil {
+		return err
+	}
+	storeReleaseCache(apiURL, body, resp.Header.Get("ETag"))
+	return json.Unmarshal(body, target)
 }
 
 func selectLatestRelease(releases []ReleaseInfo, includePrerelease bool) (ReleaseInfo, bool) {

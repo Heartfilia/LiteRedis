@@ -3,10 +3,13 @@ package redis
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -125,6 +128,21 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 		config.AppendDebugLog("[connect] proxy ready url=%s", redactProxyURL(cfg.ProxyURL))
 	}
 
+	tlsConfig, err := buildTLSConfig(cfg)
+	if err != nil {
+		if sshForward != nil {
+			sshForward.Close()
+		}
+		if clusterDialer != nil {
+			clusterDialer.Close()
+		}
+		if sshClient != nil {
+			sshClient.Close()
+		}
+		config.AppendDebugLog("[connect] tls setup failed: %v", err)
+		return normalizeConnectError(err)
+	}
+
 	var client redis.UniversalClient
 
 	if cfg.IsCluster {
@@ -132,10 +150,10 @@ func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
 		if len(addrs) == 0 {
 			addrs = []string{redisAddr}
 		}
-		opts := buildClusterOptions(addrs, cfg.Password, dialer)
+		opts := buildClusterOptions(addrs, cfg, dialer, tlsConfig)
 		client = redis.NewClusterClient(opts)
 	} else {
-		opts := buildRedisOptions(redisAddr, cfg.Password, cfg.DB, dialer)
+		opts := buildRedisOptions(redisAddr, cfg, cfg.DB, dialer, tlsConfig)
 		client = redis.NewClient(opts)
 	}
 
@@ -251,7 +269,11 @@ func (m *ClientManager) ApplyConnectionConfig(cfg config.ConnectionConfig) bool 
 func sameConnectionTransport(left, right config.ConnectionConfig) bool {
 	return left.Host == right.Host &&
 		left.Port == right.Port &&
+		left.Username == right.Username &&
 		left.Password == right.Password &&
+		left.TLSEnabled == right.TLSEnabled &&
+		left.TLSSkipVerify == right.TLSSkipVerify &&
+		left.TLSCAFile == right.TLSCAFile &&
 		left.DB == right.DB &&
 		left.IsCluster == right.IsCluster &&
 		reflect.DeepEqual(left.ClusterAddrs, right.ClusterAddrs) &&
@@ -384,7 +406,11 @@ func buildActiveRedisOptions(conn *activeConn, db int) (*redis.Options, error) {
 		}
 		dialer = proxyDialer
 	}
-	return buildRedisOptions(redisAddr, conn.cfg.Password, db, dialer), nil
+	tlsConfig, err := buildTLSConfig(conn.cfg)
+	if err != nil {
+		return nil, normalizeConnectError(err)
+	}
+	return buildRedisOptions(redisAddr, conn.cfg, db, dialer, tlsConfig), nil
 }
 
 // TestConnection 测试连通性（不持久化，不保存连接池）
@@ -451,6 +477,12 @@ func TestConnection(cfg config.ConnectionConfig) error {
 		config.AppendDebugLog("[test] proxy ready url=%s", redactProxyURL(cfg.ProxyURL))
 	}
 
+	tlsConfig, tlsErr := buildTLSConfig(cfg)
+	if tlsErr != nil {
+		config.AppendDebugLog("[test] tls setup failed: %v", tlsErr)
+		return normalizeConnectError(tlsErr)
+	}
+
 	var client redis.UniversalClient
 
 	if cfg.IsCluster {
@@ -458,10 +490,10 @@ func TestConnection(cfg config.ConnectionConfig) error {
 		if len(addrs) == 0 {
 			addrs = []string{redisAddr}
 		}
-		opts := buildClusterOptions(addrs, cfg.Password, dialer)
+		opts := buildClusterOptions(addrs, cfg, dialer, tlsConfig)
 		client = redis.NewClusterClient(opts)
 	} else {
-		opts := buildRedisOptions(redisAddr, cfg.Password, cfg.DB, dialer)
+		opts := buildRedisOptions(redisAddr, cfg, cfg.DB, dialer, tlsConfig)
 		client = redis.NewClient(opts)
 	}
 	defer client.Close()
@@ -735,10 +767,37 @@ func basicProxyAuth(username string, password string) string {
 	return out.String()
 }
 
-func buildRedisOptions(addr, password string, db int, dialer func(ctx context.Context, network, addr string) (net.Conn, error)) *redis.Options {
+// buildTLSConfig 按连接配置构造 TLS 配置；未启用时返回 nil。
+// ServerName 固定用配置里的 Host，这样经 SSH/代理转发（对端是 127.0.0.1）时证书校验依然正确。
+func buildTLSConfig(cfg config.ConnectionConfig) (*tls.Config, error) {
+	if !cfg.TLSEnabled {
+		return nil, nil
+	}
+	tlsConfig := &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		ServerName:         cfg.Host,
+		InsecureSkipVerify: cfg.TLSSkipVerify,
+	}
+	if path := strings.TrimSpace(cfg.TLSCAFile); path != "" {
+		pem, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("读取 CA 证书失败: %w", err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("CA 证书格式无效: %s", path)
+		}
+		tlsConfig.RootCAs = pool
+	}
+	return tlsConfig, nil
+}
+
+func buildRedisOptions(addr string, cfg config.ConnectionConfig, db int, dialer func(ctx context.Context, network, addr string) (net.Conn, error), tlsConfig *tls.Config) *redis.Options {
 	opts := &redis.Options{
 		Addr:         addr,
-		Password:     password,
+		Username:     cfg.Username,
+		Password:     cfg.Password,
+		TLSConfig:    tlsConfig,
 		DB:           db,
 		DialTimeout:  5 * time.Second,
 		ReadTimeout:  8 * time.Second,
@@ -752,10 +811,12 @@ func buildRedisOptions(addr, password string, db int, dialer func(ctx context.Co
 	return opts
 }
 
-func buildClusterOptions(addrs []string, password string, dialer func(ctx context.Context, network, addr string) (net.Conn, error)) *redis.ClusterOptions {
+func buildClusterOptions(addrs []string, cfg config.ConnectionConfig, dialer func(ctx context.Context, network, addr string) (net.Conn, error), tlsConfig *tls.Config) *redis.ClusterOptions {
 	opts := &redis.ClusterOptions{
 		Addrs:        addrs,
-		Password:     password,
+		Username:     cfg.Username,
+		Password:     cfg.Password,
+		TLSConfig:    tlsConfig,
 		DialTimeout:  5 * time.Second,
 		ReadTimeout:  8 * time.Second,
 		WriteTimeout: 8 * time.Second,

@@ -11,6 +11,10 @@ type ConnectionConfig struct {
 	Host             string     `json:"host"`
 	Port             int        `json:"port"`
 	Password         string     `json:"password"`
+	Username         string     `json:"username,omitempty"`    // Redis 6+ ACL 用户名，留空则按旧式 AUTH <password>
+	TLSEnabled       bool       `json:"tls_enabled"`           // 使用 TLS/SSL 连接（rediss://）
+	TLSSkipVerify    bool       `json:"tls_skip_verify"`       // 跳过证书校验，自签证书时使用
+	TLSCAFile        string     `json:"tls_ca_file,omitempty"` // 自定义 CA 证书路径
 	DB               int        `json:"db"`
 	IsCluster        bool       `json:"is_cluster"`
 	AllowClusterScan bool       `json:"allow_cluster_scan"`
@@ -299,6 +303,14 @@ type MemoryReport struct {
 	BigKeys    []MemoryKeyInfo    `json:"big_keys"`
 	Prefixes   []MemoryPrefixStat `json:"prefixes"`
 	Types      []MemoryTypeStat   `json:"types"`
+}
+
+// BatchKeyResult 批量操作结果
+type BatchKeyResult struct {
+	Success  bool   `json:"success"`
+	Affected int    `json:"affected"`
+	Failed   int    `json:"failed"`
+	Message  string `json:"message,omitempty"`
 }
 
 // RedisConsoleResult Redis Console 执行结果

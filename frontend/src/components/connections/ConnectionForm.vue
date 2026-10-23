@@ -47,6 +47,10 @@
           </div>
         </div>
         <div class="form-group">
+          <label>{{ t('connManager.username') }}</label>
+          <input v-model="form.username" type="text" :placeholder="t('connManager.usernamePlaceholder')" autocomplete="off" />
+        </div>
+        <div class="form-group">
           <label>Password</label>
           <input v-model="form.password" type="password" :placeholder="t('connManager.passwordPlaceholder')" />
         </div>
@@ -68,10 +72,35 @@
         <div class="field-hint">{{ t('connManager.allowClusterScanHint') }}</div>
         <div class="field-hint field-hint-warning">{{ t('connManager.allowClusterScanWarning') }}</div>
         <div class="form-group">
+          <label>{{ t('connManager.username') }}</label>
+          <input v-model="form.username" type="text" :placeholder="t('connManager.usernamePlaceholder')" autocomplete="off" />
+        </div>
+        <div class="form-group">
           <label>Password</label>
           <input v-model="form.password" type="password" :placeholder="t('connManager.passwordPlaceholder')" />
         </div>
       </template>
+
+      <div class="tls-section">
+        <div class="form-group toggle-row">
+          <label>{{ t('connManager.tlsEnabled') }}</label>
+          <input type="checkbox" v-model="form.tlsEnabled" />
+        </div>
+
+        <template v-if="form.tlsEnabled">
+          <div class="tls-panel">
+            <div class="form-group toggle-row">
+              <label>{{ t('connManager.tlsSkipVerify') }}</label>
+              <input type="checkbox" v-model="form.tlsSkipVerify" />
+            </div>
+            <div class="field-hint">{{ t('connManager.tlsSkipVerifyHint') }}</div>
+            <div class="form-group">
+              <label>{{ t('connManager.tlsCaFile') }}</label>
+              <input v-model="form.tlsCaFile" type="text" :placeholder="t('connManager.tlsCaFilePlaceholder')" />
+            </div>
+          </div>
+        </template>
+      </div>
 
       <div class="proxy-section">
         <div class="form-group toggle-row">
@@ -240,7 +269,11 @@ const defaultForm = () => ({
   group: '',
   host: '127.0.0.1',
   port: 6379,
+  username: '',
   password: '',
+  tlsEnabled: false,
+  tlsSkipVerify: false,
+  tlsCaFile: '',
   db: 0,
   isCluster: false,
   allowClusterScan: false,
@@ -293,7 +326,11 @@ function snapshotValue() {
     group: form.group || '',
     host: form.host || '',
     port: form.port || 6379,
+    username: form.username || '',
     password: form.password || '',
+    tlsEnabled: !!form.tlsEnabled,
+    tlsSkipVerify: !!form.tlsSkipVerify,
+    tlsCaFile: form.tlsCaFile || '',
     db: form.db || 0,
     isCluster: !!form.isCluster,
     allowClusterScan: !!form.allowClusterScan,
@@ -324,6 +361,10 @@ watch(() => props.connection, (conn) => {
       ...conn,
       group: conn.group || '',
       isCluster: conn.isCluster ?? conn.is_cluster,
+      username: conn.username || '',
+      tlsEnabled: conn.tlsEnabled ?? conn.tls_enabled ?? false,
+      tlsSkipVerify: conn.tlsSkipVerify ?? conn.tls_skip_verify ?? false,
+      tlsCaFile: conn.tlsCaFile ?? conn.tls_ca_file ?? '',
       allowClusterScan: conn.allowClusterScan ?? conn.allow_cluster_scan ?? false,
       proxyEnabled: conn.proxyEnabled ?? conn.proxy_enabled,
       proxyUrl: conn.proxyUrl ?? conn.proxy_url ?? '',
@@ -400,7 +441,11 @@ function buildCfg() {
     group: form.group || '',
     host: form.host,
     port: form.port || 6379,
+    username: (form.username || '').trim(),
     password: form.password,
+    tls_enabled: !!form.tlsEnabled,
+    tls_skip_verify: !!form.tlsSkipVerify,
+    tls_ca_file: form.tlsEnabled ? (form.tlsCaFile || '').trim() : '',
     db: form.db || 0,
     is_cluster: form.isCluster,
     allow_cluster_scan: !!form.allowClusterScan,
@@ -567,6 +612,8 @@ textarea { resize: vertical; font-family: monospace; }
 .flex1 { flex: 1; }
 .w100 { width: 100px; }
 .w80 { width: 80px; }
+.tls-section { border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 4px; }
+.tls-panel { background: #f9fafb; padding: 12px; border-radius: 6px; margin-top: 8px; border: 1px solid #e5e7eb; }
 .proxy-section { border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 4px; }
 .proxy-panel { background: #f9fafb; padding: 12px; border-radius: 6px; margin-top: 8px; border: 1px solid #e5e7eb; }
 .ssh-section { border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 4px; }
@@ -753,12 +800,14 @@ textarea { resize: vertical; font-family: monospace; }
   color: #93c5fd;
 }
 
+.connection-form.theme-dark .tls-section,
 .connection-form.theme-dark .proxy-section,
 .connection-form.theme-dark .ssh-section,
 .connection-form.theme-dark .icon-color-section {
   border-top-color: rgba(51, 65, 85, 0.88);
 }
 
+.connection-form.theme-dark .tls-panel,
 .connection-form.theme-dark .proxy-panel,
 .connection-form.theme-dark .ssh-panel,
 .connection-form.theme-dark .icon-color-card {

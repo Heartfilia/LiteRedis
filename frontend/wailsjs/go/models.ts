@@ -1,5 +1,5 @@
 export namespace config {
-
+	
 	export class AppSettings {
 	    key_scan_count: number;
 	    hash_load_count: number;
@@ -21,11 +21,11 @@ export namespace config {
 	    local_api_port: number;
 	    proxy_enabled: boolean;
 	    proxy_url: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key_scan_count = source["key_scan_count"];
@@ -50,6 +50,24 @@ export namespace config {
 	        this.proxy_url = source["proxy_url"];
 	    }
 	}
+	export class BatchKeyResult {
+	    success: boolean;
+	    affected: number;
+	    failed: number;
+	    message?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchKeyResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.affected = source["affected"];
+	        this.failed = source["failed"];
+	        this.message = source["message"];
+	    }
+	}
 	export class SSHConfig {
 	    host: string;
 	    port: number;
@@ -57,11 +75,11 @@ export namespace config {
 	    password: string;
 	    private_key_path?: string;
 	    passphrase?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SSHConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.host = source["host"];
@@ -80,6 +98,10 @@ export namespace config {
 	    host: string;
 	    port: number;
 	    password: string;
+	    username?: string;
+	    tls_enabled: boolean;
+	    tls_skip_verify: boolean;
+	    tls_ca_file?: string;
 	    db: number;
 	    is_cluster: boolean;
 	    allow_cluster_scan: boolean;
@@ -93,11 +115,11 @@ export namespace config {
 	    created_at: any;
 	    // Go type: time
 	    updated_at: any;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ConnectionConfig(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -107,6 +129,10 @@ export namespace config {
 	        this.host = source["host"];
 	        this.port = source["port"];
 	        this.password = source["password"];
+	        this.username = source["username"];
+	        this.tls_enabled = source["tls_enabled"];
+	        this.tls_skip_verify = source["tls_skip_verify"];
+	        this.tls_ca_file = source["tls_ca_file"];
 	        this.db = source["db"];
 	        this.is_cluster = source["is_cluster"];
 	        this.allow_cluster_scan = source["allow_cluster_scan"];
@@ -119,7 +145,7 @@ export namespace config {
 	        this.created_at = this.convertValues(source["created_at"], null);
 	        this.updated_at = this.convertValues(source["updated_at"], null);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -142,11 +168,11 @@ export namespace config {
 	    id: string;
 	    group?: string;
 	    sort_order: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ConnectionOrderItem(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -164,11 +190,11 @@ export namespace config {
 	    list_value?: string;
 	    member?: string;
 	    score?: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new CreateKeyRequest(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
@@ -185,11 +211,11 @@ export namespace config {
 	export class StreamEntry {
 	    id: string;
 	    fields: Record<string, string>;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new StreamEntry(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -199,11 +225,11 @@ export namespace config {
 	export class ZSetMember {
 	    member: string;
 	    score: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ZSetMember(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.member = source["member"];
@@ -226,11 +252,11 @@ export namespace config {
 	    next_stream_id?: string;
 	    total_count: number;
 	    truncated?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new KeyValue(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
@@ -249,7 +275,7 @@ export namespace config {
 	        this.total_count = source["total_count"];
 	        this.truncated = source["truncated"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -274,11 +300,11 @@ export namespace config {
 	    size: number;
 	    len?: number;
 	    ttl: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MemoryKeyInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
@@ -292,11 +318,11 @@ export namespace config {
 	    prefix: string;
 	    keys: number;
 	    bytes: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MemoryPrefixStat(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.prefix = source["prefix"];
@@ -308,11 +334,11 @@ export namespace config {
 	    type: string;
 	    keys: number;
 	    bytes: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MemoryTypeStat(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
@@ -336,11 +362,11 @@ export namespace config {
 	    big_keys: MemoryKeyInfo[];
 	    prefixes: MemoryPrefixStat[];
 	    types: MemoryTypeStat[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new MemoryReport(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.conn_id = source["conn_id"];
@@ -359,7 +385,7 @@ export namespace config {
 	        this.prefixes = this.convertValues(source["prefixes"], MemoryPrefixStat);
 	        this.types = this.convertValues(source["types"], MemoryTypeStat);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -378,16 +404,16 @@ export namespace config {
 		    return a;
 		}
 	}
-
+	
 	export class OperationResult {
 	    success: boolean;
 	    message?: string;
 	    disconnected?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new OperationResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
@@ -417,11 +443,11 @@ export namespace config {
 	    evicted_keys: number;
 	    blocked_clients: number;
 	    hit_rate: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new RedisConnectionOverview(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.conn_id = source["conn_id"];
@@ -453,11 +479,11 @@ export namespace config {
 	    output?: string;
 	    error?: string;
 	    elapsed_ms: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new RedisConsoleResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
@@ -472,11 +498,11 @@ export namespace config {
 	    type: string;
 	    ttl: number;
 	    count: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new RedisKey(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -485,23 +511,23 @@ export namespace config {
 	        this.count = source["count"];
 	    }
 	}
-
+	
 	export class ScanResult {
 	    keys: RedisKey[];
 	    next_cursor: number;
 	    has_more: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ScanResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.keys = this.convertValues(source["keys"], RedisKey);
 	        this.next_cursor = source["next_cursor"];
 	        this.has_more = source["has_more"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -520,21 +546,21 @@ export namespace config {
 		    return a;
 		}
 	}
-
+	
 
 }
 
 export namespace main {
-
+	
 	export class ConnectResult {
 	    success: boolean;
 	    message?: string;
 	    init_db: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ConnectResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
@@ -547,11 +573,11 @@ export namespace main {
 	    port: number;
 	    token: string;
 	    error?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new LocalAPIInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.running = source["running"];
@@ -567,11 +593,11 @@ export namespace main {
 	    asset_name?: string;
 	    asset_path?: string;
 	    needs_restart?: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new UpdateResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
@@ -589,11 +615,11 @@ export namespace main {
 	    release_url?: string;
 	    checked_at?: string;
 	    error?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new VersionInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.version = source["version"];

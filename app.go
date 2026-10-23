@@ -311,6 +311,41 @@ func (a *App) GetConnectionDB(connID string) (int, error) {
 	return db, nil
 }
 
+// BatchDeleteKeys 批量删除 key
+func (a *App) BatchDeleteKeys(connID string, keys []string) config.BatchKeyResult {
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error()}
+	}
+	if len(keys) == 0 {
+		return config.BatchKeyResult{Success: true}
+	}
+	affected, err := redisbackend.DeleteKeys(a.ctx, client, keys)
+	for _, key := range keys {
+		a.registry.Unpublish(connID, key)
+	}
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error(), Affected: affected, Failed: len(keys) - affected}
+	}
+	return config.BatchKeyResult{Success: true, Affected: affected, Failed: len(keys) - affected}
+}
+
+// BatchSetKeysTTL 批量设置 TTL，ttlSec < 0 表示永久
+func (a *App) BatchSetKeysTTL(connID string, keys []string, ttlSec int64) config.BatchKeyResult {
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error()}
+	}
+	if len(keys) == 0 {
+		return config.BatchKeyResult{Success: true}
+	}
+	affected, err := redisbackend.SetKeysTTL(a.ctx, client, keys, ttlSec)
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error(), Affected: affected, Failed: len(keys) - affected}
+	}
+	return config.BatchKeyResult{Success: true, Affected: affected, Failed: len(keys) - affected}
+}
+
 // ScanMemoryReport 对流式扫描 key 并生成内存体检报告
 func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (config.MemoryReport, error) {
 	client, err := a.manager.GetClient(connID)

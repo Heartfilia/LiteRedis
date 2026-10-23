@@ -117,7 +117,9 @@ func ScanMemory(ctx context.Context, client redis.UniversalClient, pattern strin
 	report.Pattern = pattern
 	report.TotalKeys = totalKeys
 	report.SizeSource = mode.source()
-	report.SizeUnavailable = mode == sizeModeLength
+	// 即便服务端支持 MEMORY USAGE，也可能因为 ACL/命令被禁用而全部失败，
+	// 这时同样要按"大小不可用"降级展示，而不是显示成 0 B
+	report.SizeUnavailable = report.SizeUnavailable || mode == sizeModeLength
 	report.ElapsedMs = time.Since(startedAt).Milliseconds()
 	return report, nil
 }
@@ -481,6 +483,7 @@ func (acc *memoryAccumulator) build() config.MemoryReport {
 	if acc.withSize > 0 {
 		report.AvgKeyBytes = acc.bytes / acc.withSize
 	}
+	report.SizeUnavailable = acc.scanned > 0 && acc.withSize == 0
 	for keyType, agg := range acc.types {
 		report.Types = append(report.Types, config.MemoryTypeStat{Type: keyType, Keys: agg.keys, Bytes: agg.bytes})
 	}

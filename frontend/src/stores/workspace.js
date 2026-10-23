@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { scanKeys, getValue, getKeyInfo, deleteKey, renameKey, setTTL, selectDB, dbSize, createKey } from '../api/wails.js'
+import { scanKeys, getValue, getKeyInfo, deleteKey, renameKey, setTTL, selectDB, dbSize, createKey, batchDeleteKeys, batchSetKeysTTL } from '../api/wails.js'
 import { buildKeyTree } from '../utils/keyTree.js'
 import { useSettingsStore } from './settings.js'
 import { useConnectionsStore } from './connections.js'
@@ -84,6 +84,9 @@ export const useWorkspaceStore = defineStore('workspace', {
       activeSessionId: null,
 
       selectedKey: null,
+      // 多选模式：批量删除 / 批量设置 TTL
+      selectionMode: false,
+      selectedKeys: [],
       keyValue: null,
       keyValueLoading: false,
       keyValueRefreshing: false,
@@ -319,6 +322,9 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     setActiveConn(id, name, initDB = 0) {
       this._invalidateRequests()
+      // 切换连接必须清空多选，否则批量操作会作用到另一个连接的同名 key
+      this.selectionMode = false
+      this.selectedKeys = []
       // 保存当前连接的状态快照
       if (this.activeConnID) {
         this.connStates[this.activeConnID] = {
@@ -767,6 +773,87 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
     },
 
+    toggleSelectionMode() {
+      this.selectionMode = !this.selectionMode
+      this.selectedKeys = []
+    },
+
+    toggleKeySelection(key) {
+      if (!key) return
+      const index = this.selectedKeys.indexOf(key)
+      if (index === -1) {
+        this.selectedKeys = [...this.selectedKeys, key]
+      } else {
+        this.selectedKeys = this.selectedKeys.filter(item => item !== key)
+      }
+    },
+
+    clearSelection() {
+      this.selectedKeys = []
+    },
+
+    _dropKeysFromSessions(keys) {
+      const drop = new Set(keys)
+      this.searchSessions = this.searchSessions.map(session => {
+        const nextKeys = session.keys.filter(item => !drop.has(item?.name))
+        return { ...session, keys: nextKeys, treeData: buildKeyTree(nextKeys) }
+      })
+      if (this.selectedKey && drop.has(this.selectedKey)) {
+        this.selectedKey = null
+        this.keyValue = null
+        this.keyValueError = null
+      }
+    },
+
+    async batchDeleteSelected() {
+      const keys = [...this.selectedKeys]
+      if (!keys.length || !this.activeConnID) return { success: false }
+      const connID = this.activeConnID
+      try {
+        const result = await batchDeleteKeys(connID, keys)
+        if (!result?.success) {
+          useConnectionsStore().showGlobalToast(result?.message || 'Batch delete failed', false)
+          return result || { success: false }
+        }
+        if (connID !== this.activeConnID) return result
+        this._dropKeysFromSessions(keys)
+        this.totalKeys = Math.max(0, (this.totalKeys || 0) - (result.affected || 0))
+        this.selectedKeys = []
+        return result
+      } catch (e) {
+        useConnectionsStore().showGlobalToast(e?.message || String(e), false)
+        return { success: false, message: e?.message || String(e) }
+      }
+    },
+
+    async batchSetTTLSelected(ttlSec) {
+      const keys = [...this.selectedKeys]
+      if (!keys.length || !this.activeConnID) return { success: false }
+      const connID = this.activeConnID
+      try {
+        const result = await batchSetKeysTTL(connID, keys, ttlSec)
+        if (!result?.success) {
+          useConnectionsStore().showGlobalToast(result?.message || 'Batch TTL failed', false)
+          return result || { success: false }
+        }
+        if (connID !== this.activeConnID) return result
+        const nextTTL = ttlSec < 0 ? -1 : ttlSec
+        const target = new Set(keys)
+        this.searchSessions = this.searchSessions.map(session => {
+          const nextKeys = session.keys.map(item => (target.has(item?.name) ? { ...item, ttl: nextTTL } : item))
+          return { ...session, keys: nextKeys, treeData: buildKeyTree(nextKeys) }
+        })
+        if (this.keyValue && target.has(this.keyValue.key)) {
+          this.keyValue = { ...this.keyValue, ttl: nextTTL }
+        }
+        this.selectedKeys = []
+        return result
+      } catch (e) {
+        useConnectionsStore().showGlobalToast(e?.message || String(e), false)
+        return { success: false, message: e?.message || String(e) }
+      }
+    },
+
     async deleteCurrentKey() {
       if (!this.selectedKey || !this.activeConnID) return
       const deletedKey = this.selectedKey
@@ -914,6 +1001,9 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     async switchDB(db) {
       if (!this.activeConnID) return
+      // 切库同样不能保留其他 DB 的选中项
+      this.selectionMode = false
+      this.selectedKeys = []
       const request = this._beginRequest('switchDB')
       const result = await selectDB(request.connID, db)
       if (!this._isRequestCurrent(request)) return { ...result, stale: true }

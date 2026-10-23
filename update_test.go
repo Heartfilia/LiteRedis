@@ -11,6 +11,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -273,5 +275,71 @@ func TestDownloadFileWithProgress(t *testing.T) {
 	last := updates[len(updates)-1]
 	if last.Percent != 100 || last.Received != int64(len(payload)) || last.Total != int64(len(payload)) {
 		t.Fatalf("final progress = %#v", last)
+	}
+}
+
+func TestFetchGitHubReleaseJSONCachesResponses(t *testing.T) {
+	resetReleaseCacheForTest()
+	defer resetReleaseCacheForTest()
+
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.Header.Get("If-None-Match") == `"v1"` {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("ETag", `"v1"`)
+		_, _ = w.Write([]byte(`{"tag_name":"v9.9.9","assets":[{"name":"LiteRedis-macos-arm64.dmg"}]}`))
+	}))
+	defer server.Close()
+
+	var first ReleaseInfo
+	if err := fetchGitHubReleaseJSON(context.Background(), server.URL, &first); err != nil {
+		t.Fatalf("first fetch: %v", err)
+	}
+	if first.TagName != "v9.9.9" {
+		t.Fatalf("tag = %q", first.TagName)
+	}
+
+	// 缓存期内不应该再打网络
+	var second ReleaseInfo
+	if err := fetchGitHubReleaseJSON(context.Background(), server.URL, &second); err != nil {
+		t.Fatalf("cached fetch: %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("cache was not used, calls = %d", calls.Load())
+	}
+
+	// 过期后用 If-None-Match 重新校验，304 也要返回缓存内容
+	expireReleaseCacheForTest(server.URL)
+	var third ReleaseInfo
+	if err := fetchGitHubReleaseJSON(context.Background(), server.URL, &third); err != nil {
+		t.Fatalf("revalidate fetch: %v", err)
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("revalidation did not hit network, calls = %d", calls.Load())
+	}
+	if third.TagName != "v9.9.9" {
+		t.Fatalf("304 body = %q", third.TagName)
+	}
+}
+
+func TestFetchGitHubReleaseJSONRateLimitedMessage(t *testing.T) {
+	resetReleaseCacheForTest()
+	defer resetReleaseCacheForTest()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer server.Close()
+
+	var out ReleaseInfo
+	err := fetchGitHubReleaseJSON(context.Background(), server.URL, &out)
+	if err == nil || !strings.Contains(err.Error(), "过于频繁") {
+		t.Fatalf("rate limit error = %v", err)
+	}
+	if _, ok := loadReleaseCache(server.URL); ok {
+		t.Fatal("failed response should not be cached")
 	}
 }

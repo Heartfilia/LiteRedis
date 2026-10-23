@@ -23,9 +23,17 @@
     <!-- 叶节点（key） -->
     <div
       v-else
-      :class="['node-row', 'leaf-row', { selected: selectedKey === node.fullPath }]"
-      @click="selectKey(node.fullPath)"
+      :class="['node-row', 'leaf-row', { selected: selectedKey === node.fullPath, checked: isChecked }]"
+      @click="onLeafClick(node.fullPath)"
     >
+      <input
+        v-if="selectionMode"
+        class="leaf-check"
+        type="checkbox"
+        :checked="isChecked"
+        @click.stop
+        @change="workspaceStore.toggleKeySelection(node.fullPath)"
+      />
       <span class="leaf-indent" />
       <span class="node-label leaf-label">{{ node.label }}</span>
       <span v-if="node.ttl > 0" class="ttl-badge" title="TTL">T</span>
@@ -60,6 +68,8 @@ const props = defineProps({
 const workspaceStore = useWorkspaceStore()
 const settingsStore = useSettingsStore()
 const selectedKey = computed(() => workspaceStore.selectedKey)
+const selectionMode = computed(() => workspaceStore.selectionMode)
+const isChecked = computed(() => workspaceStore.selectedKeys.includes(props.node.fullPath))
 const isExpanded = computed(() => workspaceStore.isNodeExpanded(props.node.fullPath, props.depth))
 
 function toggle() {
@@ -67,12 +77,29 @@ function toggle() {
 }
 
 function selectKey(fullPath) {
+  if (workspaceStore.selectionMode) {
+    workspaceStore.toggleKeySelection(fullPath)
+    return
+  }
   workspaceStore.selectKey(fullPath)
+}
+
+function onLeafClick(fullPath) {
+  selectKey(fullPath)
 }
 </script>
 
 <style scoped>
 .tree-node { user-select: none; }
+.leaf-check {
+  width: 13px;
+  height: 13px;
+  margin-right: 2px;
+  accent-color: #4e9af1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.theme-dark .leaf-check { accent-color: #60a5fa; }
 .node-row {
   display: flex;
   align-items: center;

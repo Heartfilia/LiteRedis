@@ -71,6 +71,7 @@
             <div v-if="report.truncated" class="doctor-note">⚠ {{ t('memoryDoctor.truncated') }}</div>
             <div v-if="sizeSource === 'debug'" class="doctor-note info">ℹ {{ t('memoryDoctor.sizeApprox') }}</div>
             <div v-else-if="sizeSource === 'length'" class="doctor-note">⚠ {{ t('memoryDoctor.sizeUnavailable') }}</div>
+            <div v-else-if="report.size_unavailable" class="doctor-note">⚠ {{ t('memoryDoctor.sizeUnavailable') }}</div>
 
             <div class="doctor-columns">
               <section class="doctor-section">

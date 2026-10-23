@@ -3,6 +3,10 @@
 import {config} from '../models';
 import {main} from '../models';
 
+export function BatchDeleteKeys(arg1:string,arg2:Array<string>):Promise<config.BatchKeyResult>;
+
+export function BatchSetKeysTTL(arg1:string,arg2:Array<string>,arg3:number):Promise<config.BatchKeyResult>;
+
 export function CancelMemoryScan():Promise<config.OperationResult>;
 
 export function CheckLatestRelease():Promise<main.VersionInfo>;

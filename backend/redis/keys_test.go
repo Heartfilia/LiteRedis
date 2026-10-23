@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -137,5 +138,70 @@ func TestClusterScanTokenIsSingleUse(t *testing.T) {
 	}
 	if got := takeClusterScanState(token); got != nil {
 		t.Fatal("cluster scan token was consumed more than once")
+	}
+}
+
+func TestDeleteKeysBatchAcrossChunks(t *testing.T) {
+	ctx := context.Background()
+	client := testRedisClient(t)
+
+	keys := make([]string, 0, 450)
+	for i := 0; i < 450; i++ {
+		key := fmt.Sprintf("batch:key:%d", i)
+		keys = append(keys, key)
+		if err := client.Set(ctx, key, "v", 0).Err(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	affected, err := DeleteKeys(ctx, client, keys)
+	if err != nil {
+		t.Fatalf("delete failed: %v", err)
+	}
+	if affected != 450 {
+		t.Fatalf("affected = %d, want 450", affected)
+	}
+	if size, err := client.DBSize(ctx).Result(); err != nil || size != 0 {
+		t.Fatalf("db size = %d, err=%v", size, err)
+	}
+
+	// 再删一次，已经不存在的 key 不应算作删除
+	if affected, err := DeleteKeys(ctx, client, keys[:3]); err != nil || affected != 0 {
+		t.Fatalf("second delete = %d, err=%v", affected, err)
+	}
+}
+
+func TestSetKeysTTLBatch(t *testing.T) {
+	ctx := context.Background()
+	client := testRedisClient(t)
+
+	for _, key := range []string{"ttl:a", "ttl:b"} {
+		if err := client.Set(ctx, key, "v", 0).Err(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	applied, err := SetKeysTTL(ctx, client, []string{"ttl:a", "ttl:b", "ttl:missing"}, 60)
+	if err != nil {
+		t.Fatalf("set ttl failed: %v", err)
+	}
+	if applied != 2 {
+		t.Fatalf("applied = %d, want 2", applied)
+	}
+	for _, key := range []string{"ttl:a", "ttl:b"} {
+		ttl, err := client.TTL(ctx, key).Result()
+		if err != nil || ttl <= 0 || ttl > 60*time.Second {
+			t.Fatalf("%s ttl = %s, err=%v", key, ttl, err)
+		}
+	}
+
+	if applied, err := SetKeysTTL(ctx, client, []string{"ttl:a"}, -1); err != nil || applied != 1 {
+		t.Fatalf("persist = %d, err=%v", applied, err)
+	}
+	if ttl, err := client.TTL(ctx, "ttl:a").Result(); err != nil || ttl != -1*time.Nanosecond && ttl != -1 {
+		// go-redis 用 -1 表示没有过期时间
+		if int64(ttl) != -1 {
+			t.Fatalf("ttl after persist = %s, err=%v", ttl, err)
+		}
 	}
 }

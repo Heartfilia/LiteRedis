@@ -194,3 +194,23 @@ func TestAddBatchFallsBackToElementCount(t *testing.T) {
 		t.Fatalf("noTTL = %d, want 2", report.NoTTLKeys)
 	}
 }
+
+func TestBuildMarksSizeUnavailableWhenNoSizes(t *testing.T) {
+	acc := newMemoryAccumulator()
+	acc.scanned = 3
+	acc.consume([]memoryKeySample{
+		{key: "a", keyType: "string", ttl: -1},
+		{key: "b", keyType: "hash", ttl: 10},
+	})
+	if report := acc.build(); !report.SizeUnavailable {
+		t.Fatal("all-failed size lookups should mark the report as unavailable")
+	}
+
+	acc2 := newMemoryAccumulator()
+	acc2.scanned = 1
+	acc2.withSize = 1
+	acc2.consume([]memoryKeySample{{key: "a", keyType: "string", size: 10, ttl: -1}})
+	if report := acc2.build(); report.SizeUnavailable {
+		t.Fatal("report with sizes should not be marked unavailable")
+	}
+}
