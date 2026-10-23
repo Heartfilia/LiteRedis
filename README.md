@@ -4,6 +4,47 @@
 
 ---
 
+## 功能特性
+
+**连接能力**
+
+- 单机、Cluster 两种连接模式，支持多 DB 切换
+- SSH 隧道跳板机（密码 / 私钥 / 私钥口令）
+- 连接级 HTTP / SOCKS5 代理（与 SSH 互斥）
+- TLS / SSL，可选自定义 CA 证书与跳过校验
+- Redis 6+ ACL 用户名认证，兼容旧式 `AUTH <password>`
+- 连接分组、拖拽排序、颜色标记、心跳保活
+
+**浏览与编辑**
+
+- `SCAN` 游标分页，不使用 `KEYS`，大库也不阻塞
+- 树形（按 `:` 分组）/ 平铺两种展示，glob 模式搜索，支持多会话保留
+- String / Hash / List / Set / ZSet / Stream 全类型编辑，大集合分段加载
+- 字符串 JSON 一键格式化，格式化后可一键恢复为库里的原始值
+- 重命名、TTL 修改、原子创建（Lua 脚本保证不覆盖已有 key）
+
+**批量操作**
+
+- 列表左下角勾选图标进入多选模式
+- 支持整目录勾选（父目录显示半选状态）与 `Shift` 连选
+- 批量删除（`UNLINK` 分片执行）、批量设置 TTL / 永久
+- 切换连接或 DB 会自动清空选中，避免误删
+
+**运维与排障**
+
+- **内存体检**：扫描大 key、无过期 key、按前缀与类型聚合内存占用，可导出 Markdown 报告
+- **实时监控**：QPS / 命中率 / 连接数曲线 + 内存水位，窗口失焦自动暂停
+- 连接概览（版本、角色、客户端数、运行时间）
+- 内置 Redis Console，带历史命令
+
+**其他**
+
+- 中英文双语、深浅色主题、自定义水印
+- 本地数据提取 API：把当前 key/元素发布到 `127.0.0.1` 的 HTTP 接口，方便浏览器侧工具读取
+- 应用内检查更新、下载、校验与自动替换重启（详见下方「应用内更新」）
+
+---
+
 ## 环境要求
 
 | 工具 | 版本 | 说明 |
@@ -90,6 +131,36 @@ wails dev
 Redis、SSH 和代理凭据保存在当前系统用户的 LiteRedis 配置目录中。macOS 和 Linux 上，`connections.json` 会自动设置为仅当前用户可读写（`0600`）；Windows 上由当前用户配置目录的系统 ACL 负责隔离。
 
 配置内容仍是本地明文，不应放入代码仓库、共享目录或公开备份。Debug 日志不会记录 Redis/SSH 密码，带认证信息的代理 URL 也会脱敏。后续如迁移到 Keychain 或 Credential Manager，需要保留对现有配置的兼容读取。
+
+---
+
+## 应用内更新
+
+设置面板底部点版本号即可检查更新；发现新版本后点「执行更新」，会自动下载、校验、替换并重启，不需要去 GitHub 手动下载。
+
+| 环节 | 行为 |
+|---|---|
+| 校验 | 安装包对照 Release 里的 `SHA256SUMS` 做 SHA-256 校验，不匹配直接拒绝安装 |
+| macOS | 挂载 dmg → 复制 `.app` → 进程退出后原子替换 → 自动重新打开（必须从 `.app` 运行，在 dmg 里直接跑无法替换） |
+| Windows | 原地替换 `LiteRedis.exe`（允许重命名运行中的 exe），随后自动重启 |
+| Linux | 解压 `tar.gz` 替换二进制后重启 |
+| 失败兜底 | 任一步骤失败都会回退成「打开安装包」由你手动完成，不会把应用留在半更新状态 |
+
+> 目前只发布 macOS Apple Silicon 包，Intel 机器会提示到发布页手动下载。
+
+### 应用包更新代理
+
+设置 → 应用包更新代理，**只对下面两类请求生效**，数据库连接完全不受影响：
+
+1. 检查最新版本（访问 `api.github.com`）
+2. 下载安装包与校验文件
+
+两个容易踩的坑：
+
+- 未认证的 GitHub API **每个 IP 每小时只有 60 次**配额。走代理时用的是代理节点出口 IP，共享节点很容易被用光；提示"配额已用尽"时换节点或临时直连即可
+- 浏览器能打开 `github.com` 不代表 API 可用——网页浏览不消耗 API 配额，两者是分开的
+
+请求失败时错误信息会注明"本次经代理 … 访问"，方便确认代理是否真的生效。
 
 ---
 
@@ -201,6 +272,9 @@ wails build --help
 LiteRedis/
 ├── main.go                  # 入口：启动 Wails，embed 前端静态资源
 ├── app.go                   # Wails 绑定层：所有暴露给前端的 Go 方法
+├── update.go                # 版本检查、下载校验、代理与 GitHub 响应缓存
+├── update_install_*.go      # 三平台自动安装（macOS dmg / Windows exe / Linux tar.gz）
+├── update_install_unix.go   # 后台替换脚本（等待进程退出后原子替换并重启）
 ├── wails.json               # Wails 项目配置
 ├── go.mod / go.sum          # Go 模块依赖
 │
@@ -210,10 +284,13 @@ LiteRedis/
 │   │   ├── store.go         # 连接配置的读写（connections.json）
 │   │   └── window.go        # 窗口位置/尺寸持久化（window.json）
 │   ├── redis/               # Redis 操作
-│   │   ├── client.go        # 连接管理器（连接池、DB 切换、集群支持）
-│   │   ├── keys.go          # Key 级别操作（SCAN、TTL、重命名、删除）
+│   │   ├── client.go        # 连接管理器（连接池、DB 切换、集群、TLS、代理、SSH）
+│   │   ├── keys.go          # Key 级别操作（SCAN、TTL、重命名、批量删除/TTL）
 │   │   ├── value.go         # Value 读写（String/Hash/List/Set/ZSet/Stream）
-│   │   └── search.go        # Value 内容搜索（HSCAN/SSCAN/ZSCAN glob）
+│   │   ├── search.go        # Value 内容搜索（HSCAN/SSCAN/ZSCAN glob）
+│   │   ├── overview.go      # INFO 解析、集群聚合、Command Console
+│   │   └── memory.go        # 内存体检（大 key、前缀聚合、三级大小降级）
+│   ├── localapi/            # 本地数据提取 API（127.0.0.1，带 token）
 │   └── ssh/
 │       └── tunnel.go        # SSH 隧道拨号器
 │
@@ -229,13 +306,15 @@ LiteRedis/
 │   │   │   └── settings.js     # 应用设置
 │   │   ├── components/
 │   │   │   ├── layout/      # 整体布局（Sidebar、MainContent）
-│   │   │   ├── keys/        # Key 列表与树形结构
+│   │   │   ├── keys/        # Key 列表、树形结构、多选与批量操作
 │   │   │   ├── editor/      # 各数据类型的 Value 编辑器
-│   │   │   ├── connections/ # 连接管理弹窗与表单
+│   │   │   ├── connections/ # 连接管理、连接概览、内存体检、实时监控
+│   │   │   ├── common/      # 提取菜单、浮动提示等通用组件
 │   │   │   └── settings/    # 设置弹窗
 │   │   └── utils/
 │   │       ├── keyTree.js   # Key 路径前缀树构建（按 : 分隔）
 │   │       ├── typeColors.js # 各数据类型的颜色方案
+│   │       ├── format.js    # 字节数/数量格式化
 │   │       └── clipboard.js # 剪贴板工具（兼容 Wails WebView）
 │   ├── wailsjs/             # Wails 自动生成的 JS/TS 绑定
 │   └── dist/                # 前端构建产物（编译时 embed 进 Go 二进制）

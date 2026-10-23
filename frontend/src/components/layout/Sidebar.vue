@@ -85,17 +85,6 @@
           <div class="conn-actions">
             <button
               v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
-              class="btn-tiny btn-conn-action btn-disconnect"
-              :title="t('sidebar.disconnect')"
-              @click.stop="disconnectConn(conn.id)"
-            >
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
-              </svg>
-            </button>
-            <button
-              v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
               class="btn-tiny btn-conn-action btn-diagnose"
               :title="t('sidebar.diagnostics')"
               @click.stop="openDiagMenu($event, conn)"
@@ -111,7 +100,19 @@
                 <path d="M12.8 6.7l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
               </svg>
             </button>
+            <button
+              v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
+              class="btn-tiny btn-conn-action btn-disconnect"
+              :title="t('sidebar.disconnect')"
+              @click.stop="disconnectConn(conn.id)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+              </svg>
+            </button>
             <InlineDeleteConfirm
+              v-if="!connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
               class="sidebar-delete-confirm"
               label="✕"
               :confirm-text="t('sidebar.confirmDelete')"
@@ -178,6 +179,23 @@
               <div class="conn-actions">
                 <button
                   v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
+                  class="btn-tiny btn-conn-action btn-diagnose"
+                  :title="t('sidebar.diagnostics')"
+                  @click.stop="openDiagMenu($event, conn)"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M3 12h3.4l2.2-5.6 3.7 11.2 2.3-5.6H21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
+                <button class="btn-tiny btn-conn-action" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 20h4l9.5-9.5-4-4L4 16v4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                    <path d="M12.8 6.7l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <button
+                  v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
                   class="btn-tiny btn-conn-action btn-disconnect"
                   :title="t('sidebar.disconnect')"
                   @click.stop="disconnectConn(conn.id)"
@@ -187,24 +205,8 @@
                     <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
                   </svg>
                 </button>
-                <button
-                  v-if="connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
-                  class="btn-tiny btn-conn-action btn-diagnose"
-                  :title="t('sidebar.diagnostics')"
-                  @click.stop="openDiagMenu($event, conn)"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M3 12h3.4l2.2-5.6 3.7 11.2 2.3-5.6H21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </button>
-            <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-spinner" />
-                <button class="btn-tiny btn-conn-action" :title="t('sidebar.edit')" @click.stop="openEdit(conn)">
-                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M4 20h4l9.5-9.5-4-4L4 16v4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-                    <path d="M12.8 6.7l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-                  </svg>
-                </button>
                 <InlineDeleteConfirm
+                  v-if="!connectionsStore.isConnected(conn.id) && !connectionsStore.isConnecting(conn.id)"
                   class="sidebar-delete-confirm"
                   label="✕"
                   :confirm-text="t('sidebar.confirmDelete')"

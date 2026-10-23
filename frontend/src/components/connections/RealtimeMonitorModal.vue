@@ -22,7 +22,10 @@
         </header>
 
         <div class="monitor-body">
-          <div v-if="error" class="monitor-note error">⚠ {{ error }}</div>
+          <div v-if="error" class="monitor-note error">
+            ⚠ {{ error }}
+            <button v-if="stopped" class="monitor-retry" @click="retry">{{ t('monitor.retry') }}</button>
+          </div>
           <div v-else-if="paused" class="monitor-note info">{{ t('monitor.paused') }}</div>
           <div v-else-if="isCluster" class="monitor-note info">{{ t('monitor.clusterHint') }}</div>
 
@@ -114,11 +117,13 @@ const latest = ref(null)
 const samples = ref([])
 const error = ref('')
 const paused = ref(false)
+const stopped = ref(false)
 const intervalMs = ref(5000)
 const isCluster = ref(false)
 let timer = null
 let disposed = false
 let intervalTouched = false
+let failures = 0
 
 const currentDB = computed(() => latest.value?.current_db ?? '-')
 const maxMemoryBytes = computed(() => latest.value?.max_memory_bytes || 0)
@@ -173,6 +178,7 @@ async function poll() {
     if (disposed) return
     latest.value = data
     error.value = ''
+    failures = 0
     pushSample(data)
     if (data.is_cluster) {
       isCluster.value = true
@@ -182,14 +188,28 @@ async function poll() {
     }
   } catch (e) {
     if (disposed) return
+    failures++
     error.value = e?.message || String(e)
+    if (failures >= 3) {
+      // 连续失败说明连接已经不可用，别继续每几秒打一次注定失败的请求
+      stopped.value = true
+      stopTimer()
+      error.value = error.value + ' · ' + t('monitor.stoppedHint')
+    }
   } finally {
     schedule()
   }
 }
 
+function retry() {
+  stopped.value = false
+  failures = 0
+  error.value = ''
+  poll()
+}
+
 function schedule() {
-  if (disposed || paused.value) return
+  if (disposed || paused.value || stopped.value) return
   if (timer) clearTimeout(timer)
   timer = setTimeout(poll, intervalMs.value)
 }
@@ -343,6 +363,17 @@ onBeforeUnmount(() => {
   border-color: rgba(248, 113, 113, 0.55);
   background: rgba(254, 226, 226, 0.7);
   color: #991b1b;
+}
+.monitor-retry {
+  margin-left: 8px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  cursor: pointer;
 }
 
 .monitor-grid {

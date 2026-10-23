@@ -1,8 +1,17 @@
 <template>
   <div :class="['tree-node', `theme-${settingsStore.themeMode || 'light'}`, { expanded: isExpanded }]">
     <!-- 目录节点 -->
-    <div v-if="!node.isLeaf" class="node-row dir-row" @click="toggle">
-      <span class="expand-icon" aria-hidden="true">
+    <div v-if="!node.isLeaf" class="node-row dir-row" @click="onDirClick">
+      <input
+        v-if="selectionMode"
+        class="leaf-check"
+        type="checkbox"
+        :checked="dirState === 'all'"
+        :indeterminate="dirState === 'partial'"
+        @click.stop
+        @change="toggleDirSelection"
+      />
+      <span class="expand-icon" aria-hidden="true" @click.stop="toggle">
         <svg v-if="isExpanded" viewBox="0 0 16 16" fill="none">
           <path d="M3.5 6l4.5 4.5L12.5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -24,7 +33,7 @@
     <div
       v-else
       :class="['node-row', 'leaf-row', { selected: selectedKey === node.fullPath, checked: isChecked }]"
-      @click="onLeafClick(node.fullPath)"
+      @click="onLeafClick(node.fullPath, $event)"
     >
       <input
         v-if="selectionMode"
@@ -69,7 +78,35 @@ const workspaceStore = useWorkspaceStore()
 const settingsStore = useSettingsStore()
 const selectedKey = computed(() => workspaceStore.selectedKey)
 const selectionMode = computed(() => workspaceStore.selectionMode)
-const isChecked = computed(() => workspaceStore.selectedKeys.includes(props.node.fullPath))
+const isChecked = computed(() => workspaceStore.selectedKeySet.has(props.node.fullPath))
+
+// 目录节点下所有叶子 key，用于整目录勾选
+const subtreeLeaves = computed(() => {
+  const leaves = []
+  const walk = (current) => {
+    if (!current) return
+    if (current.isLeaf) {
+      leaves.push(current.fullPath)
+      return
+    }
+    for (const child of current.children || []) walk(child)
+  }
+  walk(props.node)
+  return leaves
+})
+
+const dirState = computed(() => {
+  if (!selectionMode.value) return 'none'
+  const leaves = subtreeLeaves.value
+  if (!leaves.length) return 'none'
+  const selected = workspaceStore.selectedKeySet
+  let hit = 0
+  for (const key of leaves) {
+    if (selected.has(key)) hit++
+  }
+  if (hit === 0) return 'none'
+  return hit === leaves.length ? 'all' : 'partial'
+})
 const isExpanded = computed(() => workspaceStore.isNodeExpanded(props.node.fullPath, props.depth))
 
 function toggle() {
@@ -84,7 +121,28 @@ function selectKey(fullPath) {
   workspaceStore.selectKey(fullPath)
 }
 
-function onLeafClick(fullPath) {
+function onDirClick() {
+  if (workspaceStore.selectionMode) {
+    toggleDirSelection()
+    return
+  }
+  toggle()
+}
+
+function toggleDirSelection() {
+  workspaceStore.toggleKeysSelection(subtreeLeaves.value)
+}
+
+function onLeafClick(fullPath, event) {
+  if (workspaceStore.selectionMode) {
+    // Shift 连选：从锚点到当前 key
+    if (event && event.shiftKey) {
+      workspaceStore.selectKeyRangeTo(fullPath)
+      return
+    }
+    workspaceStore.toggleKeySelection(fullPath)
+    return
+  }
   selectKey(fullPath)
 }
 </script>

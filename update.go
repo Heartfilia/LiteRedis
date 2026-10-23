@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -332,6 +334,50 @@ func buildUpdateHTTPClient(settings config.AppSettings, timeout time.Duration) (
 	return client, nil
 }
 
+// describeGitHubError 把 GitHub 的失败响应翻译成能定位问题的提示。
+// 403 不一定就是配额用尽：代理节点被限制、出口 IP 触发风控、代理 ACL 拦截
+// api.github.com 都会返回 403，所以这里要结合 X-RateLimit-* 头和响应体判断。
+func describeGitHubError(resp *http.Response) error {
+	snippet := ""
+	if resp.Body != nil {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 400))
+		snippet = strings.TrimSpace(string(body))
+	}
+	proxy := updateProxyHint()
+	viaProxy := ""
+	if proxy != "" {
+		viaProxy = "，本次经代理 " + proxy + " 访问"
+	}
+	remaining := strings.TrimSpace(resp.Header.Get("X-RateLimit-Remaining"))
+
+	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
+		if remaining == "0" || resp.StatusCode == http.StatusTooManyRequests {
+			reset := ""
+			if ts, err := strconv.ParseInt(strings.TrimSpace(resp.Header.Get("X-RateLimit-Reset")), 10, 64); err == nil && ts > 0 {
+				reset = "，约 " + time.Unix(ts, 0).Format("15:04") + " 恢复"
+			}
+			hint := ""
+			if proxy != "" {
+				hint = "。这是代理出口 IP 的配额，换节点或临时关闭代理直连都可以重试"
+			}
+			return fmt.Errorf("GitHub API 配额已用尽（未认证请求每个 IP 每小时 60 次%s）%s%s", reset, viaProxy, hint)
+		}
+		// 没有配额耗尽标记的 403：多半是代理/出口 IP 被拦
+		message := "GitHub 返回 403，通常是代理出口 IP 被限制或代理屏蔽了 api.github.com" + viaProxy
+		if snippet != "" {
+			message += "，响应：" + snippet
+		}
+		return errors.New(message)
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("GitHub 拒绝认证（401）%s", viaProxy)
+	}
+	if snippet != "" {
+		return fmt.Errorf("github api status %s%s：%s", resp.Status, viaProxy, snippet)
+	}
+	return fmt.Errorf("github api status %s%s", resp.Status, viaProxy)
+}
+
 // updateProxyHint 返回脱敏后的代理地址，用于在错误信息里说明本次是否走了代理
 func updateProxyHint() string {
 	settings, err := config.GetSettings()
@@ -387,12 +433,8 @@ func fetchGitHubReleaseJSON(ctx context.Context, apiURL string, target any) erro
 		storeReleaseCache(cacheKey, cached.body, cached.etag)
 		return json.Unmarshal(cached.body, target)
 	}
-	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
-		// 未认证的 GitHub API 每个 IP 每小时只有 60 次配额
-		return fmt.Errorf("GitHub API 请求过于频繁（每个 IP 每小时 60 次），请稍后再试")
-	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("github api status %s", resp.Status)
+		return describeGitHubError(resp)
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, updateReleaseMaxBytes))

@@ -87,6 +87,8 @@ export const useWorkspaceStore = defineStore('workspace', {
       // 多选模式：批量删除 / 批量设置 TTL
       selectionMode: false,
       selectedKeys: [],
+      // Shift 连选的锚点
+      selectionAnchor: null,
       keyValue: null,
       keyValueLoading: false,
       keyValueRefreshing: false,
@@ -120,6 +122,8 @@ export const useWorkspaceStore = defineStore('workspace', {
 
   getters: {
     activeSession: (state) => state.searchSessions.find(s => s.id === state.activeSessionId),
+    selectedKeySet: (state) => new Set(state.selectedKeys),
+
     displaySessions: (state) => {
       if (state.keepPrevSearch) {
         // 合并模式：只展示非 * 的搜索结果（* 作为"全量刷新"不显示在合并列表里）
@@ -325,6 +329,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       // 切换连接必须清空多选，否则批量操作会作用到另一个连接的同名 key
       this.selectionMode = false
       this.selectedKeys = []
+      this.selectionAnchor = null
       // 保存当前连接的状态快照
       if (this.activeConnID) {
         this.connStates[this.activeConnID] = {
@@ -522,6 +527,11 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     async search(pattern) {
       if (!this.activeConnID) return
+      // 新的搜索会替换当前列表，旧选中项已不可见，必须清空，
+      // 否则批量删除会作用到看不见的 key 上
+      this.selectionMode = false
+      this.selectedKeys = []
+      this.selectionAnchor = null
       this._recordSearchHistory(pattern)
       const settingsStore = useSettingsStore()
       const sessionId = `${Date.now()}-${++this._requestSequence}`
@@ -776,6 +786,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     toggleSelectionMode() {
       this.selectionMode = !this.selectionMode
       this.selectedKeys = []
+      this.selectionAnchor = null
     },
 
     toggleKeySelection(key) {
@@ -786,10 +797,72 @@ export const useWorkspaceStore = defineStore('workspace', {
       } else {
         this.selectedKeys = this.selectedKeys.filter(item => item !== key)
       }
+      this.selectionAnchor = key
+    },
+
+    // 整目录勾选：全部已选则取消，否则全选
+    toggleKeysSelection(keys) {
+      const list = Array.isArray(keys) ? keys.filter(Boolean) : []
+      if (!list.length) return
+      const selected = this.selectedKeySet
+      const allSelected = list.every(key => selected.has(key))
+      const next = new Set(this.selectedKeys)
+      for (const key of list) {
+        if (allSelected) next.delete(key)
+        else next.add(key)
+      }
+      this.selectedKeys = Array.from(next)
+      this.selectionAnchor = list[list.length - 1]
+    },
+
+    // Shift 连选：按当前可见顺序把锚点到目标之间的 key 全部加入选中
+    selectKeyRangeTo(key) {
+      if (!key) return
+      const order = this.visibleLeafKeys()
+      const anchorIndex = this.selectionAnchor ? order.indexOf(this.selectionAnchor) : -1
+      const targetIndex = order.indexOf(key)
+      if (anchorIndex === -1 || targetIndex === -1) {
+        this.toggleKeySelection(key)
+        return
+      }
+      const [start, end] = anchorIndex < targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex]
+      const next = new Set(this.selectedKeys)
+      for (let i = start; i <= end; i++) next.add(order[i])
+      this.selectedKeys = Array.from(next)
+    },
+
+    // 当前屏幕上可见的叶子 key 顺序，用于 Shift 连选
+    visibleLeafKeys() {
+      const order = []
+      if (useSettingsStore().keyDisplayMode === 'flat') {
+        for (const session of this.displaySessions) {
+          for (const item of session.keys || []) {
+            if (item?.name) order.push(item.name)
+          }
+        }
+        return order
+      }
+      const walk = (nodes, depth) => {
+        for (const node of nodes || []) {
+          if (!node) continue
+          if (node.isLeaf) {
+            order.push(node.fullPath)
+            continue
+          }
+          if (this.isNodeExpanded(node.fullPath, depth)) {
+            walk(node.children, depth + 1)
+          }
+        }
+      }
+      for (const session of this.displaySessions) {
+        walk(session.treeData, 0)
+      }
+      return order
     },
 
     clearSelection() {
       this.selectedKeys = []
+      this.selectionAnchor = null
     },
 
     _dropKeysFromSessions(keys) {
@@ -1004,6 +1077,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       // 切库同样不能保留其他 DB 的选中项
       this.selectionMode = false
       this.selectedKeys = []
+      this.selectionAnchor = null
       const request = this._beginRequest('switchDB')
       const result = await selectDB(request.connID, db)
       if (!this._isRequestCurrent(request)) return { ...result, stale: true }

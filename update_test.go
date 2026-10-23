@@ -333,17 +333,44 @@ func TestFetchGitHubReleaseJSONRateLimitedMessage(t *testing.T) {
 	defer resetReleaseCacheForTest()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-RateLimit-Remaining", "0")
 		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"API rate limit exceeded"}`))
 	}))
 	defer server.Close()
 
 	var out ReleaseInfo
 	err := fetchGitHubReleaseJSON(context.Background(), server.URL, &out)
-	if err == nil || !strings.Contains(err.Error(), "过于频繁") {
+	if err == nil || !strings.Contains(err.Error(), "配额已用尽") {
 		t.Fatalf("rate limit error = %v", err)
 	}
 	if _, ok := loadReleaseCache(releaseCacheKey(server.URL)); ok {
 		t.Fatal("failed response should not be cached")
+	}
+}
+
+// 403 但没有配额耗尽标记：说明是代理/出口 IP 被拦，不能误报成配额问题
+func TestFetchGitHubReleaseJSONForbiddenWithoutRateLimit(t *testing.T) {
+	resetReleaseCacheForTest()
+	defer resetReleaseCacheForTest()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`blocked by upstream proxy`))
+	}))
+	defer server.Close()
+
+	var out ReleaseInfo
+	err := fetchGitHubReleaseJSON(context.Background(), server.URL, &out)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	message := err.Error()
+	if strings.Contains(message, "配额已用尽") {
+		t.Fatalf("403 without rate-limit headers was reported as quota: %s", message)
+	}
+	if !strings.Contains(message, "403") || !strings.Contains(message, "blocked by upstream proxy") {
+		t.Fatalf("error lacks diagnosis detail: %s", message)
 	}
 }
 
