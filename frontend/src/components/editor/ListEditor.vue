@@ -347,7 +347,7 @@ async function loadMore() {
       searchHasMore.value = !!result.has_more && searchNextCursor.value !== 0
       return
     }
-    const result = await getValue(request.context.connID, request.context.key, 0, nextOffset.value, '')
+    const result = await getValue(request.context.connID, request.context.key, 0, nextOffset.value, '', '', 'list')
     if (!requestGuard.isCurrent(request)) return
     if (result.list_val) {
       rawItems.value.push(...result.list_val)

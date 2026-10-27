@@ -33,7 +33,7 @@ func TestGetValuePagesStreamWithoutDuplicates(t *testing.T) {
 		ids   []string
 	)
 	for pageNumber := 0; pageNumber < 3; pageNumber++ {
-		page, err := GetValue(ctx, client, "events", settings, 0, 0, "", start, "test|0")
+		page, err := GetValue(ctx, client, "events", settings, 0, 0, "", start, "test|0", "")
 		if err != nil {
 			t.Fatalf("page %d: %v", pageNumber+1, err)
 		}

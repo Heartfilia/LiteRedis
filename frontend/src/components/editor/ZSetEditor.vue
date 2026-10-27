@@ -375,7 +375,7 @@ async function loadMore() {
       searchHasMore.value = !!result.has_more && searchNextCursor.value !== 0
       return
     }
-    const result = await getValue(request.context.connID, request.context.key, 0, nextOffset.value, requestOrder)
+    const result = await getValue(request.context.connID, request.context.key, 0, nextOffset.value, requestOrder, '', 'zset')
     if (!requestGuard.isCurrent(request)) return
     if (result.zset_val) {
       rawMembers.value.push(...result.zset_val)
@@ -401,7 +401,7 @@ async function reloadByScoreSort() {
   const requestOrder = scoreRequestOrder.value
   valueLoading.value = true
   try {
-    const result = await getValue(request.context.connID, request.context.key, 0, 0, requestOrder)
+    const result = await getValue(request.context.connID, request.context.key, 0, 0, requestOrder, '', 'zset')
     if (!requestGuard.isCurrent(request)) return
     rawMembers.value = [...(result.zset_val || [])]
     hasMore.value = result.has_more || false

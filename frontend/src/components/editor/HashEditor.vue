@@ -690,7 +690,7 @@ async function loadMore() {
   valueLoading.value = true
   try {
     if (!hasMore.value) return
-    const result = await getValue(request.context.connID, request.context.key, nextCursor.value, 0, '')
+    const result = await getValue(request.context.connID, request.context.key, nextCursor.value, 0, '', '', 'hash')
     if (!requestGuard.isCurrent(request)) return
     if (result.hash_val) {
       rawHashVal.value = { ...rawHashVal.value, ...result.hash_val }
@@ -1061,7 +1061,7 @@ async function resolveCalculationEntries(request) {
     let cursor = nextCursor.value
     let more = hasMore.value
     while (more) {
-      const result = await getValue(request.context.connID, request.context.key, cursor, 0, '')
+      const result = await getValue(request.context.connID, request.context.key, cursor, 0, '', '', 'hash')
       if (!requestGuard.isCurrent(request)) return null
       merged = { ...merged, ...(result.hash_val || {}) }
       cursor = result.next_cursor || 0

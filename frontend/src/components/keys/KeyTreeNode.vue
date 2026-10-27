@@ -159,6 +159,9 @@ function onLeafClick(fullPath, event) {
 }
 .theme-dark .leaf-check { accent-color: #60a5fa; }
 .node-row {
+  /* 行数很多时跳过屏幕外的布局与绘制，避免整列表滚动卡顿 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 32px;
   display: flex;
   align-items: center;
   gap: 6px;

@@ -682,7 +682,7 @@ func (a *App) executeRedisCommand(connID, command string) (config.RedisConsoleRe
 // ============================================================
 
 // GetValue 读取 Value（支持 cursor/offset/stream ID 分页）。第一页使用空 streamStart。
-func (a *App) GetValue(connID, key string, cursor uint64, offset int, zsetSort, streamStart string) (config.KeyValue, error) {
+func (a *App) GetValue(connID, key string, cursor uint64, offset int, zsetSort, streamStart, keyType string) (config.KeyValue, error) {
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.KeyValue{}, err
@@ -696,7 +696,7 @@ func (a *App) GetValue(connID, key string, cursor uint64, offset int, zsetSort, 
 	defer cancel()
 	_, db, _ := a.manager.GetConnectionState(connID)
 	scope := connID + "|" + strconv.Itoa(db)
-	return redisbackend.GetValue(ctx, client, key, settings, cursor, offset, zsetSort, streamStart, scope)
+	return redisbackend.GetValue(ctx, client, key, settings, cursor, offset, zsetSort, streamStart, scope, keyType)
 }
 
 // SearchValue 按 pattern 搜索 key 内成员（Hash/Set 支持 * 通配符，ZSet 使用 Redis glob，List 使用子串匹配）

@@ -299,6 +299,16 @@ export const useWorkspaceStore = defineStore('workspace', {
       return new RegExp(`^${regexBody}$`)
     },
 
+    // 从当前搜索结果里找 key 的类型，省掉后端一次 TYPE 往返
+    _findKeyType(keyName) {
+      if (!keyName) return ''
+      for (const session of this.searchSessions) {
+        const hit = (session.keys || []).find(item => item?.name === keyName)
+        if (hit?.type) return hit.type
+      }
+      return ''
+    },
+
     _sessionMatchesKey(session, keyName) {
       if (!session || !keyName) return false
       const pattern = session.pattern || '*'
@@ -334,6 +344,21 @@ export const useWorkspaceStore = defineStore('workspace', {
       return inserted
     },
 
+    // 只改一个节点的元信息（TTL / 类型），直接就地打补丁：
+    // 重建整棵树会让所有节点对象变新，导致整棵树重新渲染
+    _patchTreeNode(nodes, fullPath, patch) {
+      for (const node of nodes || []) {
+        if (node.fullPath === fullPath) {
+          Object.assign(node, patch)
+          return true
+        }
+        if (!node.isLeaf && node.children?.length) {
+          if (this._patchTreeNode(node.children, fullPath, patch)) return true
+        }
+      }
+      return false
+    },
+
     _updateKeyMetadata(keyName, patch) {
       if (!keyName || !patch || typeof patch !== 'object') return false
       let updated = false
@@ -346,10 +371,12 @@ export const useWorkspaceStore = defineStore('workspace', {
           return { ...item, ...patch }
         })
         if (!sessionUpdated) return session
+        const patched = this._patchTreeNode(session.treeData, keyName, patch)
         return {
           ...session,
           keys: nextKeys,
-          treeData: buildKeyTree(nextKeys),
+          // 没找到节点（理论上不会）才退回重建
+          treeData: patched ? session.treeData : buildKeyTree(nextKeys),
         }
       })
       return updated
@@ -791,7 +818,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       this._loadingKey = key
 
       try {
-        const result = await getValue(request.connID, key, 0, 0, '')
+        const result = await getValue(request.connID, key, 0, 0, '', '', this._findKeyType(key))
 
         if (!this._isRequestCurrent(request)) return
 

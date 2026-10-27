@@ -48,8 +48,8 @@ export const setTTL = (connID, key, ttl) => callGo('SetTTL', connID, key, ttl)
 export const dbSize = (connID) => callGo('DBSize', connID)
 
 // ===== Value CRUD =====
-export const getValue = (connID, key, cursor, offset, zsetSort = '', streamStart = '') =>
-  callGo('GetValue', connID, key, cursor, offset, zsetSort, streamStart)
+export const getValue = (connID, key, cursor, offset, zsetSort = '', streamStart = '', keyType = '') =>
+  callGo('GetValue', connID, key, cursor, offset, zsetSort, streamStart, keyType)
 export const searchValue = (connID, key, keyType, pattern, exact = false, cursor = 0) =>
   callGo('SearchValue', connID, key, keyType, pattern, exact, cursor)
 export const setString = (connID, key, value) => callGo('SetString', connID, key, value)

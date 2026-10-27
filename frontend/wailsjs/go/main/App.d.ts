@@ -53,7 +53,7 @@ export function GetSettings():Promise<config.AppSettings>;
 
 export function GetSlowLog(arg1:string,arg2:number):Promise<Array<config.SlowLogEntry>>;
 
-export function GetValue(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string):Promise<config.KeyValue>;
+export function GetValue(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string,arg6:string,arg7:string):Promise<config.KeyValue>;
 
 export function HDel(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 

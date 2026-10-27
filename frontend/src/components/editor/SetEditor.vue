@@ -369,7 +369,7 @@ async function loadMore() {
   }
   valueLoading.value = true
   try {
-    const result = await getValue(request.context.connID, request.context.key, nextCursor.value, 0, '')
+    const result = await getValue(request.context.connID, request.context.key, nextCursor.value, 0, '', '', 'set')
     if (!requestGuard.isCurrent(request)) return
     if (result.set_val) {
       rawMembers.value.push(...result.set_val)

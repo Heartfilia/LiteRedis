@@ -24,7 +24,7 @@ func TestListChunkPagingMatchesFullList(t *testing.T) {
 
 	var got []string
 	for offset := 0; offset < 620; offset += 20 {
-		page, err := GetValue(ctx, client, "biglist", settings, 0, offset, "", "", "page|0")
+		page, err := GetValue(ctx, client, "biglist", settings, 0, offset, "", "", "page|0", "")
 		if err != nil {
 			t.Fatalf("offset %d: %v", offset, err)
 		}
@@ -56,10 +56,10 @@ func TestListChunkCacheInvalidation(t *testing.T) {
 	settings := config.DefaultSettings()
 	settings.ListLoadCount = 20
 
-	if _, err := GetValue(ctx, client, "list", settings, 0, 0, "", "", "inv|0"); err != nil {
+	if _, err := GetValue(ctx, client, "list", settings, 0, 0, "", "", "inv|0", ""); err != nil {
 		t.Fatal(err)
 	}
-	page, err := GetValue(ctx, client, "list", settings, 0, 20, "", "", "inv|0")
+	page, err := GetValue(ctx, client, "list", settings, 0, 20, "", "", "inv|0", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestListChunkCacheInvalidation(t *testing.T) {
 	}
 
 	// 未失效时命中缓存，仍是旧值
-	cached, err := GetValue(ctx, client, "list", settings, 0, 20, "", "", "inv|0")
+	cached, err := GetValue(ctx, client, "list", settings, 0, 20, "", "", "inv|0", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestListChunkCacheInvalidation(t *testing.T) {
 	}
 
 	InvalidateListChunks("inv|0", "list")
-	fresh, err := GetValue(ctx, client, "list", settings, 0, 20, "", "", "inv|0")
+	fresh, err := GetValue(ctx, client, "list", settings, 0, 20, "", "", "inv|0", "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -106,26 +106,55 @@ func InvalidateListChunks(scope, key string) {
 	listChunkCache.Unlock()
 }
 
-// readListWindow 返回 offset 起 count 条；未命中或命中过期块时按 500 条整块拉取。
+// peekListChunk 命中未过期的缓存块时直接返回切片
+func peekListChunk(scope, key string, offset, count int64) ([]string, bool) {
+	if scope == "" || offset <= 0 || count <= 0 {
+		return nil, false
+	}
+	listChunkCache.Lock()
+	entry, ok := listChunkCache.entries[scope+"\x00"+key]
+	listChunkCache.Unlock()
+	if !ok || time.Since(entry.fetchedAt) >= listChunkTTL {
+		return nil, false
+	}
+	if offset < entry.start || offset+count > entry.start+int64(len(entry.items)) {
+		return nil, false
+	}
+	from := offset - entry.start
+	return entry.items[from : from+count], true
+}
+
+// storeListChunk 记录一块列表数据，超出上限时淘汰最早的一条
+func storeListChunk(scope, key string, offset int64, items []string) {
+	if scope == "" {
+		return
+	}
+	listChunkCache.Lock()
+	defer listChunkCache.Unlock()
+	if len(listChunkCache.entries) >= listChunkMax {
+		var oldestKey string
+		var oldest time.Time
+		for k, v := range listChunkCache.entries {
+			if oldestKey == "" || v.fetchedAt.Before(oldest) {
+				oldestKey, oldest = k, v.fetchedAt
+			}
+		}
+		if oldestKey != "" {
+			delete(listChunkCache.entries, oldestKey)
+		}
+	}
+	listChunkCache.entries[scope+"\x00"+key] = listChunk{start: offset, items: items, fetchedAt: time.Now()}
+}
+
+// readListWindow 返回 offset 起 count 条；命中缓存直接返回，否则整块读取后缓存。
 // offset 为 0（刷新首屏）时总是读最新数据。
 func readListWindow(ctx context.Context, client redis.UniversalClient, scope, key string, offset, count int64) ([]string, error) {
 	if count <= 0 {
 		count = 20
 	}
-	cacheKey := scope + "\x00" + key
-
-	if offset > 0 && scope != "" {
-		listChunkCache.Lock()
-		entry, ok := listChunkCache.entries[cacheKey]
-		listChunkCache.Unlock()
-		if ok && time.Since(entry.fetchedAt) < listChunkTTL {
-			if offset >= entry.start && offset+count <= entry.start+int64(len(entry.items)) {
-				from := offset - entry.start
-				return entry.items[from : from+count], nil
-			}
-		}
+	if items, ok := peekListChunk(scope, key, offset, count); ok {
+		return items, nil
 	}
-
 	size := int64(listChunkSize)
 	if count > size {
 		size = count
@@ -134,31 +163,29 @@ func readListWindow(ctx context.Context, client redis.UniversalClient, scope, ke
 	if err != nil && err != redis.Nil {
 		return nil, err
 	}
-
-	if scope != "" {
-		listChunkCache.Lock()
-		if len(listChunkCache.entries) >= listChunkMax {
-			// 简单淘汰：丢弃最早写入的一条
-			var oldestKey string
-			var oldest time.Time
-			for k, v := range listChunkCache.entries {
-				if oldestKey == "" || v.fetchedAt.Before(oldest) {
-					oldestKey, oldest = k, v.fetchedAt
-				}
-			}
-			delete(listChunkCache.entries, oldestKey)
-		}
-		listChunkCache.entries[cacheKey] = listChunk{start: offset, items: items, fetchedAt: time.Now()}
-		listChunkCache.Unlock()
-	}
-
+	storeListChunk(scope, key, offset, items)
 	if int64(len(items)) > count {
 		return items[:count], nil
 	}
 	return items, nil
 }
 
-func GetValue(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings, cursor uint64, offset int, zsetSort, streamStart, scope string) (config.KeyValue, error) {
+// GetValue 读取 key 的部分内容。keyType 由前端提供（key 列表里已知），
+// 用它可以把 TTL / 总数 / 数据合并成一次往返；为空或类型不符时退回探测路径。
+func GetValue(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings, cursor uint64, offset int, zsetSort, streamStart, scope, keyType string) (config.KeyValue, error) {
+	if keyType != "" {
+		kv, err := getValueKnownType(ctx, client, key, keyType, settings, cursor, offset, zsetSort, scope)
+		if err == nil {
+			return kv, nil
+		}
+		if !errors.Is(err, errFallbackToProbe) && !strings.Contains(strings.ToUpper(err.Error()), "WRONGTYPE") {
+			return kv, err
+		}
+	}
+	return getValueWithProbe(ctx, client, key, settings, cursor, offset, zsetSort, streamStart, scope)
+}
+
+func getValueWithProbe(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings, cursor uint64, offset int, zsetSort, streamStart, scope string) (config.KeyValue, error) {
 	keyInfo, err := GetKeyInfo(ctx, client, key)
 	if err != nil {
 		return config.KeyValue{}, err

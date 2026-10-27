@@ -137,7 +137,7 @@ async function loadMore() {
   const request = requestGuard.begin('load')
   valueLoading.value = true
   try {
-    const result = await getValue(request.context.connID, request.context.key, 0, 0, '', nextStreamID.value)
+    const result = await getValue(request.context.connID, request.context.key, 0, 0, '', nextStreamID.value, 'stream')
     if (!requestGuard.isCurrent(request)) return
     entries.value = mergeStreamEntries(entries.value, result.stream_val)
     hasMore.value = !!result.has_more
