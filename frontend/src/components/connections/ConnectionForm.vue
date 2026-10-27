@@ -617,7 +617,7 @@ textarea { resize: vertical; font-family: monospace; }
   color: #2563eb;
 }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; }
-.toggle-row input[type=checkbox] { width: auto; }
+.toggle-row input[type=checkbox] { width: 14px; height: 14px; flex: 0 0 auto; }
 .form-row { display: flex; gap: 8px; }
 .flex1 { flex: 1; }
 .w100 { width: 100px; }
