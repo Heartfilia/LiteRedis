@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -165,6 +166,28 @@ func WriteExportedKey(ctx context.Context, client redis.UniversalClient, entry c
 		return false, err
 	}
 	return true, nil
+}
+
+// GetDatabaseCount 读取实例配置的 DB 数量；集群或读取失败（云厂商常禁用 CONFIG）时回退 16
+func GetDatabaseCount(ctx context.Context, client redis.UniversalClient) int {
+	const fallback = 16
+	single, ok := client.(*redis.Client)
+	if !ok {
+		return 1
+	}
+	values, err := single.ConfigGet(ctx, "databases").Result()
+	if err != nil {
+		return fallback
+	}
+	raw, ok := values["databases"]
+	if !ok {
+		return fallback
+	}
+	count, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || count <= 0 || count > 4096 {
+		return fallback
+	}
+	return count
 }
 
 // CopyKeysToDB 在同一实例内把 key 复制到另一个 DB（依赖 Redis 6.2+ 的 COPY ... DB）

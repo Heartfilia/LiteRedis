@@ -27,6 +27,7 @@ export const getSlowLog = (connID, count) => callGo('GetSlowLog', connID, count)
 export const exportKeysToFile = (connID, keys, format) => callGo('ExportKeysToFile', connID, keys, format)
 export const copyKeysToConnection = (srcConnID, dstConnID, keys, overwrite) => callGo('CopyKeysToConnection', srcConnID, dstConnID, keys, overwrite)
 export const copyKeysToDatabase = (connID, keys, dstDB, overwrite) => callGo('CopyKeysToDatabase', connID, keys, dstDB, overwrite)
+export const getDatabases = (connID) => callGo('GetDatabases', connID)
 export const executeRedisCommand = (id, command) => callGo('ExecuteRedisCommand', id, command)
 export const executeRedisCommandForce = (id, command) => callGo('ExecuteRedisCommandForce', id, command)
 

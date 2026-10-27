@@ -397,6 +397,22 @@ func (a *App) BatchRenamePrefix(connID string, keys []string, oldPrefix, newPref
 	return config.BatchKeyResult{Success: true, Affected: renamed, Failed: len(keys) - renamed}
 }
 
+// GetDatabases 返回连接的 DB 数量（集群为 1，读取失败回退 16）
+func (a *App) GetDatabases(connID string) int {
+	cfg, _, err := a.manager.GetConnectionState(connID)
+	if err != nil {
+		return 0
+	}
+	if cfg.IsCluster {
+		return 1
+	}
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return 0
+	}
+	return redisbackend.GetDatabaseCount(a.ctx, client)
+}
+
 // ExportKeysToFile 把选中的 key 导出到文件，返回实际写入路径（用户取消时为空）
 func (a *App) ExportKeysToFile(connID string, keys []string, format string) (string, error) {
 	client, err := a.manager.GetClient(connID)
@@ -419,12 +435,14 @@ func (a *App) ExportKeysToFile(connID string, keys []string, format string) (str
 		entries = append(entries, entry)
 	}
 
+	// 文件名带时间戳，连续导出两次不会互相覆盖
+	stamp := time.Now().Format("20060102-150405")
 	var content []byte
 	filters := []wailsruntime.FileFilter{}
-	defaultName := "literedis-export.json"
+	defaultName := "literedis-export-" + stamp + ".json"
 	if strings.EqualFold(format, "commands") {
 		content = []byte(redisbackend.FormatExportCommands(entries))
-		defaultName = "literedis-export.txt"
+		defaultName = "literedis-commands-" + stamp + ".txt"
 		filters = append(filters, wailsruntime.FileFilter{DisplayName: "Redis commands", Pattern: "*.txt"})
 	} else {
 		content, err = redisbackend.FormatExportJSON(entries)

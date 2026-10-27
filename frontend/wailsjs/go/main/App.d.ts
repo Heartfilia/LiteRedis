@@ -43,6 +43,8 @@ export function GetConnectionDB(arg1:string):Promise<number>;
 
 export function GetConnectionOverview(arg1:string):Promise<config.RedisConnectionOverview>;
 
+export function GetDatabases(arg1:string):Promise<number>;
+
 export function GetKeyInfo(arg1:string,arg2:string):Promise<config.RedisKey>;
 
 export function GetLocalAPIInfo():Promise<main.LocalAPIInfo>;

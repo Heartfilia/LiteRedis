@@ -82,6 +82,10 @@ export function GetConnectionOverview(arg1) {
   return window['go']['main']['App']['GetConnectionOverview'](arg1);
 }
 
+export function GetDatabases(arg1) {
+  return window['go']['main']['App']['GetDatabases'](arg1);
+}
+
 export function GetKeyInfo(arg1, arg2) {
   return window['go']['main']['App']['GetKeyInfo'](arg1, arg2);
 }

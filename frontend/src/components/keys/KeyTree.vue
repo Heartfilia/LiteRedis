@@ -118,7 +118,7 @@
           <div class="db-bar-left-inner" :class="{ 'cluster-align': activeConn?.is_cluster }">
             <template v-if="!activeConn?.is_cluster">
               <select :value="currentDB" @change="switchDB($event.target.value)" class="db-select">
-                <option v-for="i in 16" :key="i-1" :value="i-1">{{ i-1 }}</option>
+                <option v-for="i in dbCount" :key="i-1" :value="i-1">{{ i-1 }}</option>
               </select>
             </template>
             <button
@@ -213,7 +213,16 @@
             <div class="more-title">{{ t('keyTree.copyToTarget') }}</div>
             <template v-if="!isCluster">
               <div class="more-subtitle">{{ t('keyTree.copyToDb') }}</div>
-              <div class="db-grid">
+              <div v-if="dbGridMode === 'input'" class="db-input-row">
+                <input
+                  v-model="copyDbInput"
+                  class="more-input"
+                  :placeholder="t('keyTree.copyDbPlaceholder')"
+                  @keydown.enter="copyToDBInput"
+                />
+                <button class="more-btn" @click="copyToDBInput">{{ t('keyTree.confirm') }}</button>
+              </div>
+              <div v-else class="db-grid" :class="{ dense: dbGridMode === 'dense' }">
                 <button v-for="db in dbOptions" :key="'db-' + db" class="db-chip" @click="copyToDB(db)">
                   DB {{ db }}
                 </button>
@@ -236,7 +245,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -245,7 +254,7 @@ import KeySearchBar from './KeySearchBar.vue'
 import SearchTabs from './SearchTabs.vue'
 import KeyTreeNode from './KeyTreeNode.vue'
 import { buildKeyTree } from '../../utils/keyTree.js'
-import { exportKeysToFile, copyKeysToConnection, copyKeysToDatabase } from '../../api/wails.js'
+import { exportKeysToFile, copyKeysToConnection, copyKeysToDatabase, getDatabases } from '../../api/wails.js'
 
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
@@ -272,10 +281,35 @@ const copyTargets = computed(() =>
   connectionsStore.connections.filter(item => item.id !== activeConnID.value)
 )
 const isCluster = computed(() => !!activeConn.value?.is_cluster)
+// 真实 DB 数量：读不到 CONFIG 时后端回退 16
+const dbCount = ref(16)
+const copyDbInput = ref('')
 // 同实例跨 DB 复制：列出除当前库以外的 DB
 const dbOptions = computed(() => {
   const current = Number(workspaceStore.currentDB) || 0
-  return Array.from({ length: 16 }, (_, index) => index).filter(index => index !== current)
+  const total = Math.max(1, dbCount.value || 16)
+  return Array.from({ length: total }, (_, index) => index).filter(index => index !== current)
+})
+const dbGridMode = computed(() => {
+  if (dbOptions.value.length <= 20) return 'compact'
+  if (dbOptions.value.length <= 64) return 'dense'
+  return 'input'
+})
+
+async function loadDatabaseCount() {
+  if (!activeConnID.value) return
+  try {
+    const count = await getDatabases(activeConnID.value)
+    if (count > 0) dbCount.value = count
+  } catch (e) {
+    dbCount.value = 16
+  }
+}
+
+onMounted(loadDatabaseCount)
+watch(activeConnID, () => {
+  dbCount.value = 16
+  loadDatabaseCount()
 })
 
 function openMoreMenu(event) {
@@ -334,6 +368,16 @@ async function applyRename() {
   } else {
     connectionsStore.showGlobalToast(result?.message || t('keyTree.batchRenameFailed'), false)
   }
+}
+
+async function copyToDBInput() {
+  const db = Number.parseInt(String(copyDbInput.value || '').trim(), 10)
+  if (!Number.isInteger(db) || db < 0 || db >= dbCount.value) {
+    connectionsStore.showGlobalToast(t('keyTree.copyDbInvalid'), false)
+    return
+  }
+  copyDbInput.value = ''
+  await copyToDB(db)
 }
 
 async function copyToDB(db) {
@@ -946,6 +990,22 @@ function collapseVisibleTree() {
   grid-template-columns: repeat(4, 1fr);
   gap: 4px;
   padding: 4px 12px 6px;
+}
+.db-grid.dense {
+  grid-template-columns: repeat(6, 1fr);
+  max-height: 168px;
+  overflow-y: auto;
+}
+.db-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 8px;
+}
+.db-input-row .more-input {
+  width: auto;
+  flex: 1;
+  margin: 0;
 }
 .db-chip {
   height: 24px;
