@@ -822,19 +822,20 @@ function collapseVisibleTree() {
   background: transparent;
   color: #94a3b8;
   border: 1px solid rgba(203, 213, 225, 0.95);
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
+  flex-shrink: 0;
   transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
 }
 .btn-load-more svg {
-  width: 11px;
-  height: 11px;
+  width: 13px;
+  height: 13px;
   display: block;
 }
 .btn-load-more:hover:not(:disabled) {
   color: #2563eb;
   border-color: #93c5fd;
-  background: rgba(239, 246, 255, 0.9);
+  background: rgba(239, 246, 255, 0.72);
 }
 .btn-load-more.loading svg {
   opacity: 0.4;
@@ -845,19 +846,18 @@ function collapseVisibleTree() {
   50% { transform: translateY(2px); }
 }
 .btn-load-more:disabled {
-  color: #cbd5e1;
-  border-color: rgba(226, 232, 240, 0.9);
+  opacity: 0.5;
   cursor: not-allowed;
   background: transparent;
 }
 .key-tree.theme-dark .btn-load-more {
   color: #94a3b8;
-  border-color: rgba(71, 85, 105, 0.9);
+  border-color: rgba(71, 85, 105, 0.95);
 }
 .key-tree.theme-dark .btn-load-more:hover:not(:disabled) {
-  color: #bfdbfe;
-  border-color: rgba(59, 130, 246, 0.7);
-  background: rgba(30, 58, 95, 0.6);
+  color: #dbeafe;
+  border-color: rgba(96, 165, 250, 0.6);
+  background: rgba(30, 41, 59, 0.9);
 }
 .load-more-hint {
   font-size: 12px;
