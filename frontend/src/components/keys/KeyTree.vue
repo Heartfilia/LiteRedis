@@ -107,11 +107,8 @@
         <button class="batch-btn" :disabled="readOnly || !workspaceStore.selectedKeys.length" @click="batchTTL">
           {{ t('keyTree.batchTTL') }}
         </button>
-        <button class="batch-btn" :disabled="readOnly || !workspaceStore.selectedKeys.length" @click="batchRename">
-          {{ t('keyTree.batchRename') }}
-        </button>
-        <button class="batch-btn ghost" @click="workspaceStore.toggleSelectionMode()">
-          {{ t('keyTree.cancelSelection') }}
+        <button class="batch-btn" :disabled="readOnly || !workspaceStore.selectedKeys.length" @click.stop="openMoreMenu">
+          ⋯
         </button>
       </div>
 
@@ -177,11 +174,45 @@
         </div>
       </div>
     </template>
+
+    <Teleport to="body">
+      <div v-if="moreMenu.visible" class="more-menu-backdrop" @mousedown.self="closeMoreMenu">
+        <div
+          class="more-menu"
+          :class="'theme-' + (settingsStore.themeMode || 'light')"
+          :style="{ left: moreMenu.x + 'px', top: moreMenu.y + 'px' }"
+          @mousedown.stop
+          @click.stop
+        >
+          <template v-if="moreMenu.mode === 'more'">
+            <button class="more-item" @click="pickMore('rename')">{{ t('keyTree.batchRename') }}</button>
+            <button class="more-item" @click="pickMore('json')">{{ t('keyTree.exportJson') }}</button>
+            <button class="more-item" @click="pickMore('commands')">{{ t('keyTree.exportCommands') }}</button>
+            <div class="more-divider" />
+            <button class="more-item" :disabled="!copyTargets.length" @click="pickMore('copy')">
+              {{ t('keyTree.copyTo') }}
+            </button>
+            <div class="more-divider" />
+            <button class="more-item" @click="exitSelection">{{ t('keyTree.cancelSelection') }}</button>
+          </template>
+          <template v-else>
+            <div class="more-title">{{ t('keyTree.copyToTarget') }}</div>
+            <button
+              v-for="target in copyTargets"
+              :key="target.id"
+              class="more-item"
+              @click="copyTo(target)"
+            >{{ target.name || t('sidebar.unnamed') }}</button>
+            <div v-if="!copyTargets.length" class="more-empty">{{ t('keyTree.copyNoTarget') }}</div>
+          </template>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -206,6 +237,69 @@ const favoriteKeys = computed(() => workspaceStore.favoriteKeys)
 const recentKeyList = computed(() => workspaceStore.recentKeyList)
 const favoriteKeySet = computed(() => workspaceStore.favoriteKeySet)
 const readOnly = computed(() => connectionsStore.isReadOnly(activeConnID.value))
+
+// 批量操作「更多」菜单：改前缀 / 导出 / 复制到其他连接
+const moreMenu = ref({ visible: false, x: 0, y: 0, mode: 'more' })
+const copyTargets = computed(() =>
+  connectionsStore.connections.filter(item => item.id !== activeConnID.value)
+)
+
+function openMoreMenu(event) {
+  if (readOnly.value || !workspaceStore.selectedKeys.length) return
+  const rect = event.currentTarget.getBoundingClientRect()
+  moreMenu.value = { visible: true, x: rect.left, y: rect.top - 8, mode: 'more' }
+}
+
+function closeMoreMenu() {
+  moreMenu.value.visible = false
+}
+
+function exitSelection() {
+  closeMoreMenu()
+  workspaceStore.toggleSelectionMode()
+}
+
+async function pickMore(kind) {
+  if (kind === 'copy') {
+    moreMenu.value = { ...moreMenu.value, mode: 'copy' }
+    return
+  }
+  closeMoreMenu()
+  if (kind === 'rename') {
+    await batchRename()
+    return
+  }
+  await exportSelected(kind === 'commands' ? 'commands' : 'json')
+}
+
+async function exportSelected(format) {
+  const keys = [...workspaceStore.selectedKeys]
+  if (!keys.length) return
+  try {
+    const path = await exportKeysToFile(workspaceStore.activeConnID, keys, format)
+    if (!path) return
+    connectionsStore.showGlobalToast(t('keyTree.exportOk').replace('{path}', path), true)
+  } catch (e) {
+    connectionsStore.showGlobalToast(e?.message || String(e), false)
+  }
+}
+
+async function copyTo(target) {
+  closeMoreMenu()
+  const keys = [...workspaceStore.selectedKeys]
+  if (!keys.length) return
+  try {
+    const result = await copyKeysToConnection(workspaceStore.activeConnID, target.id, keys, false)
+    connectionsStore.showGlobalToast(result?.message || t('keyTree.copyFailed'), !!result?.success)
+  } catch (e) {
+    connectionsStore.showGlobalToast(e?.message || String(e), false)
+  }
+}
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeMoreMenu)
+})
+document.addEventListener('click', closeMoreMenu)
 const clusterExactOnly = computed(() => !!activeConn.value?.is_cluster && !activeConn.value?.allow_cluster_scan)
 const showClusterEmptyHint = computed(() =>
   clusterExactOnly.value &&
@@ -655,7 +749,8 @@ function collapseVisibleTree() {
 .batch-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
   padding: 7px 10px;
   margin: 0 8px 6px;
   border-radius: 10px;
@@ -712,6 +807,54 @@ function collapseVisibleTree() {
 .key-tree.theme-dark .shortcut-row:hover { background: rgba(30, 41, 59, 0.9); }
 .batch-info { flex: 1; min-width: 0; font-weight: 600; }
 .batch-readonly { font-size: 12px; }
+.more-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2400;
+  background: transparent;
+}
+.more-menu {
+  position: fixed;
+  transform: translateY(-100%);
+  min-width: 176px;
+  padding: 5px 0;
+  border-radius: 10px;
+  border: 1px solid rgba(214, 224, 236, 0.9);
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+.more-menu.theme-dark {
+  border-color: rgba(71, 85, 105, 0.92);
+  background: rgba(15, 23, 42, 0.98);
+}
+.more-item {
+  display: block;
+  width: 100%;
+  padding: 7px 14px;
+  border: none;
+  background: transparent;
+  color: #334155;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.more-item:hover:not(:disabled) { background: rgba(239, 246, 255, 0.9); }
+.more-item:disabled { opacity: 0.45; cursor: default; }
+.more-menu.theme-dark .more-item { color: #cbd5e1; }
+.more-menu.theme-dark .more-item:hover:not(:disabled) { background: rgba(30, 41, 59, 0.9); }
+.more-divider { height: 1px; margin: 4px 0; background: rgba(226, 232, 240, 0.9); }
+.more-menu.theme-dark .more-divider { background: rgba(51, 65, 85, 0.9); }
+.more-title {
+  padding: 4px 14px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+.more-empty {
+  padding: 8px 14px;
+  font-size: 11px;
+  color: #94a3b8;
+}
 .batch-btn {
   height: 24px;
   padding: 0 10px;

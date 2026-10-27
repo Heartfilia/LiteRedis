@@ -306,6 +306,19 @@ type MemoryReport struct {
 	Types      []MemoryTypeStat   `json:"types"`
 }
 
+// ExportedKey 导出的单个 key（结构化，可用于导出文件或跨实例复制）
+type ExportedKey struct {
+	Key    string            `json:"key"`
+	Type   string            `json:"type"`
+	TTL    int64             `json:"ttl"`
+	String string            `json:"string,omitempty"`
+	Hash   map[string]string `json:"hash,omitempty"`
+	List   []string          `json:"list,omitempty"`
+	Set    []string          `json:"set,omitempty"`
+	ZSet   []ZSetMember      `json:"zset,omitempty"`
+	Stream []StreamEntry     `json:"stream,omitempty"`
+}
+
 // SlowLogEntry 慢查询记录
 type SlowLogEntry struct {
 	ID         int64  `json:"id"`

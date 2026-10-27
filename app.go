@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -394,6 +395,113 @@ func (a *App) BatchRenamePrefix(connID string, keys []string, oldPrefix, newPref
 		return config.BatchKeyResult{Message: err.Error(), Affected: renamed, Failed: len(keys) - renamed}
 	}
 	return config.BatchKeyResult{Success: true, Affected: renamed, Failed: len(keys) - renamed}
+}
+
+// ExportKeysToFile 把选中的 key 导出到文件，返回实际写入路径（用户取消时为空）
+func (a *App) ExportKeysToFile(connID string, keys []string, format string) (string, error) {
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return "", err
+	}
+	if len(keys) == 0 {
+		return "", errors.New("请先选择要导出的 key")
+	}
+	if len(keys) > redisbackend.ExportMaxKeys {
+		return "", fmt.Errorf("单次最多导出 %d 个 key", redisbackend.ExportMaxKeys)
+	}
+
+	entries := make([]config.ExportedKey, 0, len(keys))
+	for _, key := range keys {
+		entry, err := redisbackend.ReadKeyForExport(a.ctx, client, key)
+		if err != nil {
+			return "", fmt.Errorf("%s: %w", key, err)
+		}
+		entries = append(entries, entry)
+	}
+
+	var content []byte
+	filters := []wailsruntime.FileFilter{}
+	defaultName := "literedis-export.json"
+	if strings.EqualFold(format, "commands") {
+		content = []byte(redisbackend.FormatExportCommands(entries))
+		defaultName = "literedis-export.txt"
+		filters = append(filters, wailsruntime.FileFilter{DisplayName: "Redis commands", Pattern: "*.txt"})
+	} else {
+		content, err = redisbackend.FormatExportJSON(entries)
+		if err != nil {
+			return "", err
+		}
+		filters = append(filters, wailsruntime.FileFilter{DisplayName: "JSON", Pattern: "*.json"})
+	}
+
+	path, err := wailsruntime.SaveFileDialog(a.ctx, wailsruntime.SaveDialogOptions{
+		Title:           "导出 Key",
+		DefaultFilename: defaultName,
+		Filters:         filters,
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil
+	}
+	if err := os.WriteFile(path, content, 0644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// CopyKeysToConnection 把 key 复制到另一个已连接的实例，保留 TTL
+func (a *App) CopyKeysToConnection(srcConnID, dstConnID string, keys []string, overwrite bool) (config.BatchKeyResult, error) {
+	if srcConnID == dstConnID {
+		return config.BatchKeyResult{Message: "源连接和目标连接相同"}, nil
+	}
+	if len(keys) == 0 {
+		return config.BatchKeyResult{Message: "请先选择要复制的 key"}, nil
+	}
+	if len(keys) > redisbackend.ExportMaxKeys {
+		return config.BatchKeyResult{Message: fmt.Sprintf("单次最多复制 %d 个 key", redisbackend.ExportMaxKeys)}, nil
+	}
+	src, err := a.manager.GetClient(srcConnID)
+	if err != nil {
+		return config.BatchKeyResult{Message: "源连接不可用: " + err.Error()}, nil
+	}
+	dst, err := a.manager.GetClient(dstConnID)
+	if err != nil {
+		return config.BatchKeyResult{Message: "目标连接未连接，请先连上再复制"}, nil
+	}
+
+	copied, skipped, failed := 0, 0, 0
+	var firstErr error
+	for _, key := range keys {
+		entry, err := redisbackend.ReadKeyForExport(a.ctx, src, key)
+		if err != nil {
+			failed++
+			if firstErr == nil {
+				firstErr = fmt.Errorf("%s: %w", key, err)
+			}
+			continue
+		}
+		written, err := redisbackend.WriteExportedKey(a.ctx, dst, entry, overwrite)
+		if err != nil {
+			failed++
+			if firstErr == nil {
+				firstErr = fmt.Errorf("%s: %w", key, err)
+			}
+			continue
+		}
+		if written {
+			copied++
+		} else {
+			skipped++
+		}
+	}
+
+	message := fmt.Sprintf("已复制 %d 个，跳过 %d 个，失败 %d 个", copied, skipped, failed)
+	if firstErr != nil {
+		message += "（首个错误: " + firstErr.Error() + "）"
+	}
+	return config.BatchKeyResult{Success: failed == 0, Affected: copied, Failed: failed, Message: message}, nil
 }
 
 // GetSlowLog 读取当前连接的慢查询记录

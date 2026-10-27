@@ -26,6 +26,10 @@ export function Connect(arg1) {
   return window['go']['main']['App']['Connect'](arg1);
 }
 
+export function CopyKeysToConnection(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CopyKeysToConnection'](arg1, arg2, arg3, arg4);
+}
+
 export function CreateKey(arg1, arg2) {
   return window['go']['main']['App']['CreateKey'](arg1, arg2);
 }
@@ -52,6 +56,10 @@ export function ExecuteRedisCommand(arg1, arg2) {
 
 export function ExecuteRedisCommandForce(arg1, arg2) {
   return window['go']['main']['App']['ExecuteRedisCommandForce'](arg1, arg2);
+}
+
+export function ExportKeysToFile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ExportKeysToFile'](arg1, arg2, arg3);
 }
 
 export function ForgetSSHHostFingerprint(arg1, arg2) {
