@@ -18,7 +18,7 @@
         {{ saving ? t('keyEditor.saving') : t('keyEditor.save') }}
       </button>
       <button
-        v-if="settingsStore.localApiEnabled"
+        v-if="settingsStore.localApiEnabled && settingsStore.debugMode"
         class="btn-action btn-extract"
         :title="t('keyEditor.browserExtract')"
         :disabled="extracting"

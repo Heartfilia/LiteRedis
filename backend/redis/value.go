@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 	"unicode/utf8"
 
 	"LiteRedis/backend/config"
@@ -76,7 +78,87 @@ func truncateUTF8Safe(s string, limit int) string {
 	return s
 }
 
-func GetValue(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings, cursor uint64, offset int, zsetSort, streamStart string) (config.KeyValue, error) {
+const (
+	// listChunkSize 一次从 Redis 读取的列表块大小，用于摊薄大 offset 的遍历成本
+	listChunkSize = 500
+	listChunkTTL  = 10 * time.Second
+	listChunkMax  = 16
+)
+
+type listChunk struct {
+	start     int64
+	items     []string
+	fetchedAt time.Time
+}
+
+var listChunkCache = struct {
+	sync.Mutex
+	entries map[string]listChunk
+}{entries: make(map[string]listChunk)}
+
+// InvalidateListChunks 列表内容变化后清掉缓存，避免翻页读到旧数据
+func InvalidateListChunks(scope, key string) {
+	if scope == "" || key == "" {
+		return
+	}
+	listChunkCache.Lock()
+	delete(listChunkCache.entries, scope+"\x00"+key)
+	listChunkCache.Unlock()
+}
+
+// readListWindow 返回 offset 起 count 条；未命中或命中过期块时按 500 条整块拉取。
+// offset 为 0（刷新首屏）时总是读最新数据。
+func readListWindow(ctx context.Context, client redis.UniversalClient, scope, key string, offset, count int64) ([]string, error) {
+	if count <= 0 {
+		count = 20
+	}
+	cacheKey := scope + "\x00" + key
+
+	if offset > 0 && scope != "" {
+		listChunkCache.Lock()
+		entry, ok := listChunkCache.entries[cacheKey]
+		listChunkCache.Unlock()
+		if ok && time.Since(entry.fetchedAt) < listChunkTTL {
+			if offset >= entry.start && offset+count <= entry.start+int64(len(entry.items)) {
+				from := offset - entry.start
+				return entry.items[from : from+count], nil
+			}
+		}
+	}
+
+	size := int64(listChunkSize)
+	if count > size {
+		size = count
+	}
+	items, err := client.LRange(ctx, key, offset, offset+size-1).Result()
+	if err != nil && err != redis.Nil {
+		return nil, err
+	}
+
+	if scope != "" {
+		listChunkCache.Lock()
+		if len(listChunkCache.entries) >= listChunkMax {
+			// 简单淘汰：丢弃最早写入的一条
+			var oldestKey string
+			var oldest time.Time
+			for k, v := range listChunkCache.entries {
+				if oldestKey == "" || v.fetchedAt.Before(oldest) {
+					oldestKey, oldest = k, v.fetchedAt
+				}
+			}
+			delete(listChunkCache.entries, oldestKey)
+		}
+		listChunkCache.entries[cacheKey] = listChunk{start: offset, items: items, fetchedAt: time.Now()}
+		listChunkCache.Unlock()
+	}
+
+	if int64(len(items)) > count {
+		return items[:count], nil
+	}
+	return items, nil
+}
+
+func GetValue(ctx context.Context, client redis.UniversalClient, key string, settings config.AppSettings, cursor uint64, offset int, zsetSort, streamStart, scope string) (config.KeyValue, error) {
 	keyInfo, err := GetKeyInfo(ctx, client, key)
 	if err != nil {
 		return config.KeyValue{}, err
@@ -146,22 +228,17 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		kv.HashVal = result
 		kv.NextCursor = cursor
 		kv.HasMore = cursor != 0
-		total, err := client.HLen(ctx, key).Result()
-		if err != nil {
-			return kv, err
-		}
-		kv.TotalCount = total
+		// 总数在 GetKeyInfo 的同一次往返里已经拿到了
+		kv.TotalCount = keyInfo.Count
 
 	case "list":
-		end := int64(offset) + listCount - 1
-		val, err := client.LRange(ctx, key, int64(offset), end).Result()
+		// LRANGE 的复杂度是 O(offset)，越往后翻越慢。
+		// 这里按整块读取并缓存，顺序翻页时只有每 500 条才会真正打一次 Redis。
+		val, err := readListWindow(ctx, client, scope, key, int64(offset), listCount)
 		if err != nil {
 			return kv, err
 		}
-		total, err := client.LLen(ctx, key).Result()
-		if err != nil {
-			return kv, err
-		}
+		total := keyInfo.Count
 		kv.ListVal = val
 		kv.NextOffset = offset + len(val)
 		kv.TotalCount = total
@@ -183,11 +260,7 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		kv.SetVal = members
 		kv.NextCursor = cursor
 		kv.HasMore = cursor != 0
-		total, err := client.SCard(ctx, key).Result()
-		if err != nil {
-			return kv, err
-		}
-		kv.TotalCount = total
+		kv.TotalCount = keyInfo.Count
 
 	case "zset":
 		end := int64(offset) + zsetCount - 1
@@ -203,10 +276,7 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		if err != nil {
 			return kv, err
 		}
-		total, err := client.ZCard(ctx, key).Result()
-		if err != nil {
-			return kv, err
-		}
+		total := keyInfo.Count
 		members := make([]config.ZSetMember, len(vals))
 		for i, z := range vals {
 			members[i] = config.ZSetMember{
@@ -224,10 +294,7 @@ func GetValue(ctx context.Context, client redis.UniversalClient, key string, set
 		if err != nil {
 			return kv, err
 		}
-		total, err := client.XLen(ctx, key).Result()
-		if err != nil {
-			return kv, err
-		}
+		total := keyInfo.Count
 		kv.StreamVal = entries
 		kv.NextStreamID = nextID
 		kv.HasMore = hasMore

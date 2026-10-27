@@ -409,7 +409,7 @@ const emit = defineEmits(['close'])
 const settingsStore = useSettingsStore()
 
 const form = reactive({
-  keyScanCount: 20,
+  keyScanCount: 200,
   hashLoadCount: 20,
   listLoadCount: 20,
   setLoadCount: 20,
@@ -425,7 +425,7 @@ const form = reactive({
   watermarkOpacity: 12,
   watermarkDensity: 3,
   language: 'zh',
-  localApiEnabled: true,
+  localApiEnabled: false,
   localApiPort: 64201,
   proxyEnabled: false,
   proxyUrl: '',
@@ -504,7 +504,7 @@ function syncFromStore() {
 }
 
 function reset() {
-  form.keyScanCount = 20
+  form.keyScanCount = 200
   form.hashLoadCount = 20
   form.listLoadCount = 20
   form.setLoadCount = 20
@@ -520,7 +520,7 @@ function reset() {
   form.watermarkOpacity = 12
   form.watermarkDensity = 3
   form.language = 'zh'
-  form.localApiEnabled = true
+  form.localApiEnabled = false
   form.localApiPort = 64201
   form.proxyEnabled = false
   form.proxyUrl = ''

@@ -56,11 +56,20 @@ func loadStore() (*ConfigStore, error) {
 	if store.Settings.KeyScanCount == 0 || store.Settings.SearchHistoryLimit == 0 {
 		store.Settings = DefaultSettings()
 	}
-	// 旧配置缺少本地 API 字段（port 未配置过为 0）：按默认开启处理；
-	// 之后用户显式关闭会持久化 enabled=false，不会再被覆盖
+	// 旧配置缺少本地 API 字段（port 未配置过为 0）：按默认关闭处理，需要用户显式开启
 	if store.Settings.LocalAPIPort == 0 {
-		store.Settings.LocalAPIEnabled = true
+		store.Settings.LocalAPIEnabled = false
 		store.Settings.LocalAPIPort = DefaultSettings().LocalAPIPort
+	}
+	// 一次性迁移（保存设置时打标，之后不再执行）：
+	// 1. 历史默认的每页 20 条提到 200
+	// 2. 本地数据提取 API 改为默认关闭，需要进开发者模式手动开启
+	if !store.Settings.ScanDefaultMigrated {
+		if store.Settings.KeyScanCount == 20 {
+			store.Settings.KeyScanCount = 200
+		}
+		store.Settings.LocalAPIEnabled = false
+		store.Settings.ScanDefaultMigrated = true
 	}
 	ensureConnectionOrder(&store)
 	return &store, nil
@@ -268,6 +277,8 @@ func SaveSettings(s AppSettings) error {
 		return err
 	}
 	defaults := DefaultSettings()
+	// 用户显式保存过设置，标记迁移完成，后续不再把 20 改成 200
+	s.ScanDefaultMigrated = true
 	// 边界保护：非法值回退到与新配置一致的默认值。
 	if s.KeyScanCount <= 0 {
 		s.KeyScanCount = defaults.KeyScanCount

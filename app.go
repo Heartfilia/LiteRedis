@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -323,6 +324,15 @@ func (a *App) GetConnectionDB(connID string) (int, error) {
 
 // errReadOnly 保护模式下拒绝写操作的统一错误
 var errReadOnly = errors.New("当前连接处于保护模式，已阻止写操作")
+
+// invalidateListCache 列表内容变化后让分页缓存失效
+func (a *App) invalidateListCache(connID, key string) {
+	_, db, err := a.manager.GetConnectionState(connID)
+	if err != nil {
+		return
+	}
+	redisbackend.InvalidateListChunks(connID+"|"+strconv.Itoa(db), key)
+}
 
 // ensureWritable 在所有写操作入口校验连接是否处于保护模式。
 // 只靠前端置灰不够可靠，后端必须兜底，避免误调用真的改到数据。
@@ -684,7 +694,9 @@ func (a *App) GetValue(connID, key string, cursor uint64, offset int, zsetSort, 
 	// 每次读取用独立超时 context，防止大 key 阻塞整个应用
 	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
 	defer cancel()
-	return redisbackend.GetValue(ctx, client, key, settings, cursor, offset, zsetSort, streamStart)
+	_, db, _ := a.manager.GetConnectionState(connID)
+	scope := connID + "|" + strconv.Itoa(db)
+	return redisbackend.GetValue(ctx, client, key, settings, cursor, offset, zsetSort, streamStart, scope)
 }
 
 // SearchValue 按 pattern 搜索 key 内成员（Hash/Set 支持 * 通配符，ZSet 使用 Redis glob，List 使用子串匹配）
@@ -768,6 +780,7 @@ func (a *App) HDel(connID, key, field string) config.OperationResult {
 
 // LPush 向 list 头部插入
 func (a *App) LPush(connID, key, value string) config.OperationResult {
+	defer a.invalidateListCache(connID, key)
 	if err := a.ensureWritable(connID); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
@@ -783,6 +796,7 @@ func (a *App) LPush(connID, key, value string) config.OperationResult {
 
 // RPush 向 list 尾部插入
 func (a *App) RPush(connID, key, value string) config.OperationResult {
+	defer a.invalidateListCache(connID, key)
 	if err := a.ensureWritable(connID); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
@@ -798,6 +812,7 @@ func (a *App) RPush(connID, key, value string) config.OperationResult {
 
 // LSet 设置 list 指定索引的值
 func (a *App) LSet(connID, key string, index int64, value string) config.OperationResult {
+	defer a.invalidateListCache(connID, key)
 	if err := a.ensureWritable(connID); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
@@ -813,6 +828,7 @@ func (a *App) LSet(connID, key string, index int64, value string) config.Operati
 
 // LRem 删除 list 中匹配的元素
 func (a *App) LRem(connID, key string, count int64, value string) config.OperationResult {
+	defer a.invalidateListCache(connID, key)
 	if err := a.ensureWritable(connID); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}

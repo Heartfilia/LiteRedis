@@ -47,7 +47,7 @@ type SSHConfig struct {
 
 // AppSettings 全局应用设置
 type AppSettings struct {
-	KeyScanCount       int64  `json:"key_scan_count"`       // 每次扫描 key 的数量，默认 20
+	KeyScanCount       int64  `json:"key_scan_count"`       // 每次扫描 key 的数量，默认 200
 	HashLoadCount      int64  `json:"hash_load_count"`      // Hash 每次加载 field 数，默认 20
 	ListLoadCount      int64  `json:"list_load_count"`      // List 每次加载条数，默认 20
 	SetLoadCount       int64  `json:"set_load_count"`       // Set 每次加载成员数，默认 20
@@ -63,8 +63,10 @@ type AppSettings struct {
 	WatermarkOpacity   int    `json:"watermark_opacity"`    // 水印透明度 0-100
 	WatermarkDensity   int    `json:"watermark_density"`    // 水印密度 1-5
 	Language           string `json:"language"`             // 界面语言，默认 zh
-	LocalAPIEnabled    bool   `json:"local_api_enabled"`    // 本地数据提取 API 服务开关，默认 true
-	LocalAPIPort       int    `json:"local_api_port"`       // 本地 API 服务端口，默认 64201，仅监听 127.0.0.1
+	LocalAPIEnabled    bool   `json:"local_api_enabled"`    // 本地数据提取 API 服务开关，默认 false
+	// ScanDefaultMigrated 记录"每页扫描数"是否已完成 20→200 的一次性迁移
+	ScanDefaultMigrated bool `json:"scan_default_migrated"`
+	LocalAPIPort        int  `json:"local_api_port"` // 本地 API 服务端口，默认 64201，仅监听 127.0.0.1
 	// 应用包更新代理：仅用于访问 GitHub 与下载安装包，不影响数据库连接
 	ProxyEnabled bool   `json:"proxy_enabled"` // 代理开关
 	ProxyURL     string `json:"proxy_url"`     // http://host:port 或 socks5://host:port
@@ -121,7 +123,7 @@ func EffectiveLocalAPIPort(configured int) int {
 // DefaultSettings 返回默认设置
 func DefaultSettings() AppSettings {
 	return AppSettings{
-		KeyScanCount:       20,
+		KeyScanCount:       200,
 		HashLoadCount:      20,
 		ListLoadCount:      20,
 		SetLoadCount:       20,
@@ -137,7 +139,7 @@ func DefaultSettings() AppSettings {
 		WatermarkOpacity:   12,
 		WatermarkDensity:   3,
 		Language:           "zh",
-		LocalAPIEnabled:    true,
+		LocalAPIEnabled:    false,
 		LocalAPIPort:       defaultLocalAPIPort,
 		ProxyEnabled:       false,
 		ProxyURL:           "",

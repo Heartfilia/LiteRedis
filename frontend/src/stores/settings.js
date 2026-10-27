@@ -16,7 +16,7 @@ export const useSettingsStore = defineStore('settings', {
     loaded: false,
     debugMode: false,
     themeMode: 'light',
-    keyScanCount: 20,
+    keyScanCount: 200,
     hashLoadCount: 20,
     listLoadCount: 20,
     setLoadCount: 20,
@@ -32,7 +32,7 @@ export const useSettingsStore = defineStore('settings', {
     watermarkOpacity: 12,
     watermarkDensity: 3,
     language: 'zh',
-    localApiEnabled: true,
+    localApiEnabled: false,
     localApiPort: 64201,
     proxyEnabled: false,
     proxyUrl: '',
@@ -82,7 +82,7 @@ export const useSettingsStore = defineStore('settings', {
         this.watermarkOpacity = s.watermark_opacity || 12
         this.watermarkDensity = s.watermark_density || 3
         this.language = s.language || 'zh'
-        this.localApiEnabled = s.local_api_enabled !== false
+        this.localApiEnabled = s.local_api_enabled === true
         this.localApiPort = s.local_api_port || 64201
         this.proxyEnabled = !!s.proxy_enabled
         this.proxyUrl = s.proxy_url || ''

@@ -365,12 +365,21 @@ func pruneClusterScanStatesLocked(now time.Time) {
 
 // GetKeyInfo 获取单个 key 的元信息
 func GetKeyInfo(ctx context.Context, client redis.UniversalClient, key string) (config.RedisKey, error) {
+	// TYPE / TTL / 各类型长度命令都是 O(1)，全部塞进一个 pipeline，
+	// 这样打开一个 key 只花一次网络往返（走 SSH/代理时差别明显）
 	pipe := client.Pipeline()
 	typeCmd := pipe.Type(ctx, key)
 	ttlCmd := pipe.TTL(ctx, key)
-	_, err := pipe.Exec(ctx)
-	if err != nil && err != redis.Nil {
-		return config.RedisKey{}, err
+	listLen := pipe.LLen(ctx, key)
+	hashLen := pipe.HLen(ctx, key)
+	setLen := pipe.SCard(ctx, key)
+	zsetLen := pipe.ZCard(ctx, key)
+	streamLen := pipe.XLen(ctx, key)
+	// 这些长度命令只有对应类型的 key 才成立，其余会返回 WRONGTYPE，
+	// 属于预期结果，只看 TYPE 本身的错误
+	_, _ = pipe.Exec(ctx)
+	if typeErr := typeCmd.Err(); typeErr != nil && typeErr != redis.Nil {
+		return config.RedisKey{}, typeErr
 	}
 
 	ttlDur := ttlCmd.Val()
@@ -385,15 +394,15 @@ func GetKeyInfo(ctx context.Context, client redis.UniversalClient, key string) (
 	var count int64
 	switch keyType {
 	case "list":
-		count, _ = client.LLen(ctx, key).Result()
+		count = listLen.Val()
 	case "hash":
-		count, _ = client.HLen(ctx, key).Result()
+		count = hashLen.Val()
 	case "set":
-		count, _ = client.SCard(ctx, key).Result()
+		count = setLen.Val()
 	case "zset":
-		count, _ = client.ZCard(ctx, key).Result()
+		count = zsetLen.Val()
 	case "stream":
-		count, _ = client.XLen(ctx, key).Result()
+		count = streamLen.Val()
 	default:
 		count = 0
 	}
