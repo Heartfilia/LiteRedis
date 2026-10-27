@@ -924,6 +924,16 @@ export const useWorkspaceStore = defineStore('workspace', {
       return order
     },
 
+    // 目标连接的缓存快照失效，下次切过去重新拉取（复制数据后避免看到旧列表）
+    invalidateConnState(id) {
+      if (!id) return
+      if (this.connStates[id]) {
+        const next = { ...this.connStates }
+        delete next[id]
+        this.connStates = next
+      }
+    },
+
     clearSelection() {
       this.selectedKeys = []
       this.selectionAnchor = null

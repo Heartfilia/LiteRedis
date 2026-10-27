@@ -235,7 +235,10 @@
               :key="target.id"
               class="more-item"
               @click="copyTo(target)"
-            >{{ target.name || t('sidebar.unnamed') }}</button>
+            >
+              {{ target.name || t('sidebar.unnamed') }}
+              <span class="target-db">[{{ targetDBs[target.id] ?? '?' }}]</span>
+            </button>
             <div v-if="!copyTargets.length" class="more-empty">{{ t('keyTree.copyNoTarget') }}</div>
           </template>
         </div>
@@ -254,7 +257,7 @@ import KeySearchBar from './KeySearchBar.vue'
 import SearchTabs from './SearchTabs.vue'
 import KeyTreeNode from './KeyTreeNode.vue'
 import { buildKeyTree } from '../../utils/keyTree.js'
-import { exportKeysToFile, copyKeysToConnection, copyKeysToDatabase, getDatabases } from '../../api/wails.js'
+import { exportKeysToFile, copyKeysToConnection, copyKeysToDatabase, getDatabases, getConnectionDB } from '../../api/wails.js'
 
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
@@ -277,6 +280,8 @@ const moreMenu = ref({ visible: false, x: 0, y: 0, mode: 'more' })
 const renamePrefix = ref('')
 const renameFrom = ref('')
 const renameInputRef = ref(null)
+// 目标实例当前所在 DB，展示成 name[db]
+const targetDBs = ref({})
 // 只列出已连接的其他实例，未连接的没法直接写数据
 const copyTargets = computed(() =>
   connectionsStore.connections.filter(
@@ -330,9 +335,24 @@ function exitSelection() {
   workspaceStore.toggleSelectionMode()
 }
 
+async function loadTargetDBs() {
+  const map = {}
+  await Promise.all(
+    copyTargets.value.map(async (target) => {
+      try {
+        map[target.id] = await getConnectionDB(target.id)
+      } catch (e) {
+        // 读不到就显示 ?，不影响复制
+      }
+    })
+  )
+  targetDBs.value = map
+}
+
 async function pickMore(kind) {
   if (kind === 'copy') {
     moreMenu.value = { ...moreMenu.value, mode: 'copy' }
+    loadTargetDBs()
     return
   }
   if (kind === 'rename') {
@@ -413,6 +433,10 @@ async function copyTo(target) {
   if (!keys.length) return
   try {
     const result = await copyKeysToConnection(workspaceStore.activeConnID, target.id, keys, false)
+    if (result?.success) {
+      // 目标连接的缓存里没有新数据，切过去时重新加载
+      workspaceStore.invalidateConnState(target.id)
+    }
     connectionsStore.showGlobalToast(result?.message || t('keyTree.copyFailed'), !!result?.success)
   } catch (e) {
     connectionsStore.showGlobalToast(e?.message || String(e), false)
@@ -1025,6 +1049,12 @@ function collapseVisibleTree() {
   background: rgba(15, 23, 42, 0.9);
   color: #e2e8f0;
 }
+.target-db {
+  margin-left: 4px;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+.more-menu.theme-dark .target-db { color: #64748b; }
 .more-menu.theme-dark .db-chip {
   border-color: rgba(71, 85, 105, 0.9);
   background: rgba(30, 41, 59, 0.9);
