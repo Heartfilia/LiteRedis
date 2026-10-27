@@ -370,10 +370,8 @@ async function moveToGroup(conn, targetGroup) {
 
 async function moveToNewGroup(conn) {
   closeCtxMenu()
-  const name = prompt(t('connManager.newGroupPrompt'))
-  if (name && name.trim()) {
-    await connectionsStore.save(buildCfg(conn, name.trim()))
-  }
+  // WebView 不支持原生 prompt，直接打开编辑表单，在分组输入框里填新分组
+  openEdit(conn)
 }
 
 async function deleteConn(conn) {

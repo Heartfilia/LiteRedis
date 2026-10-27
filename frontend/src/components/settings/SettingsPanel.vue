@@ -335,8 +335,8 @@
               <button type="button" class="local-api-btn" @click="copyToken">
                 {{ tokenCopied ? t('settings.localApiCopied') : t('settings.localApiCopyToken') }}
               </button>
-              <button type="button" class="local-api-btn" @click="regenerateToken">
-                {{ t('settings.localApiRegenerate') }}
+              <button type="button" class="local-api-btn" :class="{ danger: regenConfirming }" @click="regenerateToken">
+                {{ regenConfirming ? t('settings.localApiRegenConfirmShort') : t('settings.localApiRegenerate') }}
               </button>
             </span>
           </div>
@@ -471,6 +471,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  if (regenTimer) clearTimeout(regenTimer)
   EventsOff('update:progress')
   requestGuard.invalidateAll()
   if (titleTapTimer) clearTimeout(titleTapTimer)
@@ -699,8 +700,19 @@ async function copyToken() {
   }, 1500)
 }
 
+// WebView 不支持原生 confirm，改成按钮二次点击确认
+const regenConfirming = ref(false)
+let regenTimer = null
+
 async function regenerateToken() {
-  if (!confirm(t('settings.localApiRegenConfirm'))) return
+  if (!regenConfirming.value) {
+    regenConfirming.value = true
+    if (regenTimer) clearTimeout(regenTimer)
+    regenTimer = setTimeout(() => { regenConfirming.value = false }, 4000)
+    return
+  }
+  regenConfirming.value = false
+  if (regenTimer) clearTimeout(regenTimer)
   const result = await regenerateLocalAPIToken()
   if (!result.success) {
     ok.value = false

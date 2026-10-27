@@ -101,10 +101,10 @@
       <div v-if="workspaceStore.selectionMode" class="batch-bar">
         <span class="batch-info">{{ t('keyTree.selectedCount').replace('{n}', workspaceStore.selectedKeys.length) }}</span>
         <span v-if="readOnly" class="batch-readonly">🔒</span>
-        <button class="batch-btn" :disabled="readOnly || !workspaceStore.selectedKeys.length" @click="batchDelete">
+        <button class="batch-btn" :disabled="readOnly || !workspaceStore.selectedKeys.length" @click.stop="openBatchDelete">
           {{ t('keyTree.batchDelete') }}
         </button>
-        <button class="batch-btn" :disabled="readOnly || !workspaceStore.selectedKeys.length" @click="batchTTL">
+        <button class="batch-btn" :disabled="readOnly || !workspaceStore.selectedKeys.length" @click.stop="openBatchTTL">
           {{ t('keyTree.batchTTL') }}
         </button>
         <button class="batch-btn" :disabled="readOnly || !workspaceStore.selectedKeys.length" @click.stop="openMoreMenu">
@@ -208,6 +208,28 @@
             <div class="more-divider" />
             <button class="more-item" @click="exitSelection">{{ t('keyTree.cancelSelection') }}</button>
           </template>
+          <template v-else-if="moreMenu.mode === 'confirmDelete'">
+            <div class="more-title">
+              {{ t('keyTree.batchDeleteConfirm').replace('{n}', workspaceStore.selectedKeys.length) }}
+            </div>
+            <div class="more-actions">
+              <button class="more-btn danger" @click="confirmBatchDelete">{{ t('keyTree.batchDelete') }}</button>
+              <button class="more-btn ghost" @click="closeMoreMenu">{{ t('keyTree.cancelSelection') }}</button>
+            </div>
+          </template>
+          <template v-else-if="moreMenu.mode === 'ttl'">
+            <div class="more-title">{{ t('keyTree.batchTTLTitle') }}</div>
+            <input
+              v-model="ttlInput"
+              class="more-input"
+              inputmode="numeric"
+              @keydown.enter="applyBatchTTL"
+            />
+            <div class="more-actions">
+              <button class="more-btn" @click="applyBatchTTL">{{ t('keyTree.confirm') }}</button>
+              <button class="more-btn ghost" @click="closeMoreMenu">{{ t('keyTree.cancelSelection') }}</button>
+            </div>
+          </template>
           <template v-else-if="moreMenu.mode === 'rename'">
             <div class="more-title">{{ t('keyTree.batchRenameTitle').replace('{prefix}', renameFrom) }}</div>
             <input
@@ -294,6 +316,7 @@ const moreMenu = ref({ visible: false, x: 0, y: 0, mode: 'more' })
 const renamePrefix = ref('')
 const renameFrom = ref('')
 const renameInputRef = ref(null)
+const ttlInput = ref('3600')
 // 目标实例当前所在 DB，展示成 name[db]
 const targetDBs = ref({})
 // 只列出已连接的其他实例，未连接的没法直接写数据
@@ -497,28 +520,44 @@ const showBottomLoadMore = computed(() =>
   !!session.value?.hasMore
 )
 
-async function batchDelete() {
+// 删除 / TTL 都走菜单内的二次确认，不用浏览器原生 confirm/prompt（WebView 里不可用）
+function openBatchDelete(event) {
+  if (!workspaceStore.selectedKeys.length) return
+  const rect = event.currentTarget.getBoundingClientRect()
+  moreMenu.value = { visible: true, x: rect.left, y: rect.top - 8, mode: 'confirmDelete' }
+}
+
+function openBatchTTL(event) {
+  if (!workspaceStore.selectedKeys.length) return
+  const rect = event.currentTarget.getBoundingClientRect()
+  ttlInput.value = '3600'
+  moreMenu.value = { visible: true, x: rect.left, y: rect.top - 8, mode: 'ttl' }
+}
+
+async function confirmBatchDelete() {
   const count = workspaceStore.selectedKeys.length
+  closeMoreMenu()
   if (!count) return
-  if (!window.confirm(t('keyTree.batchDeleteConfirm').replace('{n}', count))) return
   const result = await workspaceStore.batchDeleteSelected()
   if (result?.success) {
     connectionsStore.showGlobalToast(t('keyTree.batchDeleteOk').replace('{n}', result.affected), true)
+  } else {
+    connectionsStore.showGlobalToast(result?.message || t('keyTree.batchDelete'), false)
   }
 }
 
-async function batchTTL() {
-  if (!workspaceStore.selectedKeys.length) return
-  const input = window.prompt(t('keyTree.batchTTLPrompt'), '3600')
-  if (input === null) return
-  const ttl = Number(String(input).trim())
+async function applyBatchTTL() {
+  const ttl = Number(String(ttlInput.value || '').trim())
   if (!Number.isFinite(ttl) || ttl === 0 || ttl < -1) {
     connectionsStore.showGlobalToast(t('keyTree.batchTTLInvalid'), false)
     return
   }
+  closeMoreMenu()
   const result = await workspaceStore.batchSetTTLSelected(Math.trunc(ttl))
   if (result?.success) {
     connectionsStore.showGlobalToast(t('keyTree.batchTTLOk').replace('{n}', result.affected), true)
+  } else {
+    connectionsStore.showGlobalToast(result?.message || t('keyTree.batchTTL'), false)
   }
 }
 
@@ -1042,6 +1081,16 @@ function collapseVisibleTree() {
 }
 .more-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18); }
 .more-actions { display: flex; gap: 8px; padding: 2px 14px 8px; }
+.more-btn.danger {
+  border-color: rgba(248, 113, 113, 0.9);
+  background: rgba(254, 226, 226, 0.9);
+  color: #b91c1c;
+}
+.more-menu.theme-dark .more-btn.danger {
+  border-color: rgba(185, 28, 28, 0.7);
+  background: rgba(127, 29, 29, 0.5);
+  color: #fecaca;
+}
 .more-btn {
   height: 26px;
   padding: 0 12px;
