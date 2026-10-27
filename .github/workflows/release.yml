@@ -10,10 +10,52 @@ permissions:
 
 jobs:
   # ─────────────────────────────────────────
+  # 发版前必须先通过测试，避免发出编译/tests 失败的包
+  # ─────────────────────────────────────────
+  test:
+    name: Vet and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.5'
+          cache: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Go vet
+        run: CGO_ENABLED=0 go vet ./...
+
+      - name: Go build
+        run: CGO_ENABLED=0 go build ./...
+
+      - name: Go test
+        run: CGO_ENABLED=0 go test -count=1 -timeout 300s ./...
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: frontend
+
+      - name: Frontend build
+        run: npm run build
+        working-directory: frontend
+
+      - name: Frontend unit tests
+        run: node --test src/utils/*.test.js src/stores/*.test.js
+        working-directory: frontend
+
+  # ─────────────────────────────────────────
   # macOS ARM64 (Apple Silicon)
   # ─────────────────────────────────────────
   build-macos-arm64:
     name: Build macOS (Apple Silicon)
+    needs: test
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,6 +102,7 @@ jobs:
   # ─────────────────────────────────────────
   build-linux-amd64:
     name: Build Linux (x86_64)
+    needs: test
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -105,6 +148,7 @@ jobs:
   # ─────────────────────────────────────────
   build-windows:
     name: Build Windows (x64)
+    needs: test
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

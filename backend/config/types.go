@@ -306,6 +306,17 @@ type MemoryReport struct {
 	Types      []MemoryTypeStat   `json:"types"`
 }
 
+// SlowLogEntry 慢查询记录
+type SlowLogEntry struct {
+	ID         int64  `json:"id"`
+	Timestamp  int64  `json:"timestamp"`
+	DurationUs int64  `json:"duration_us"`
+	Command    string `json:"command"`
+	ClientAddr string `json:"client_addr,omitempty"`
+	ClientName string `json:"client_name,omitempty"`
+	Node       string `json:"node,omitempty"`
+}
+
 // BatchKeyResult 批量操作结果
 type BatchKeyResult struct {
 	Success  bool   `json:"success"`

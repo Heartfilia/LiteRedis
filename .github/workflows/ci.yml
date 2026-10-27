@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Vet, test and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.5'
+          cache: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Go vet
+        run: CGO_ENABLED=0 go vet ./...
+
+      # 后端逻辑与 Go 编译都不需要 GTK/WebKit，关掉 CGO 可以在裸 ubuntu 上跑
+      - name: Go build
+        run: CGO_ENABLED=0 go build ./...
+
+      - name: Go test
+        run: CGO_ENABLED=0 go test -count=1 -timeout 300s ./...
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: frontend
+
+      - name: Frontend build
+        run: npm run build
+        working-directory: frontend
+
+      - name: Frontend unit tests
+        run: node --test src/utils/*.test.js src/stores/*.test.js
+        working-directory: frontend

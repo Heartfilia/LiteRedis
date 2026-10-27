@@ -82,6 +82,10 @@ export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
 
+export function GetSlowLog(arg1, arg2) {
+  return window['go']['main']['App']['GetSlowLog'](arg1, arg2);
+}
+
 export function GetValue(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['GetValue'](arg1, arg2, arg3, arg4, arg5, arg6);
 }

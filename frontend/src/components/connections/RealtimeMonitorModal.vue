@@ -21,7 +21,41 @@
           </div>
         </header>
 
-        <div class="monitor-body">
+        <div class="monitor-tabs">
+          <button class="monitor-tab" :class="{ active: tab === 'metrics' }" @click="switchTab('metrics')">
+            {{ t('monitor.tabMetrics') }}
+          </button>
+          <button class="monitor-tab" :class="{ active: tab === 'slowlog' }" @click="switchTab('slowlog')">
+            {{ t('monitor.tabSlowlog') }}
+          </button>
+        </div>
+
+        <div v-if="tab === 'slowlog'" class="monitor-body">
+          <div class="slowlog-head">
+            <span class="slowlog-hint">{{ t('monitor.slowlogHint') }}</span>
+            <button class="slowlog-refresh" :disabled="slowlogLoading" @click="loadSlowlog">
+              {{ slowlogLoading ? t('monitor.sampling') : t('monitor.refresh') }}
+            </button>
+          </div>
+          <div v-if="slowlogError" class="monitor-note error">⚠ {{ slowlogError }}</div>
+          <div v-else-if="!slowlog.length" class="slowlog-empty">{{ t('monitor.slowlogEmpty') }}</div>
+          <div v-else class="slowlog-list">
+            <div
+              v-for="entry in slowlog"
+              :key="entry.id + '-' + (entry.node || '')"
+              class="slowlog-row"
+              :title="t('monitor.jumpToKey')"
+              @click="jumpToKey(entry)"
+            >
+              <span class="slowlog-time">{{ formatTime(entry.timestamp) }}</span>
+              <span class="slowlog-duration">{{ (entry.duration_us / 1000).toFixed(1) }} ms</span>
+              <span class="slowlog-command">{{ entry.command }}</span>
+              <span class="slowlog-client">{{ entry.client_addr || '-' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="monitor-body">
           <div v-if="error" class="monitor-note error">
             ⚠ {{ error }}
             <button v-if="stopped" class="monitor-retry" @click="retry">{{ t('monitor.retry') }}</button>
@@ -98,7 +132,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
-import { getConnectionOverview } from '../../api/wails.js'
+import { getConnectionOverview, getSlowLog } from '../../api/wails.js'
+import { useWorkspaceStore } from '../../stores/workspace.js'
 import { formatBytes, formatCount } from '../../utils/format.js'
 
 const MAX_SAMPLES = 60
@@ -110,6 +145,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const settingsStore = useSettingsStore()
+const workspaceStore = useWorkspaceStore()
 const { t } = useI18n()
 
 const themeMode = computed(() => settingsStore.themeMode || 'light')
@@ -118,6 +154,10 @@ const samples = ref([])
 const error = ref('')
 const paused = ref(false)
 const stopped = ref(false)
+const tab = ref('metrics')
+const slowlog = ref([])
+const slowlogLoading = ref(false)
+const slowlogError = ref('')
 const intervalMs = ref(5000)
 const isCluster = ref(false)
 let timer = null
@@ -201,6 +241,43 @@ async function poll() {
   }
 }
 
+async function switchTab(next) {
+  if (tab.value === next) return
+  tab.value = next
+  stopTimer()
+  if (next === 'slowlog') {
+    await loadSlowlog()
+    return
+  }
+  if (!paused.value && !stopped.value) poll()
+}
+
+async function loadSlowlog() {
+  slowlogLoading.value = true
+  slowlogError.value = ''
+  try {
+    slowlog.value = await getSlowLog(props.connId, 64)
+  } catch (e) {
+    slowlogError.value = e?.message || String(e)
+  } finally {
+    slowlogLoading.value = false
+  }
+}
+
+function formatTime(timestamp) {
+  if (!timestamp) return '-'
+  return new Date(timestamp * 1000).toLocaleTimeString()
+}
+
+// 慢查询里绝大多数命令的第二段就是 key，点了直接跳到编辑器
+function jumpToKey(entry) {
+  const parts = String(entry?.command || '').trim().split(/\s+/)
+  const key = parts.length > 1 ? parts[1] : ''
+  if (!key) return
+  emit('close')
+  workspaceStore.selectKey(key)
+}
+
 function retry() {
   stopped.value = false
   failures = 0
@@ -209,7 +286,8 @@ function retry() {
 }
 
 function schedule() {
-  if (disposed || paused.value || stopped.value) return
+  // 切到慢查询页时暂停指标采样，减少无谓的 INFO 请求
+  if (disposed || paused.value || stopped.value || tab.value !== 'metrics') return
   if (timer) clearTimeout(timer)
   timer = setTimeout(poll, intervalMs.value)
 }
@@ -336,6 +414,97 @@ onBeforeUnmount(() => {
   color: #475569;
 }
 
+.monitor-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 18px 12px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.96);
+}
+.monitor-tab {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  cursor: pointer;
+}
+.monitor-tab:hover { background: rgba(241, 245, 249, 0.9); }
+.monitor-tab.active {
+  background: rgba(219, 234, 254, 0.75);
+  border-color: rgba(147, 197, 253, 0.9);
+  color: #1d4ed8;
+  font-weight: 600;
+}
+.slowlog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.slowlog-hint { font-size: 11px; color: #94a3b8; }
+.slowlog-refresh {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  background: #fff;
+  color: #475569;
+  font-size: 11px;
+  cursor: pointer;
+}
+.slowlog-refresh:disabled { opacity: 0.6; cursor: default; }
+.slowlog-empty {
+  padding: 48px 0;
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+}
+.slowlog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.slowlog-row {
+  display: grid;
+  grid-template-columns: 74px 72px minmax(0, 1fr) 130px;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #334155;
+}
+.slowlog-row:hover { background: rgba(239, 246, 255, 0.9); }
+.slowlog-time { color: #64748b; font-variant-numeric: tabular-nums; }
+.slowlog-duration { color: #dc2626; font-weight: 600; font-variant-numeric: tabular-nums; }
+.slowlog-command {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.slowlog-client { color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.monitor-backdrop.theme-dark .monitor-tabs { border-bottom-color: rgba(51, 65, 85, 0.94); }
+.monitor-backdrop.theme-dark .monitor-tab { color: #94a3b8; }
+.monitor-backdrop.theme-dark .monitor-tab:hover { background: rgba(30, 41, 59, 0.9); }
+.monitor-backdrop.theme-dark .monitor-tab.active {
+  background: rgba(30, 58, 95, 0.7);
+  border-color: rgba(59, 130, 246, 0.6);
+  color: #bfdbfe;
+}
+.monitor-backdrop.theme-dark .slowlog-row { color: #cbd5e1; }
+.monitor-backdrop.theme-dark .slowlog-row:hover { background: rgba(30, 41, 59, 0.9); }
+.monitor-backdrop.theme-dark .slowlog-refresh {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(30, 41, 59, 0.7);
+  color: #cbd5e1;
+}
 .monitor-body {
   flex: 1;
   min-height: 0;

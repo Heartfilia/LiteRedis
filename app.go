@@ -396,6 +396,15 @@ func (a *App) BatchRenamePrefix(connID string, keys []string, oldPrefix, newPref
 	return config.BatchKeyResult{Success: true, Affected: renamed, Failed: len(keys) - renamed}
 }
 
+// GetSlowLog 读取当前连接的慢查询记录
+func (a *App) GetSlowLog(connID string, count int) ([]config.SlowLogEntry, error) {
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return nil, err
+	}
+	return redisbackend.GetSlowLog(a.ctx, client, int64(count))
+}
+
 // ScanMemoryReport 对流式扫描 key 并生成内存体检报告
 func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (config.MemoryReport, error) {
 	client, err := a.manager.GetClient(connID)
