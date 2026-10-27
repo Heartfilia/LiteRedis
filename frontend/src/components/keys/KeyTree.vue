@@ -189,7 +189,7 @@
             <button class="more-item" @click="pickMore('json')">{{ t('keyTree.exportJson') }}</button>
             <button class="more-item" @click="pickMore('commands')">{{ t('keyTree.exportCommands') }}</button>
             <div class="more-divider" />
-            <button class="more-item" :disabled="!copyTargets.length" @click="pickMore('copy')">
+            <button class="more-item" @click="pickMore('copy')">
               {{ t('keyTree.copyTo') }}
             </button>
             <div class="more-divider" />
@@ -277,8 +277,11 @@ const moreMenu = ref({ visible: false, x: 0, y: 0, mode: 'more' })
 const renamePrefix = ref('')
 const renameFrom = ref('')
 const renameInputRef = ref(null)
+// 只列出已连接的其他实例，未连接的没法直接写数据
 const copyTargets = computed(() =>
-  connectionsStore.connections.filter(item => item.id !== activeConnID.value)
+  connectionsStore.connections.filter(
+    item => item.id !== activeConnID.value && connectionsStore.isConnected(item.id)
+  )
 )
 const isCluster = computed(() => !!activeConn.value?.is_cluster)
 // 真实 DB 数量：读不到 CONFIG 时后端回退 16
