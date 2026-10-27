@@ -3,8 +3,18 @@
     <FloatingMessage :message="msg" :success="ok" />
     <div class="toolbar">
       <span class="count">{{ entries.length }} / {{ totalEntries }} {{ t('settings.unitItem') }}</span>
-      <button v-if="hasMore" class="btn-load-more" :disabled="valueLoading" @click="loadMore">
-        {{ valueLoading ? '...' : t('keyTree.loadMore') }}
+      <button
+        v-if="hasMore"
+        class="btn-load-more"
+        :class="{ loading: valueLoading }"
+        :title="t('keyTree.loadMore')"
+        :disabled="valueLoading"
+        @click="loadMore"
+      >
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3.6 4.8 8 9.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3.6 8.8 8 13.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </button>
     </div>
     <div class="stream-wrap">

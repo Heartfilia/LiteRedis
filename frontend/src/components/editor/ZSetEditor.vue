@@ -90,10 +90,15 @@
       <button
         v-if="(searchResults === null && hasMore) || (searchResults !== null && searchHasMore)"
         class="btn-load-more"
+        :class="{ loading: valueLoading }"
+        :title="t('keyTree.loadMore')"
         :disabled="valueLoading"
         @click="loadMore"
       >
-        {{ valueLoading ? '...' : t('keyTree.loadMore') }}
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3.6 4.8 8 9.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3.6 8.8 8 13.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </button>
       <span
         v-else-if="searchResults === null ? (!hasMore && totalMembers > 0) : (!searchHasMore && searchResults.length > 0)"
@@ -760,36 +765,6 @@ async function copyMember(member) {
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95));
   flex-shrink: 0;
   box-sizing: border-box;
-}
-.btn-load-more {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 24px;
-  min-height: 24px;
-  padding: 0 10px;
-  background: linear-gradient(180deg, #ffffff, #f8fafc);
-  color: #3b82f6;
-  border: 1px solid rgba(191, 219, 254, 0.92);
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 10px rgba(191, 219, 254, 0.18);
-  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
-}
-.btn-load-more:hover:not(:disabled) {
-  background: linear-gradient(180deg, #f8fbff, #f1f5f9);
-  border-color: #60a5fa;
-  box-shadow: 0 6px 14px rgba(147, 197, 253, 0.2);
-  transform: translateY(-1px);
-}
-.btn-load-more:disabled {
-  color: #9ca3af;
-  border-color: #d1d5db;
-  cursor: not-allowed;
-  background: #f9fafb;
-  box-shadow: none;
 }
 .load-more-hint {
   font-size: 11px;

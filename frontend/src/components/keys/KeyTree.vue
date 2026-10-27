@@ -72,10 +72,15 @@
                 <button
                   v-if="sess.hasMore"
                   class="btn-load-more"
+                  :class="{ loading: sess.loading }"
+                  :title="t('keyTree.loadMore')"
                   :disabled="sess.loading"
                   @click="workspaceStore.loadMoreKeys(sess.id)"
                 >
-                  {{ sess.loading ? '...' : t('keyTree.loadMore') }}
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M3.6 4.8 8 9.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M3.6 8.8 8 13.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
                 </button>
               </div>
             </div>
@@ -176,10 +181,15 @@
           <button
             v-if="showBottomLoadMore"
             class="btn-load-more"
+            :class="{ loading: session?.loading }"
+            :title="t('keyTree.loadMore')"
             :disabled="session?.loading"
             @click="workspaceStore.loadMoreKeys(session.id)"
           >
-            {{ session?.loading ? '...' : t('keyTree.loadMore') }}
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M3.6 4.8 8 9.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M3.6 8.8 8 13.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
           </button>
         </div>
         <div class="db-bar-side db-bar-right">
@@ -798,35 +808,54 @@ function collapseVisibleTree() {
   flex-shrink: 0;
 }
 
+/* 加载更多：与同栏图标按钮一致的方形小按钮 */
 .btn-load-more {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 24px;
-  height: 24px;
-  padding: 0 10px;
-  background: linear-gradient(180deg, #ffffff, #f8fafc);
-  color: #3b82f6;
-  border: 1px solid rgba(191, 219, 254, 0.92);
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 600;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 6px;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(191, 219, 254, 0.18);
-  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+.btn-load-more svg {
+  width: 13px;
+  height: 13px;
+  display: block;
 }
 .btn-load-more:hover:not(:disabled) {
-  background: linear-gradient(180deg, #f8fbff, #f1f5f9);
-  border-color: #60a5fa;
-  box-shadow: 0 6px 14px rgba(147, 197, 253, 0.2);
-  transform: translateY(-1px);
+  color: #2563eb;
+  border-color: #93c5fd;
+  background: rgba(239, 246, 255, 0.9);
+}
+.btn-load-more.loading svg {
+  opacity: 0.4;
+  animation: load-more-pulse 1s ease-in-out infinite;
+}
+@keyframes load-more-pulse {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
 }
 .btn-load-more:disabled {
-  color: #9ca3af;
-  border-color: #d1d5db;
+  color: #cbd5e1;
+  border-color: rgba(226, 232, 240, 0.9);
   cursor: not-allowed;
-  background: #f8fafc;
-  box-shadow: none;
+  background: transparent;
+}
+.key-tree.theme-dark .btn-load-more {
+  color: #94a3b8;
+  border-color: rgba(71, 85, 105, 0.9);
+}
+.key-tree.theme-dark .btn-load-more:hover:not(:disabled) {
+  color: #bfdbfe;
+  border-color: rgba(59, 130, 246, 0.7);
+  background: rgba(30, 58, 95, 0.6);
 }
 .load-more-hint {
   font-size: 12px;
