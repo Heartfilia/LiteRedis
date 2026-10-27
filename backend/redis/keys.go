@@ -414,21 +414,109 @@ func DeleteKey(ctx context.Context, client redis.UniversalClient, key string) er
 // batchKeyChunk 批量操作的单个分片大小，避免一次命令参数过多
 const batchKeyChunk = 200
 
-// DeleteKeys 批量删除 key，返回实际删除数量
+// DeleteKeys 批量删除 key，返回实际删除数量。
+// 优先用 UNLINK（非阻塞），老版本 Redis（<4.0）不支持时回退到 DEL。
 func DeleteKeys(ctx context.Context, client redis.UniversalClient, keys []string) (int, error) {
 	total := 0
+	useDel := false
 	for start := 0; start < len(keys); start += batchKeyChunk {
 		end := start + batchKeyChunk
 		if end > len(keys) {
 			end = len(keys)
 		}
-		deleted, err := client.Unlink(ctx, keys[start:end]...).Result()
+		chunk := keys[start:end]
+		var (
+			deleted int64
+			err     error
+		)
+		if useDel {
+			deleted, err = client.Del(ctx, chunk...).Result()
+		} else {
+			deleted, err = client.Unlink(ctx, chunk...).Result()
+			if err != nil && isUnknownCommandError(err) {
+				// 老版本 Redis 没有 UNLINK，后续分片直接用 DEL
+				useDel = true
+				deleted, err = client.Del(ctx, chunk...).Result()
+			}
+		}
 		if err != nil {
 			return total, err
 		}
 		total += int(deleted)
 	}
 	return total, nil
+}
+
+// isUnknownCommandError 识别 "ERR unknown command" 这类老版本不支持的错误
+func isUnknownCommandError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "unknown command") || strings.Contains(message, "not supported")
+}
+
+// RenameKeysPrefix 把选中的 key 从 oldPrefix 替换成 newPrefix，
+// 目标 key 已存在时跳过，避免静默覆盖别处数据。返回实际改名数量。
+func RenameKeysPrefix(ctx context.Context, client redis.UniversalClient, keys []string, oldPrefix, newPrefix string) (int, error) {
+	if oldPrefix == "" {
+		return 0, errors.New("旧前缀不能为空")
+	}
+	type renamePair struct {
+		from string
+		to   string
+	}
+	pending := make([]renamePair, 0, len(keys))
+	for _, key := range keys {
+		if !strings.HasPrefix(key, oldPrefix) {
+			continue
+		}
+		pending = append(pending, renamePair{from: key, to: newPrefix + strings.TrimPrefix(key, oldPrefix)})
+	}
+	if len(pending) == 0 {
+		return 0, nil
+	}
+
+	renamed := 0
+	for start := 0; start < len(pending); start += batchKeyChunk {
+		end := start + batchKeyChunk
+		if end > len(pending) {
+			end = len(pending)
+		}
+		chunk := pending[start:end]
+
+		check := client.Pipeline()
+		existsCmds := make([]*redis.IntCmd, len(chunk))
+		for i, pair := range chunk {
+			existsCmds[i] = check.Exists(ctx, pair.to)
+		}
+		if _, err := check.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
+			return renamed, err
+		}
+
+		rename := client.Pipeline()
+		renameCmds := make([]*redis.StatusCmd, len(chunk))
+		targets := 0
+		for i, pair := range chunk {
+			if exists, err := existsCmds[i].Result(); err == nil && exists > 0 {
+				continue
+			}
+			renameCmds[i] = rename.Rename(ctx, pair.from, pair.to)
+			targets++
+		}
+		if targets == 0 {
+			continue
+		}
+		if _, err := rename.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
+			return renamed, err
+		}
+		for _, cmd := range renameCmds {
+			if cmd != nil && cmd.Err() == nil {
+				renamed++
+			}
+		}
+	}
+	return renamed, nil
 }
 
 // SetKeysTTL 批量设置过期时间；ttlSec < 0 表示移除过期时间（PERSIST）

@@ -5,6 +5,8 @@ import {main} from '../models';
 
 export function BatchDeleteKeys(arg1:string,arg2:Array<string>):Promise<config.BatchKeyResult>;
 
+export function BatchRenamePrefix(arg1:string,arg2:Array<string>,arg3:string,arg4:string):Promise<config.BatchKeyResult>;
+
 export function BatchSetKeysTTL(arg1:string,arg2:Array<string>,arg3:number):Promise<config.BatchKeyResult>;
 
 export function CancelMemoryScan():Promise<config.OperationResult>;

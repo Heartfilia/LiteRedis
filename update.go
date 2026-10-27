@@ -356,11 +356,9 @@ func describeGitHubError(resp *http.Response) error {
 			if ts, err := strconv.ParseInt(strings.TrimSpace(resp.Header.Get("X-RateLimit-Reset")), 10, 64); err == nil && ts > 0 {
 				reset = "，约 " + time.Unix(ts, 0).Format("15:04") + " 恢复"
 			}
-			hint := ""
-			if proxy != "" {
-				hint = "。这是代理出口 IP 的配额，换节点或临时关闭代理直连都可以重试"
-			}
-			return fmt.Errorf("GitHub API 配额已用尽（未认证请求每个 IP 每小时 60 次%s）%s%s", reset, viaProxy, hint)
+			// 细节留给调试日志，界面只给一句可执行的提示
+			config.AppendDebugLog("[update] github rate limited remaining=0 proxy=%s", proxy)
+			return fmt.Errorf("GitHub 接口触发了 IP 访问限制，请等待约 1 小时后重试%s", reset)
 		}
 		// 没有配额耗尽标记的 403：多半是代理/出口 IP 被拦
 		message := "GitHub 返回 403，通常是代理出口 IP 被限制或代理屏蔽了 api.github.com" + viaProxy

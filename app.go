@@ -346,6 +346,22 @@ func (a *App) BatchSetKeysTTL(connID string, keys []string, ttlSec int64) config
 	return config.BatchKeyResult{Success: true, Affected: affected, Failed: len(keys) - affected}
 }
 
+// BatchRenamePrefix 批量替换选中 key 的前缀
+func (a *App) BatchRenamePrefix(connID string, keys []string, oldPrefix, newPrefix string) config.BatchKeyResult {
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error()}
+	}
+	if len(keys) == 0 || strings.TrimSpace(oldPrefix) == "" {
+		return config.BatchKeyResult{Success: true}
+	}
+	renamed, err := redisbackend.RenameKeysPrefix(a.ctx, client, keys, oldPrefix, newPrefix)
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error(), Affected: renamed, Failed: len(keys) - renamed}
+	}
+	return config.BatchKeyResult{Success: true, Affected: renamed, Failed: len(keys) - renamed}
+}
+
 // ScanMemoryReport 对流式扫描 key 并生成内存体检报告
 func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (config.MemoryReport, error) {
 	client, err := a.manager.GetClient(connID)

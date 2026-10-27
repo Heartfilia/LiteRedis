@@ -6,6 +6,10 @@ export function BatchDeleteKeys(arg1, arg2) {
   return window['go']['main']['App']['BatchDeleteKeys'](arg1, arg2);
 }
 
+export function BatchRenamePrefix(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['BatchRenamePrefix'](arg1, arg2, arg3, arg4);
+}
+
 export function BatchSetKeysTTL(arg1, arg2, arg3) {
   return window['go']['main']['App']['BatchSetKeysTTL'](arg1, arg2, arg3);
 }

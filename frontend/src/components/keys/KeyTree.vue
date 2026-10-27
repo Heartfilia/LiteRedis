@@ -8,6 +8,40 @@
       <!-- SearchTabs 只在单session模式显示 -->
       <SearchTabs v-if="!workspaceStore.keepPrevSearch && !showClusterEmptyHint" />
 
+      <div v-if="favoriteKeys.length || recentKeyList.length" class="shortcut-block">
+        <div v-if="favoriteKeys.length" class="shortcut-group">
+          <div class="shortcut-title">★ {{ t('keyTree.favorites') }} · {{ favoriteKeys.length }}</div>
+          <div
+            v-for="item in favoriteKeys"
+            :key="'fav-' + item"
+            class="shortcut-row"
+            :title="item"
+            @click="workspaceStore.selectKey(item)"
+          >
+            <span class="shortcut-star active" @click.stop="workspaceStore.toggleFavorite(item)">★</span>
+            <span class="shortcut-name">{{ item }}</span>
+          </div>
+        </div>
+        <div v-if="recentKeyList.length" class="shortcut-group">
+          <div class="shortcut-title">{{ t('keyTree.recent') }} · {{ recentKeyList.length }}</div>
+          <div
+            v-for="item in recentKeyList"
+            :key="'recent-' + item"
+            class="shortcut-row"
+            :title="item"
+            @click="workspaceStore.selectKey(item)"
+          >
+            <span
+              class="shortcut-star"
+              :class="{ active: favoriteKeySet.has(item) }"
+              :title="t('keyTree.favoriteToggle')"
+              @click.stop="workspaceStore.toggleFavorite(item)"
+            >{{ favoriteKeySet.has(item) ? '★' : '☆' }}</span>
+            <span class="shortcut-name">{{ item }}</span>
+          </div>
+        </div>
+      </div>
+
       <div class="tree-content">
         <div v-if="showClusterEmptyHint" class="empty-state cluster-empty-state">
           <div class="cluster-empty-title">{{ t('keyTree.clusterEmptyTitle') }}</div>
@@ -71,6 +105,9 @@
         </button>
         <button class="batch-btn" :disabled="!workspaceStore.selectedKeys.length" @click="batchTTL">
           {{ t('keyTree.batchTTL') }}
+        </button>
+        <button class="batch-btn" :disabled="!workspaceStore.selectedKeys.length" @click="batchRename">
+          {{ t('keyTree.batchRename') }}
         </button>
         <button class="batch-btn ghost" @click="workspaceStore.toggleSelectionMode()">
           {{ t('keyTree.cancelSelection') }}
@@ -164,6 +201,9 @@ const keyDisplayMode = computed(() => settingsStore.keyDisplayMode || 'tree')
 const session = computed(() => mapSessionForDisplay(workspaceStore.activeSession))
 const displaySessions = computed(() => workspaceStore.displaySessions.map(mapSessionForDisplay))
 const activeConn = computed(() => connectionsStore.connections.find(c => c.id === activeConnID.value))
+const favoriteKeys = computed(() => workspaceStore.favoriteKeys)
+const recentKeyList = computed(() => workspaceStore.recentKeyList)
+const favoriteKeySet = computed(() => workspaceStore.favoriteKeySet)
 const clusterExactOnly = computed(() => !!activeConn.value?.is_cluster && !activeConn.value?.allow_cluster_scan)
 const showClusterEmptyHint = computed(() =>
   clusterExactOnly.value &&
@@ -208,6 +248,41 @@ async function batchTTL() {
   const result = await workspaceStore.batchSetTTLSelected(Math.trunc(ttl))
   if (result?.success) {
     connectionsStore.showGlobalToast(t('keyTree.batchTTLOk').replace('{n}', result.affected), true)
+  }
+}
+
+// 选中 key 的公共前缀（按最后一个 : 截断，保证 key 名不被吃掉）
+function commonKeyPrefix(keys) {
+  if (!keys.length) return ''
+  let prefix = keys[0]
+  for (const key of keys.slice(1)) {
+    let i = 0
+    while (i < prefix.length && i < key.length && prefix[i] === key[i]) i++
+    prefix = prefix.slice(0, i)
+    if (!prefix) break
+  }
+  const idx = prefix.lastIndexOf(':')
+  return idx >= 0 ? prefix.slice(0, idx + 1) : prefix
+}
+
+async function batchRename() {
+  const keys = [...workspaceStore.selectedKeys]
+  if (!keys.length) return
+  const prefix = commonKeyPrefix(keys)
+  if (!prefix) {
+    connectionsStore.showGlobalToast(t('keyTree.batchRenameInvalid'), false)
+    return
+  }
+  const input = window.prompt(t('keyTree.batchRenamePrompt').replace('{prefix}', prefix), prefix)
+  if (input === null) return
+  const nextPrefix = input.trim()
+  if (!nextPrefix) {
+    connectionsStore.showGlobalToast(t('keyTree.batchRenameInvalid'), false)
+    return
+  }
+  const result = await workspaceStore.batchRenameSelectedPrefix(prefix, nextPrefix)
+  if (result?.success) {
+    connectionsStore.showGlobalToast(t('keyTree.batchRenameOk').replace('{n}', result.affected), true)
   }
 }
 
@@ -587,6 +662,52 @@ function collapseVisibleTree() {
   font-size: 12px;
   color: #1e40af;
 }
+.shortcut-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 8px 6px;
+  border-bottom: 1px dashed rgba(203, 213, 225, 0.9);
+  margin-bottom: 4px;
+  max-height: 168px;
+  overflow-y: auto;
+}
+.shortcut-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  padding: 4px 4px 2px;
+  text-transform: uppercase;
+}
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #334155;
+  min-width: 0;
+}
+.shortcut-row:hover { background: rgba(239, 246, 255, 0.9); }
+.shortcut-star {
+  flex: 0 0 12px;
+  font-size: 11px;
+  color: #cbd5e1;
+  line-height: 1;
+}
+.shortcut-star.active { color: #f59e0b; }
+.shortcut-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.key-tree.theme-dark .shortcut-block { border-bottom-color: rgba(51, 65, 85, 0.9); }
+.key-tree.theme-dark .shortcut-row { color: #cbd5e1; }
+.key-tree.theme-dark .shortcut-row:hover { background: rgba(30, 41, 59, 0.9); }
 .batch-info { flex: 1; min-width: 0; font-weight: 600; }
 .batch-btn {
   height: 24px;

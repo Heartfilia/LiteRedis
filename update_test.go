@@ -341,7 +341,7 @@ func TestFetchGitHubReleaseJSONRateLimitedMessage(t *testing.T) {
 
 	var out ReleaseInfo
 	err := fetchGitHubReleaseJSON(context.Background(), server.URL, &out)
-	if err == nil || !strings.Contains(err.Error(), "配额已用尽") {
+	if err == nil || !strings.Contains(err.Error(), "IP 访问限制") {
 		t.Fatalf("rate limit error = %v", err)
 	}
 	if _, ok := loadReleaseCache(releaseCacheKey(server.URL)); ok {
@@ -366,7 +366,7 @@ func TestFetchGitHubReleaseJSONForbiddenWithoutRateLimit(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	message := err.Error()
-	if strings.Contains(message, "配额已用尽") {
+	if strings.Contains(message, "IP 访问限制") {
 		t.Fatalf("403 without rate-limit headers was reported as quota: %s", message)
 	}
 	if !strings.Contains(message, "403") || !strings.Contains(message, "blocked by upstream proxy") {

@@ -205,3 +205,64 @@ func TestSetKeysTTLBatch(t *testing.T) {
 		}
 	}
 }
+
+func TestRenameKeysPrefix(t *testing.T) {
+	ctx := context.Background()
+	client := testRedisClient(t)
+
+	for _, key := range []string{"user:1", "user:2", "other:1"} {
+		if err := client.Set(ctx, key, "v", time.Hour).Err(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	renamed, err := RenameKeysPrefix(ctx, client, []string{"user:1", "user:2", "other:1"}, "user:", "v2:user:")
+	if err != nil {
+		t.Fatalf("rename failed: %v", err)
+	}
+	if renamed != 2 {
+		t.Fatalf("renamed = %d, want 2", renamed)
+	}
+	for _, key := range []string{"v2:user:1", "v2:user:2"} {
+		if exists, err := client.Exists(ctx, key).Result(); err != nil || exists != 1 {
+			t.Fatalf("%s exists = %d, err=%v", key, exists, err)
+		}
+		// TTL 必须跟着 key 一起走
+		if ttl, err := client.TTL(ctx, key).Result(); err != nil || ttl <= 0 {
+			t.Fatalf("%s ttl = %s, err=%v", key, ttl, err)
+		}
+	}
+	if exists, _ := client.Exists(ctx, "user:1").Result(); exists != 0 {
+		t.Fatal("old key still exists")
+	}
+	if exists, _ := client.Exists(ctx, "other:1").Result(); exists != 1 {
+		t.Fatal("key without prefix should stay untouched")
+	}
+}
+
+func TestRenameKeysPrefixSkipsExistingTarget(t *testing.T) {
+	ctx := context.Background()
+	client := testRedisClient(t)
+
+	if err := client.Set(ctx, "user:1", "old", 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Set(ctx, "v2:user:1", "existing", 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+
+	renamed, err := RenameKeysPrefix(ctx, client, []string{"user:1"}, "user:", "v2:user:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if renamed != 0 {
+		t.Fatalf("renamed = %d, want 0", renamed)
+	}
+	value, err := client.Get(ctx, "v2:user:1").Result()
+	if err != nil || value != "existing" {
+		t.Fatalf("target was overwritten: %q, err=%v", value, err)
+	}
+	if exists, _ := client.Exists(ctx, "user:1").Result(); exists != 1 {
+		t.Fatal("source key should stay when target exists")
+	}
+}

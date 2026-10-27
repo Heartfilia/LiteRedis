@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { scanKeys, getValue, getKeyInfo, deleteKey, renameKey, setTTL, selectDB, dbSize, createKey, batchDeleteKeys, batchSetKeysTTL } from '../api/wails.js'
+import { scanKeys, getValue, getKeyInfo, deleteKey, renameKey, setTTL, selectDB, dbSize, createKey, batchDeleteKeys, batchSetKeysTTL, batchRenamePrefix } from '../api/wails.js'
 import { buildKeyTree } from '../utils/keyTree.js'
 import { useSettingsStore } from './settings.js'
 import { useConnectionsStore } from './connections.js'
@@ -61,6 +61,19 @@ function collectExpandableNodePaths(treeData = [], output = []) {
   return output
 }
 
+const SHORTCUT_STORAGE_KEY = 'liteRedis_shortcuts'
+
+function loadShortcuts() {
+  try {
+    const raw = localStorage.getItem(SHORTCUT_STORAGE_KEY)
+    if (!raw) return { favorites: {}, recent: {} }
+    const parsed = JSON.parse(raw)
+    return { favorites: parsed.favorites || {}, recent: parsed.recent || {} }
+  } catch (e) {
+    return { favorites: {}, recent: {} }
+  }
+}
+
 export const useWorkspaceStore = defineStore('workspace', {
   state: () => {
     // 从 localStorage 加载持久化的搜索历史
@@ -89,6 +102,8 @@ export const useWorkspaceStore = defineStore('workspace', {
       selectedKeys: [],
       // Shift 连选的锚点
       selectionAnchor: null,
+      // 收藏 / 最近访问（按「连接|DB」维度存 localStorage）
+      shortcuts: loadShortcuts(),
       keyValue: null,
       keyValueLoading: false,
       keyValueRefreshing: false,
@@ -123,6 +138,21 @@ export const useWorkspaceStore = defineStore('workspace', {
   getters: {
     activeSession: (state) => state.searchSessions.find(s => s.id === state.activeSessionId),
     selectedKeySet: (state) => new Set(state.selectedKeys),
+
+    shortcutScope: (state) => String(state.activeConnID || '') + '|' + String(state.currentDB || 0),
+
+    favoriteKeys() {
+      return this.shortcuts.favorites[this.shortcutScope] || []
+    },
+
+    favoriteKeySet() {
+      return new Set(this.favoriteKeys)
+    },
+
+    recentKeyList(state) {
+      const list = this.shortcuts.recent[this.shortcutScope] || []
+      return list.filter(key => key !== state.selectedKey)
+    },
 
     displaySessions: (state) => {
       if (state.keepPrevSearch) {
@@ -749,6 +779,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       this._selectionSequence++
       // 立即切换选中状态，让 UI 即时响应
       this.selectedKey = key
+      if (key) this.recordRecentKey(key)
       this.keyValueError = null
       if (!preserveCurrentValue) {
         this.keyValue = null
@@ -781,6 +812,37 @@ export const useWorkspaceStore = defineStore('workspace', {
         }
         this._finishRequest(request)
       }
+    },
+
+    _persistShortcuts() {
+      try {
+        localStorage.setItem(SHORTCUT_STORAGE_KEY, JSON.stringify(this.shortcuts))
+      } catch (e) {}
+    },
+
+    toggleFavorite(key) {
+      if (!key || !this.activeConnID) return
+      const scope = this.shortcutScope
+      const current = this.shortcuts.favorites[scope] || []
+      const next = current.includes(key) ? current.filter(item => item !== key) : [...current, key]
+      this.shortcuts = {
+        ...this.shortcuts,
+        favorites: { ...this.shortcuts.favorites, [scope]: next },
+      }
+      this._persistShortcuts()
+    },
+
+    recordRecentKey(key) {
+      if (!key || !this.activeConnID) return
+      const scope = this.shortcutScope
+      const current = this.shortcuts.recent[scope] || []
+      if (current[0] === key) return
+      const next = [key, ...current.filter(item => item !== key)].slice(0, 12)
+      this.shortcuts = {
+        ...this.shortcuts,
+        recent: { ...this.shortcuts.recent, [scope]: next },
+      }
+      this._persistShortcuts()
     },
 
     toggleSelectionMode() {
@@ -920,6 +982,28 @@ export const useWorkspaceStore = defineStore('workspace', {
           this.keyValue = { ...this.keyValue, ttl: nextTTL }
         }
         this.selectedKeys = []
+        return result
+      } catch (e) {
+        useConnectionsStore().showGlobalToast(e?.message || String(e), false)
+        return { success: false, message: e?.message || String(e) }
+      }
+    },
+
+    async batchRenameSelectedPrefix(oldPrefix, newPrefix) {
+      const keys = [...this.selectedKeys]
+      if (!keys.length || !this.activeConnID) return { success: false }
+      const connID = this.activeConnID
+      try {
+        const result = await batchRenamePrefix(connID, keys, oldPrefix, newPrefix)
+        if (!result?.success) {
+          useConnectionsStore().showGlobalToast(result?.message || 'Batch rename failed', false)
+          return result || { success: false }
+        }
+        if (connID !== this.activeConnID) return result
+        this.selectedKeys = []
+        // key 名称变了，重新拉一次当前搜索，保证列表与实际一致
+        const pattern = this.activeSession?.pattern
+        if (pattern) await this.search(pattern)
         return result
       } catch (e) {
         useConnectionsStore().showGlobalToast(e?.message || String(e), false)
