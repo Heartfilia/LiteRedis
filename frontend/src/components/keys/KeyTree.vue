@@ -195,8 +195,32 @@
             <div class="more-divider" />
             <button class="more-item" @click="exitSelection">{{ t('keyTree.cancelSelection') }}</button>
           </template>
+          <template v-else-if="moreMenu.mode === 'rename'">
+            <div class="more-title">{{ t('keyTree.batchRenameTitle').replace('{prefix}', renameFrom) }}</div>
+            <input
+              ref="renameInputRef"
+              v-model="renamePrefix"
+              class="more-input"
+              spellcheck="false"
+              @keydown.enter="applyRename"
+            />
+            <div class="more-actions">
+              <button class="more-btn" @click="applyRename">{{ t('keyTree.confirm') }}</button>
+              <button class="more-btn ghost" @click="closeMoreMenu">{{ t('keyTree.cancelSelection') }}</button>
+            </div>
+          </template>
           <template v-else>
             <div class="more-title">{{ t('keyTree.copyToTarget') }}</div>
+            <template v-if="!isCluster">
+              <div class="more-subtitle">{{ t('keyTree.copyToDb') }}</div>
+              <div class="db-grid">
+                <button v-for="db in dbOptions" :key="'db-' + db" class="db-chip" @click="copyToDB(db)">
+                  DB {{ db }}
+                </button>
+              </div>
+            </template>
+            <div class="more-divider" />
+            <div class="more-subtitle">{{ t('keyTree.copyToConn') }}</div>
             <button
               v-for="target in copyTargets"
               :key="target.id"
@@ -212,7 +236,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -221,6 +245,7 @@ import KeySearchBar from './KeySearchBar.vue'
 import SearchTabs from './SearchTabs.vue'
 import KeyTreeNode from './KeyTreeNode.vue'
 import { buildKeyTree } from '../../utils/keyTree.js'
+import { exportKeysToFile, copyKeysToConnection, copyKeysToDatabase } from '../../api/wails.js'
 
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
@@ -240,9 +265,18 @@ const readOnly = computed(() => connectionsStore.isReadOnly(activeConnID.value))
 
 // 批量操作「更多」菜单：改前缀 / 导出 / 复制到其他连接
 const moreMenu = ref({ visible: false, x: 0, y: 0, mode: 'more' })
+const renamePrefix = ref('')
+const renameFrom = ref('')
+const renameInputRef = ref(null)
 const copyTargets = computed(() =>
   connectionsStore.connections.filter(item => item.id !== activeConnID.value)
 )
+const isCluster = computed(() => !!activeConn.value?.is_cluster)
+// 同实例跨 DB 复制：列出除当前库以外的 DB
+const dbOptions = computed(() => {
+  const current = Number(workspaceStore.currentDB) || 0
+  return Array.from({ length: 16 }, (_, index) => index).filter(index => index !== current)
+})
 
 function openMoreMenu(event) {
   if (readOnly.value || !workspaceStore.selectedKeys.length) return
@@ -264,12 +298,54 @@ async function pickMore(kind) {
     moreMenu.value = { ...moreMenu.value, mode: 'copy' }
     return
   }
-  closeMoreMenu()
   if (kind === 'rename') {
-    await batchRename()
+    const keys = [...workspaceStore.selectedKeys]
+    renameFrom.value = commonKeyPrefix(keys)
+    if (!renameFrom.value) {
+      closeMoreMenu()
+      connectionsStore.showGlobalToast(t('keyTree.batchRenameInvalid'), false)
+      return
+    }
+    renamePrefix.value = renameFrom.value
+    moreMenu.value = { ...moreMenu.value, mode: 'rename' }
+    await nextTick()
+    renameInputRef.value?.focus()
+    renameInputRef.value?.select()
     return
   }
+  closeMoreMenu()
   await exportSelected(kind === 'commands' ? 'commands' : 'json')
+}
+
+async function applyRename() {
+  const nextPrefix = String(renamePrefix.value || '').trim()
+  if (!nextPrefix) {
+    connectionsStore.showGlobalToast(t('keyTree.batchRenameInvalid'), false)
+    return
+  }
+  if (nextPrefix === renameFrom.value) {
+    connectionsStore.showGlobalToast(t('keyTree.batchRenameSame'), false)
+    return
+  }
+  closeMoreMenu()
+  const result = await workspaceStore.batchRenameSelectedPrefix(renameFrom.value, nextPrefix)
+  if (result?.success) {
+    connectionsStore.showGlobalToast(t('keyTree.batchRenameOk').replace('{n}', result.affected), true)
+  } else {
+    connectionsStore.showGlobalToast(result?.message || t('keyTree.batchRenameFailed'), false)
+  }
+}
+
+async function copyToDB(db) {
+  closeMoreMenu()
+  const keys = [...workspaceStore.selectedKeys]
+  if (!keys.length) return
+  try {
+    const result = await copyKeysToDatabase(workspaceStore.activeConnID, keys, db, false)
+    connectionsStore.showGlobalToast(result?.message || t('keyTree.copyFailed'), !!result?.success)
+  } catch (e) {
+    connectionsStore.showGlobalToast(e?.message || String(e), false)
+  }
 }
 
 async function exportSelected(format) {
@@ -359,27 +435,6 @@ function commonKeyPrefix(keys) {
   }
   const idx = prefix.lastIndexOf(':')
   return idx >= 0 ? prefix.slice(0, idx + 1) : prefix
-}
-
-async function batchRename() {
-  const keys = [...workspaceStore.selectedKeys]
-  if (!keys.length) return
-  const prefix = commonKeyPrefix(keys)
-  if (!prefix) {
-    connectionsStore.showGlobalToast(t('keyTree.batchRenameInvalid'), false)
-    return
-  }
-  const input = window.prompt(t('keyTree.batchRenamePrompt').replace('{prefix}', prefix), prefix)
-  if (input === null) return
-  const nextPrefix = input.trim()
-  if (!nextPrefix) {
-    connectionsStore.showGlobalToast(t('keyTree.batchRenameInvalid'), false)
-    return
-  }
-  const result = await workspaceStore.batchRenameSelectedPrefix(prefix, nextPrefix)
-  if (result?.success) {
-    connectionsStore.showGlobalToast(t('keyTree.batchRenameOk').replace('{n}', result.affected), true)
-  }
 }
 
 async function switchDB(db) {
@@ -848,6 +903,79 @@ function collapseVisibleTree() {
 .more-title {
   padding: 4px 14px;
   font-size: 11px;
+  color: #94a3b8;
+}
+.more-subtitle {
+  padding: 6px 14px 2px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+.more-input {
+  display: block;
+  width: calc(100% - 28px);
+  margin: 6px 14px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  background: #fff;
+  color: #1e293b;
+  font-size: 12px;
+  outline: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.more-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18); }
+.more-actions { display: flex; gap: 8px; padding: 2px 14px 8px; }
+.more-btn {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(147, 197, 253, 0.9);
+  background: rgba(219, 234, 254, 0.8);
+  color: #1d4ed8;
+  font-size: 12px;
+  cursor: pointer;
+}
+.more-btn.ghost {
+  border-color: rgba(203, 213, 225, 0.9);
+  background: transparent;
+  color: #64748b;
+}
+.db-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 4px 12px 6px;
+}
+.db-chip {
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: #fff;
+  color: #334155;
+  font-size: 11px;
+  cursor: pointer;
+}
+.db-chip:hover { border-color: #93c5fd; color: #1d4ed8; background: rgba(239, 246, 255, 0.9); }
+.more-menu.theme-dark .more-input {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+}
+.more-menu.theme-dark .db-chip {
+  border-color: rgba(71, 85, 105, 0.9);
+  background: rgba(30, 41, 59, 0.9);
+  color: #cbd5e1;
+}
+.more-menu.theme-dark .db-chip:hover { border-color: rgba(59, 130, 246, 0.8); color: #bfdbfe; }
+.more-menu.theme-dark .more-btn {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(30, 58, 95, 0.7);
+  color: #bfdbfe;
+}
+.more-menu.theme-dark .more-btn.ghost {
+  border-color: rgba(71, 85, 105, 0.9);
+  background: transparent;
   color: #94a3b8;
 }
 .more-empty {

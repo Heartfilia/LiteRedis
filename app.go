@@ -451,6 +451,29 @@ func (a *App) ExportKeysToFile(connID string, keys []string, format string) (str
 	return path, nil
 }
 
+// CopyKeysToDatabase 把 key 复制到同一实例的另一个 DB（Redis 6.2+）
+func (a *App) CopyKeysToDatabase(connID string, keys []string, dstDB int, overwrite bool) config.BatchKeyResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.BatchKeyResult{Message: err.Error()}
+	}
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error()}
+	}
+	if len(keys) == 0 {
+		return config.BatchKeyResult{Message: "请先选择要复制的 key"}
+	}
+	if len(keys) > redisbackend.ExportMaxKeys {
+		return config.BatchKeyResult{Message: fmt.Sprintf("单次最多复制 %d 个 key", redisbackend.ExportMaxKeys)}
+	}
+	copied, skipped, failed, err := redisbackend.CopyKeysToDB(a.ctx, client, keys, dstDB, overwrite)
+	message := fmt.Sprintf("DB %d：已复制 %d 个，跳过 %d 个，失败 %d 个", dstDB, copied, skipped, failed)
+	if err != nil {
+		message += "（" + err.Error() + "）"
+	}
+	return config.BatchKeyResult{Success: err == nil && failed == 0, Affected: copied, Failed: failed, Message: message}
+}
+
 // CopyKeysToConnection 把 key 复制到另一个已连接的实例，保留 TTL
 func (a *App) CopyKeysToConnection(srcConnID, dstConnID string, keys []string, overwrite bool) (config.BatchKeyResult, error) {
 	if srcConnID == dstConnID {

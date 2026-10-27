@@ -30,6 +30,10 @@ export function CopyKeysToConnection(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CopyKeysToConnection'](arg1, arg2, arg3, arg4);
 }
 
+export function CopyKeysToDatabase(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CopyKeysToDatabase'](arg1, arg2, arg3, arg4);
+}
+
 export function CreateKey(arg1, arg2) {
   return window['go']['main']['App']['CreateKey'](arg1, arg2);
 }

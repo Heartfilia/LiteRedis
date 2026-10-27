@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -164,6 +165,56 @@ func WriteExportedKey(ctx context.Context, client redis.UniversalClient, entry c
 		return false, err
 	}
 	return true, nil
+}
+
+// CopyKeysToDB 在同一实例内把 key 复制到另一个 DB（依赖 Redis 6.2+ 的 COPY ... DB）
+func CopyKeysToDB(ctx context.Context, client redis.UniversalClient, keys []string, dstDB int, overwrite bool) (int, int, int, error) {
+	if _, ok := client.(*redis.ClusterClient); ok {
+		return 0, 0, 0, fmt.Errorf("集群模式不支持跨 DB 复制")
+	}
+	if dstDB < 0 {
+		return 0, 0, 0, fmt.Errorf("目标 DB 无效")
+	}
+
+	copied, skipped, failed := 0, 0, 0
+	var firstErr error
+	for start := 0; start < len(keys); start += batchKeyChunk {
+		end := start + batchKeyChunk
+		if end > len(keys) {
+			end = len(keys)
+		}
+		chunk := keys[start:end]
+
+		pipe := client.Pipeline()
+		cmds := make([]*redis.IntCmd, len(chunk))
+		for i, key := range chunk {
+			cmds[i] = pipe.Copy(ctx, key, key, dstDB, overwrite)
+		}
+		if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+		for _, cmd := range cmds {
+			value, err := cmd.Result()
+			if err != nil {
+				failed++
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
+			}
+			if value == 1 {
+				copied++
+			} else {
+				skipped++
+			}
+		}
+	}
+	if copied == 0 && failed > 0 && firstErr != nil {
+		return copied, skipped, failed, firstErr
+	}
+	return copied, skipped, failed, nil
 }
 
 // FormatExportJSON 输出结构化 JSON

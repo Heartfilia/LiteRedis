@@ -17,6 +17,8 @@ export function Connect(arg1:string):Promise<main.ConnectResult>;
 
 export function CopyKeysToConnection(arg1:string,arg2:string,arg3:Array<string>,arg4:boolean):Promise<config.BatchKeyResult>;
 
+export function CopyKeysToDatabase(arg1:string,arg2:Array<string>,arg3:number,arg4:boolean):Promise<config.BatchKeyResult>;
+
 export function CreateKey(arg1:string,arg2:config.CreateKeyRequest):Promise<config.OperationResult>;
 
 export function DBSize(arg1:string):Promise<number>;
