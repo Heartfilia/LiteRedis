@@ -18,6 +18,7 @@ export namespace config {
 	    watermark_density: number;
 	    language: string;
 	    local_api_enabled: boolean;
+	    scan_default_migrated: boolean;
 	    local_api_port: number;
 	    proxy_enabled: boolean;
 	    proxy_url: string;
@@ -45,6 +46,7 @@ export namespace config {
 	        this.watermark_density = source["watermark_density"];
 	        this.language = source["language"];
 	        this.local_api_enabled = source["local_api_enabled"];
+	        this.scan_default_migrated = source["scan_default_migrated"];
 	        this.local_api_port = source["local_api_port"];
 	        this.proxy_enabled = source["proxy_enabled"];
 	        this.proxy_url = source["proxy_url"];
@@ -102,6 +104,7 @@ export namespace config {
 	    tls_enabled: boolean;
 	    tls_skip_verify: boolean;
 	    tls_ca_file?: string;
+	    read_only: boolean;
 	    db: number;
 	    is_cluster: boolean;
 	    allow_cluster_scan: boolean;
@@ -133,6 +136,7 @@ export namespace config {
 	        this.tls_enabled = source["tls_enabled"];
 	        this.tls_skip_verify = source["tls_skip_verify"];
 	        this.tls_ca_file = source["tls_ca_file"];
+	        this.read_only = source["read_only"];
 	        this.db = source["db"];
 	        this.is_cluster = source["is_cluster"];
 	        this.allow_cluster_scan = source["allow_cluster_scan"];
@@ -479,6 +483,7 @@ export namespace config {
 	    output?: string;
 	    error?: string;
 	    elapsed_ms: number;
+	    blocked?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new RedisConsoleResult(source);
@@ -491,6 +496,7 @@ export namespace config {
 	        this.output = source["output"];
 	        this.error = source["error"];
 	        this.elapsed_ms = source["elapsed_ms"];
+	        this.blocked = source["blocked"];
 	    }
 	}
 	export class RedisKey {
@@ -545,6 +551,30 @@ export namespace config {
 		    }
 		    return a;
 		}
+	}
+	export class SlowLogEntry {
+	    id: number;
+	    timestamp: number;
+	    duration_us: number;
+	    command: string;
+	    client_addr?: string;
+	    client_name?: string;
+	    node?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SlowLogEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.timestamp = source["timestamp"];
+	        this.duration_us = source["duration_us"];
+	        this.command = source["command"];
+	        this.client_addr = source["client_addr"];
+	        this.client_name = source["client_name"];
+	        this.node = source["node"];
+	    }
 	}
 	
 

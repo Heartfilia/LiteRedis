@@ -78,8 +78,9 @@
                   @click="workspaceStore.loadMoreKeys(sess.id)"
                 >
                   <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path d="M3.6 4.8 8 9.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M3.6 8.8 8 13.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4 6.2 8 10.2l4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4 9.6 8 13.6l4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+
                   </svg>
                 </button>
               </div>
@@ -187,8 +188,9 @@
             @click="workspaceStore.loadMoreKeys(session.id)"
           >
             <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path d="M3.6 4.8 8 9.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M3.6 8.8 8 13.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4 6.2 8 10.2l4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4 9.6 8 13.6l4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+
                   </svg>
           </button>
         </div>
@@ -813,20 +815,20 @@ function collapseVisibleTree() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  min-width: 22px;
-  height: 22px;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
   padding: 0;
   background: transparent;
   color: #94a3b8;
-  border: 1px solid rgba(203, 213, 225, 0.9);
-  border-radius: 6px;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 5px;
   cursor: pointer;
   transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
 }
 .btn-load-more svg {
-  width: 13px;
-  height: 13px;
+  width: 11px;
+  height: 11px;
   display: block;
 }
 .btn-load-more:hover:not(:disabled) {

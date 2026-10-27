@@ -12,8 +12,9 @@
         @click="loadMore"
       >
         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M3.6 4.8 8 9.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M3.6 8.8 8 13.2l4.4-4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4 6.2 8 10.2l4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M4 9.6 8 13.6l4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+
         </svg>
       </button>
     </div>
