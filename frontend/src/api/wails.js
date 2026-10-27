@@ -28,6 +28,7 @@ export const exportKeysToFile = (connID, keys, format) => callGo('ExportKeysToFi
 export const copyKeysToConnection = (srcConnID, dstConnID, keys, overwrite) => callGo('CopyKeysToConnection', srcConnID, dstConnID, keys, overwrite)
 export const copyKeysToDatabase = (connID, keys, dstDB, overwrite) => callGo('CopyKeysToDatabase', connID, keys, dstDB, overwrite)
 export const getDatabases = (connID) => callGo('GetDatabases', connID)
+export const importKeysFromFile = (connID, overwrite) => callGo('ImportKeysFromFile', connID, overwrite)
 export const executeRedisCommand = (id, command) => callGo('ExecuteRedisCommand', id, command)
 export const executeRedisCommandForce = (id, command) => callGo('ExecuteRedisCommandForce', id, command)
 

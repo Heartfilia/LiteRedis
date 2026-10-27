@@ -114,6 +114,10 @@ export function HSet(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['HSet'](arg1, arg2, arg3, arg4);
 }
 
+export function ImportKeysFromFile(arg1, arg2) {
+  return window['go']['main']['App']['ImportKeysFromFile'](arg1, arg2);
+}
+
 export function IsConnected(arg1) {
   return window['go']['main']['App']['IsConnected'](arg1);
 }

@@ -2,13 +2,19 @@
   <div class="string-editor" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <FloatingMessage :message="msg" :success="ok" />
     <div v-if="props.keyValue?.truncated" class="truncated-hint">⚠️ {{ t('keyEditor.stringTruncated') }}</div>
-    <textarea v-model="localVal" rows="10" :disabled="saving" />
+    <div v-if="treeMode" class="json-view" :class="`theme-${settingsStore.themeMode || 'light'}`">
+      <JsonTree :data="treeData" :depth="0" />
+    </div>
+    <textarea v-else v-model="localVal" rows="10" :disabled="saving" />
     <div class="editor-actions">
       <button
         class="btn-action btn-json"
         :disabled="saving || (!formatApplied && !localVal.trim())"
         @click="toggleJson"
       >{{ formatApplied ? t('keyEditor.jsonRestore') : t('keyEditor.jsonFormat') }}</button>
+      <button class="btn-action btn-json" :disabled="saving || !localVal.trim()" @click="toggleTreeView">
+        {{ treeMode ? t('keyEditor.jsonTextView') : t('keyEditor.jsonTreeView') }}
+      </button>
       <button class="btn-action" :class="{ copied }" @click="copyValue">{{ copied ? '✓ ' + t('keyEditor.copied') : t('keyEditor.copy') }}</button>
       <button
         :class="[isDirty ? 'btn-primary' : 'btn-action', { 'success-flash': saveFlashing, 'error-flash': errorFlashing }]"
@@ -40,6 +46,7 @@ import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
 import { setString } from '../../api/wails.js'
 import FloatingMessage from '../common/FloatingMessage.vue'
+import JsonTree from '../common/JsonTree.vue'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
 import './editorShared.css'
 
@@ -63,6 +70,9 @@ const saveFlashing = ref(false)
 const errorFlashing = ref(false)
 const originalVal = ref(props.keyValue?.string_val || '')
 const formatApplied = ref(false)
+// 树形只读视图：只在内容能解析成 JSON 时可用
+const treeMode = ref(false)
+const treeData = ref(null)
 const isDirty = computed(() => localVal.value !== originalVal.value)
 let saveFlashTimer = null
 let errorFlashTimer = null
@@ -112,6 +122,8 @@ watch(() => props.keyValue, (kv) => {
   localVal.value = kv?.string_val || ''
   originalVal.value = kv?.string_val || ''
   formatApplied.value = false
+  treeMode.value = false
+  treeData.value = null
   msg.value = ''
 }, { immediate: true })
 
@@ -137,6 +149,21 @@ function formatJson() {
     ok.value = true
     msg.value = t('keyEditor.jsonFormatted')
     setTimeout(() => { msg.value = '' }, 1800)
+  } catch (e) {
+    ok.value = false
+    msg.value = t('keyEditor.jsonInvalid')
+    setTimeout(() => { msg.value = '' }, 2600)
+  }
+}
+
+function toggleTreeView() {
+  if (treeMode.value) {
+    treeMode.value = false
+    return
+  }
+  try {
+    treeData.value = JSON.parse(localVal.value)
+    treeMode.value = true
   } catch (e) {
     ok.value = false
     msg.value = t('keyEditor.jsonInvalid')
@@ -241,6 +268,33 @@ async function save() {
   border: 1px solid rgba(251, 191, 36, 0.35);
   border-radius: 6px;
   padding: 5px 10px;
+}
+.json-view {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  --json-key: #1d4ed8;
+  --json-sep: #94a3b8;
+  --json-string: #15803d;
+  --json-number: #b45309;
+  --json-boolean: #a21caf;
+  --json-null: #94a3b8;
+  --json-summary: #64748b;
+}
+.json-view.theme-dark {
+  border-color: rgba(71, 85, 105, 0.96);
+  background: rgba(15, 23, 42, 0.75);
+  --json-key: #93c5fd;
+  --json-sep: #64748b;
+  --json-string: #86efac;
+  --json-number: #fcd34d;
+  --json-boolean: #f0abfc;
+  --json-null: #94a3b8;
+  --json-summary: #94a3b8;
 }
 textarea {
   flex: 1; resize: none; padding: 10px 12px;

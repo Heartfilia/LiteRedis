@@ -122,6 +122,19 @@
               </select>
             </template>
             <button
+              v-if="!readOnly"
+              class="tree-bulk-btn"
+              type="button"
+              :title="t('keyTree.importKeys')"
+              @click="importKeys"
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 4v9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                <path d="M8.5 9.5 12 13l3.5-3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M5 16.5v2A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <button
               class="tree-bulk-btn"
               :class="{ active: workspaceStore.selectionMode }"
               type="button"
@@ -257,7 +270,7 @@ import KeySearchBar from './KeySearchBar.vue'
 import SearchTabs from './SearchTabs.vue'
 import KeyTreeNode from './KeyTreeNode.vue'
 import { buildKeyTree } from '../../utils/keyTree.js'
-import { exportKeysToFile, copyKeysToConnection, copyKeysToDatabase, getDatabases, getConnectionDB } from '../../api/wails.js'
+import { exportKeysToFile, copyKeysToConnection, copyKeysToDatabase, getDatabases, getConnectionDB, importKeysFromFile } from '../../api/wails.js'
 
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
@@ -506,6 +519,23 @@ function commonKeyPrefix(keys) {
   }
   const idx = prefix.lastIndexOf(':')
   return idx >= 0 ? prefix.slice(0, idx + 1) : prefix
+}
+
+async function importKeys() {
+  if (readOnly.value || !workspaceStore.activeConnID) return
+  try {
+    const result = await importKeysFromFile(workspaceStore.activeConnID, false)
+    if (result?.message) {
+      connectionsStore.showGlobalToast(result.message, !!result.success)
+    }
+    if (result?.affected > 0) {
+      // 导入完成后刷新当前列表，新 key 才会出现
+      const pattern = workspaceStore.activeSession?.pattern || '*'
+      await workspaceStore.search(pattern)
+    }
+  } catch (e) {
+    connectionsStore.showGlobalToast(e?.message || String(e), false)
+  }
 }
 
 async function switchDB(db) {

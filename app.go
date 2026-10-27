@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -477,6 +478,77 @@ func (a *App) ExportKeysToFile(connID string, keys []string, format string) (str
 		return "", err
 	}
 	return path, nil
+}
+
+// ImportKeysFromFile 从导出的 JSON 文件导入 key（写入当前 DB）
+func (a *App) ImportKeysFromFile(connID string, overwrite bool) (config.BatchKeyResult, error) {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.BatchKeyResult{Message: err.Error()}, nil
+	}
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error()}, nil
+	}
+
+	path, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "导入 Key",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "JSON", Pattern: "*.json"},
+		},
+	})
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error()}, nil
+	}
+	if strings.TrimSpace(path) == "" {
+		return config.BatchKeyResult{Message: "已取消"}, nil
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error()}, nil
+	}
+	if info.Size() > 64<<20 {
+		return config.BatchKeyResult{Message: "文件超过 64MB，请拆分后再导入"}, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error()}, nil
+	}
+
+	var entries []config.ExportedKey
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return config.BatchKeyResult{Message: "不是有效的导出文件: " + err.Error()}, nil
+	}
+	if len(entries) == 0 {
+		return config.BatchKeyResult{Message: "文件中没有可导入的 key"}, nil
+	}
+	if len(entries) > redisbackend.ExportMaxKeys {
+		return config.BatchKeyResult{Message: fmt.Sprintf("单次最多导入 %d 个 key", redisbackend.ExportMaxKeys)}, nil
+	}
+
+	imported, skipped, failed := 0, 0, 0
+	var firstErr error
+	for _, entry := range entries {
+		written, err := redisbackend.WriteExportedKey(a.ctx, client, entry, overwrite)
+		if err != nil {
+			failed++
+			if firstErr == nil {
+				firstErr = fmt.Errorf("%s: %w", entry.Key, err)
+			}
+			continue
+		}
+		if written {
+			imported++
+		} else {
+			skipped++
+		}
+	}
+
+	message := fmt.Sprintf("已导入 %d 个，跳过 %d 个，失败 %d 个", imported, skipped, failed)
+	if firstErr != nil {
+		message += "（首个错误: " + firstErr.Error() + "）"
+	}
+	return config.BatchKeyResult{Success: failed == 0, Affected: imported, Failed: failed, Message: message}, nil
 }
 
 // CopyKeysToDatabase 把 key 复制到同一实例的另一个 DB（Redis 6.2+）

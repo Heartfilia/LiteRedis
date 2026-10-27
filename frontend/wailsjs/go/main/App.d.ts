@@ -59,6 +59,8 @@ export function HDel(arg1:string,arg2:string,arg3:string):Promise<config.Operati
 
 export function HSet(arg1:string,arg2:string,arg3:string,arg4:string):Promise<config.OperationResult>;
 
+export function ImportKeysFromFile(arg1:string,arg2:boolean):Promise<config.BatchKeyResult>;
+
 export function IsConnected(arg1:string):Promise<boolean>;
 
 export function LPush(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;

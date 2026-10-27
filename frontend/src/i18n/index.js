@@ -45,6 +45,7 @@ const messages = {
     keyTree: {
       selectConn: '请在左侧选择一个连接',
       multiSelect: '多选模式',
+      importKeys: '从 JSON 文件导入 key',
       favorites: '收藏',
       recent: '最近访问',
       favoriteToggle: '收藏 / 取消收藏',
@@ -113,6 +114,8 @@ const messages = {
     keyEditor: {
       jsonFormat: '格式化',
       jsonRestore: '恢复',
+      jsonTreeView: '树形',
+      jsonTextView: '文本',
       jsonFormatted: '已格式化为 JSON',
       jsonRestored: '已恢复为原始内容',
       jsonInvalid: '内容不是合法 JSON',
@@ -488,6 +491,7 @@ const messages = {
     keyTree: {
       selectConn: 'Select a connection on the left',
       multiSelect: 'Multi-select',
+      importKeys: 'Import keys from a JSON file',
       favorites: 'Favorites',
       recent: 'Recent',
       favoriteToggle: 'Favorite / unfavorite',
@@ -556,6 +560,8 @@ const messages = {
     keyEditor: {
       jsonFormat: 'Format',
       jsonRestore: 'Restore',
+      jsonTreeView: 'Tree',
+      jsonTextView: 'Text',
       jsonFormatted: 'Formatted as JSON',
       jsonRestored: 'Restored to original value',
       jsonInvalid: 'Content is not valid JSON',
