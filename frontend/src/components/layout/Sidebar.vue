@@ -404,6 +404,7 @@ import ConnectionOverviewModal from '../connections/ConnectionOverviewModal.vue'
 import MemoryDoctorModal from '../connections/MemoryDoctorModal.vue'
 import RealtimeMonitorModal from '../connections/RealtimeMonitorModal.vue'
 import { formatDebugMessage } from '../../utils/debug.js'
+import { registerEscapeHandler } from '../../utils/shortcuts.js'
 
 const props = defineProps({
   themeMode: {
@@ -508,11 +509,25 @@ function pickDiag(kind) {
   }
 }
 
+// 菜单打开期间接管 Esc
+let disposeMenuEscape = null
+watch(() => diagMenu.value.visible, (visible) => {
+  if (visible) {
+    disposeMenuEscape = registerEscapeHandler(closeDiagMenu)
+    return
+  }
+  if (disposeMenuEscape) {
+    disposeMenuEscape()
+    disposeMenuEscape = null
+  }
+})
+
 onMounted(() => {
   document.addEventListener('click', closeCtxMenu)
   document.addEventListener('click', closeDiagMenu)
 })
 onBeforeUnmount(() => {
+  if (disposeMenuEscape) disposeMenuEscape()
   document.removeEventListener('click', closeCtxMenu)
   document.removeEventListener('click', closeDiagMenu)
   if (toastTimer) clearTimeout(toastTimer)

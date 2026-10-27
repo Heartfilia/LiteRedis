@@ -24,6 +24,7 @@
 
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref, provide, Teleport, Transition, watch } from 'vue'
+import { installGlobalShortcuts } from './utils/shortcuts.js'
 import Sidebar from './components/layout/Sidebar.vue'
 import MainContent from './components/layout/MainContent.vue'
 import ConnectionManager from './components/connections/ConnectionManager.vue'
@@ -46,6 +47,8 @@ provide('openConnManager', (connection = null) => {
 provide('openSettings', () => { showSettings.value = true })
 
 onMounted(() => {
+  // Cmd/Ctrl+R 刷新当前 key，Esc 关闭最上层浮层
+  installGlobalShortcuts()
   connectionsStore.loadConnections()
   settingsStore.load()
   // 屏蔽原生右键菜单（输入框/可编辑区域保留，编辑器行首的自定义菜单另行处理）

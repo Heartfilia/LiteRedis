@@ -108,6 +108,7 @@
 
 <script setup>
 import { Teleport, computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { executeRedisCommand, executeRedisCommandForce, getConnectionOverview } from '../../api/wails.js'
 import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -120,7 +121,11 @@ const props = defineProps({
   connectionName: { type: String, default: '' },
 })
 
-defineEmits(['close'])
+const emit = defineEmits(['close'])
+
+let disposeEscape = null
+onMounted(() => { disposeEscape = registerEscapeHandler(() => emit('close')) })
+onBeforeUnmount(() => { if (disposeEscape) disposeEscape() })
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()

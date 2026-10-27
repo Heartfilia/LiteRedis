@@ -133,6 +133,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { getConnectionOverview, getSlowLog } from '../../api/wails.js'
+import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { formatBytes, formatCount } from '../../utils/format.js'
 
@@ -143,6 +144,7 @@ const props = defineProps({
   connectionName: { type: String, default: '' },
 })
 const emit = defineEmits(['close'])
+let disposeEscape = null
 
 const settingsStore = useSettingsStore()
 const workspaceStore = useWorkspaceStore()
@@ -323,11 +325,13 @@ function handleClose() {
 }
 
 onMounted(() => {
+  disposeEscape = registerEscapeHandler(handleClose)
   document.addEventListener('visibilitychange', onVisibilityChange)
   poll()
 })
 
 onBeforeUnmount(() => {
+  if (disposeEscape) disposeEscape()
   disposed = true
   stopTimer()
   document.removeEventListener('visibilitychange', onVisibilityChange)

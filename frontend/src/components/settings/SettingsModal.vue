@@ -9,10 +9,16 @@
 </template>
 
 <script setup>
+import { onBeforeUnmount, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import SettingsPanel from './SettingsPanel.vue'
-defineEmits(['close'])
+import { registerEscapeHandler } from '../../utils/shortcuts.js'
+const emit = defineEmits(['close'])
 const settingsStore = useSettingsStore()
+
+let disposeEscape = null
+onMounted(() => { disposeEscape = registerEscapeHandler(() => emit('close')) })
+onBeforeUnmount(() => { if (disposeEscape) disposeEscape() })
 </script>
 
 <style scoped>

@@ -48,7 +48,8 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
@@ -65,6 +66,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'save'])
+let disposeEscape = null
+onMounted(() => { disposeEscape = registerEscapeHandler(() => emit('close')) })
+onBeforeUnmount(() => { if (disposeEscape) disposeEscape() })
 
 const localContent = ref(props.content)
 const copied = ref(false)

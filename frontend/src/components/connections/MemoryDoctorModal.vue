@@ -154,6 +154,7 @@ import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { cancelMemoryScan, getConnectionDB, scanMemoryReport } from '../../api/wails.js'
 import { EventsOff, EventsOn } from '../../../wailsjs/runtime/runtime.js'
+import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { formatBytes, formatCount } from '../../utils/format.js'
 import { getTypeColor } from '../../utils/typeColors.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
@@ -163,6 +164,7 @@ const props = defineProps({
   connectionName: { type: String, default: '' },
 })
 const emit = defineEmits(['close'])
+let disposeEscape = null
 
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
@@ -194,6 +196,7 @@ const displayDB = computed(() => {
 })
 
 onMounted(async () => {
+  disposeEscape = registerEscapeHandler(handleClose)
   EventsOn('memory:progress', handleProgress)
   try {
     currentDB.value = await getConnectionDB(props.connId)
@@ -203,6 +206,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  if (disposeEscape) disposeEscape()
   EventsOff('memory:progress')
   if (scanning.value) cancelMemoryScan().catch(() => {})
   if (toastTimer) clearTimeout(toastTimer)

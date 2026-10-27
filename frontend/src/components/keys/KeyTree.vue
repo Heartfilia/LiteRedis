@@ -271,6 +271,7 @@ import SearchTabs from './SearchTabs.vue'
 import KeyTreeNode from './KeyTreeNode.vue'
 import { buildKeyTree } from '../../utils/keyTree.js'
 import { exportKeysToFile, copyKeysToConnection, copyKeysToDatabase, getDatabases, getConnectionDB, importKeysFromFile } from '../../api/wails.js'
+import { registerEscapeHandler } from '../../utils/shortcuts.js'
 
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
@@ -456,7 +457,21 @@ async function copyTo(target) {
   }
 }
 
+// 菜单打开期间接管 Esc
+let disposeMenuEscape = null
+watch(() => moreMenu.value.visible, (visible) => {
+  if (visible) {
+    disposeMenuEscape = registerEscapeHandler(closeMoreMenu)
+    return
+  }
+  if (disposeMenuEscape) {
+    disposeMenuEscape()
+    disposeMenuEscape = null
+  }
+})
+
 onBeforeUnmount(() => {
+  if (disposeMenuEscape) disposeMenuEscape()
   document.removeEventListener('click', closeMoreMenu)
 })
 document.addEventListener('click', closeMoreMenu)

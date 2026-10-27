@@ -368,12 +368,14 @@ onBeforeUnmount(() => {
 })
 
 onMounted(() => {
+  window.addEventListener('literedis:refresh-key', refreshKey)
   document.addEventListener('pointerdown', handleTTLOutsidePointer, true)
   window.addEventListener('resize', handleTTLViewportChange)
   window.addEventListener('scroll', handleTTLViewportChange, true)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('literedis:refresh-key', refreshKey)
   document.removeEventListener('pointerdown', handleTTLOutsidePointer, true)
   window.removeEventListener('resize', handleTTLViewportChange)
   window.removeEventListener('scroll', handleTTLViewportChange, true)

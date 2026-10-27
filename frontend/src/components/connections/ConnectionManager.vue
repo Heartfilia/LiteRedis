@@ -155,6 +155,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import ConnectionForm from './ConnectionForm.vue'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
@@ -166,6 +167,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+
+let disposeEscape = null
+onMounted(() => { disposeEscape = registerEscapeHandler(() => emit('close')) })
+onBeforeUnmount(() => { if (disposeEscape) disposeEscape() })
 const connectionsStore = useConnectionsStore()
 const workspaceStore = useWorkspaceStore()
 const settingsStore = useSettingsStore()
