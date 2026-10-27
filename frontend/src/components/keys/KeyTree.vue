@@ -818,6 +818,8 @@ function collapseVisibleTree() {
   width: 18px;
   min-width: 18px;
   height: 18px;
+  aspect-ratio: 1 / 1;
+  box-sizing: border-box;
   padding: 0;
   background: transparent;
   color: #94a3b8;
@@ -865,9 +867,9 @@ function collapseVisibleTree() {
 }
 
 .db-bar {
-  display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
+  gap: 8px;
   min-height: 34px;
   height: 34px;
   padding: 3px 12px;
@@ -885,7 +887,8 @@ function collapseVisibleTree() {
 .db-bar-side {
   display: flex;
   align-items: center;
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: min-content;
 }
 .db-bar-left {
   justify-content: flex-start;
@@ -905,15 +908,12 @@ function collapseVisibleTree() {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 0;
+  flex: 0 0 auto;
   height: 100%;
-  padding: 0 6px;
-  overflow: hidden;
 }
 .db-bar-right {
   justify-content: flex-end;
-  min-width: fit-content;
-  padding-left: 6px;
+  min-width: 0;
 }
 .db-select {
   width: 46px;
