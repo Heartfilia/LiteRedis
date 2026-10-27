@@ -77,8 +77,19 @@
           <div class="conn-main" @click="handleConnect(conn)">
             <span class="conn-avatar" :style="{ background: connColor(conn) }">{{ connInitial(conn) }}</span>
             <span :class="['conn-dot', connectionStateClass(conn.id)]" />
-            <span class="conn-name">
-              {{ conn.name || t('sidebar.unnamed') }}
+              <span class="conn-name">
+                <svg
+                  v-if="isReadOnlyConn(conn)"
+                  class="conn-lock"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                  :title="t('sidebar.readOnlyBadge')"
+                >
+                  <rect x="5" y="10.5" width="14" height="9.5" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M8.5 10.5V7.8a3.5 3.5 0 017 0v2.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+                {{ conn.name || t('sidebar.unnamed') }}
               <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-inline">{{ t('sidebar.connecting') }}</span>
             </span>
           </div>
@@ -172,6 +183,17 @@
                 <span class="conn-avatar" :style="{ background: connColor(conn) }">{{ connInitial(conn) }}</span>
                 <span :class="['conn-dot', connectionStateClass(conn.id)]" />
                 <span class="conn-name">
+                  <svg
+                    v-if="isReadOnlyConn(conn)"
+                    class="conn-lock"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                    :title="t('sidebar.readOnlyBadge')"
+                  >
+                    <rect x="5" y="10.5" width="14" height="9.5" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                    <path d="M8.5 10.5V7.8a3.5 3.5 0 017 0v2.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                  </svg>
                   {{ conn.name || t('sidebar.unnamed') }}
                   <span v-if="connectionsStore.isConnecting(conn.id)" class="connecting-inline">{{ t('sidebar.connecting') }}</span>
                 </span>
@@ -508,6 +530,10 @@ function openOverview(conn) {
 
 function openMemory(conn) {
   memoryConn.value = conn
+}
+
+function isReadOnlyConn(conn) {
+  return !!(conn?.read_only ?? conn?.readOnly)
 }
 
 function openGitHub() {
@@ -1083,6 +1109,14 @@ async function disconnectConn(id) {
   transform: scale(0.985);
   background: rgba(78, 154, 241, 0.12);
   box-shadow: inset 0 0 0 1px rgba(120, 185, 255, 0.18);
+}
+.conn-lock {
+  width: 11px;
+  height: 11px;
+  margin-right: 3px;
+  vertical-align: -1px;
+  color: #f59e0b;
+  flex-shrink: 0;
 }
 .conn-item.dragging .conn-actions {
   display: none;

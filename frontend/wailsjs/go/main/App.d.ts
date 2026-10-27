@@ -27,6 +27,8 @@ export function Disconnect(arg1:string):Promise<config.OperationResult>;
 
 export function ExecuteRedisCommand(arg1:string,arg2:string):Promise<config.RedisConsoleResult>;
 
+export function ExecuteRedisCommandForce(arg1:string,arg2:string):Promise<config.RedisConsoleResult>;
+
 export function ForgetSSHHostFingerprint(arg1:string,arg2:number):Promise<config.OperationResult>;
 
 export function GetAppVersion():Promise<string>;

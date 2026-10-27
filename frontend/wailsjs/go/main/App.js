@@ -50,6 +50,10 @@ export function ExecuteRedisCommand(arg1, arg2) {
   return window['go']['main']['App']['ExecuteRedisCommand'](arg1, arg2);
 }
 
+export function ExecuteRedisCommandForce(arg1, arg2) {
+  return window['go']['main']['App']['ExecuteRedisCommandForce'](arg1, arg2);
+}
+
 export function ForgetSSHHostFingerprint(arg1, arg2) {
   return window['go']['main']['App']['ForgetSSHHostFingerprint'](arg1, arg2);
 }

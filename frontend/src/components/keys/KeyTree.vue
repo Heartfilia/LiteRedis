@@ -100,13 +100,14 @@
 
       <div v-if="workspaceStore.selectionMode" class="batch-bar">
         <span class="batch-info">{{ t('keyTree.selectedCount').replace('{n}', workspaceStore.selectedKeys.length) }}</span>
-        <button class="batch-btn" :disabled="!workspaceStore.selectedKeys.length" @click="batchDelete">
+        <span v-if="readOnly" class="batch-readonly">🔒</span>
+        <button class="batch-btn" :disabled="readOnly || !workspaceStore.selectedKeys.length" @click="batchDelete">
           {{ t('keyTree.batchDelete') }}
         </button>
-        <button class="batch-btn" :disabled="!workspaceStore.selectedKeys.length" @click="batchTTL">
+        <button class="batch-btn" :disabled="readOnly || !workspaceStore.selectedKeys.length" @click="batchTTL">
           {{ t('keyTree.batchTTL') }}
         </button>
-        <button class="batch-btn" :disabled="!workspaceStore.selectedKeys.length" @click="batchRename">
+        <button class="batch-btn" :disabled="readOnly || !workspaceStore.selectedKeys.length" @click="batchRename">
           {{ t('keyTree.batchRename') }}
         </button>
         <button class="batch-btn ghost" @click="workspaceStore.toggleSelectionMode()">
@@ -204,6 +205,7 @@ const activeConn = computed(() => connectionsStore.connections.find(c => c.id ==
 const favoriteKeys = computed(() => workspaceStore.favoriteKeys)
 const recentKeyList = computed(() => workspaceStore.recentKeyList)
 const favoriteKeySet = computed(() => workspaceStore.favoriteKeySet)
+const readOnly = computed(() => connectionsStore.isReadOnly(activeConnID.value))
 const clusterExactOnly = computed(() => !!activeConn.value?.is_cluster && !activeConn.value?.allow_cluster_scan)
 const showClusterEmptyHint = computed(() =>
   clusterExactOnly.value &&
@@ -709,6 +711,7 @@ function collapseVisibleTree() {
 .key-tree.theme-dark .shortcut-row { color: #cbd5e1; }
 .key-tree.theme-dark .shortcut-row:hover { background: rgba(30, 41, 59, 0.9); }
 .batch-info { flex: 1; min-width: 0; font-weight: 600; }
+.batch-readonly { font-size: 12px; }
 .batch-btn {
   height: 24px;
   padding: 0 10px;

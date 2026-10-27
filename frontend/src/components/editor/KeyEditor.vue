@@ -38,13 +38,20 @@
             class="ttl-chip"
             :class="ttlChipClass"
             type="button"
+            :disabled="activeReadOnly"
             @click="toggleTTLEdit"
           >
             TTL
           </button>
+          <span v-if="activeReadOnly" class="readonly-chip" :title="t('keyEditor.readOnlyHint')">🔒</span>
         </div>
         <div class="key-actions">
-          <button class="btn-tiny icon-btn top-action-btn" :title="t('keyEditor.rename')" @click="startRename">
+          <button
+            class="btn-tiny icon-btn top-action-btn"
+            :title="activeReadOnly ? t('keyEditor.readOnlyHint') : t('keyEditor.rename')"
+            :disabled="activeReadOnly"
+            @click="startRename"
+          >
             <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
               <path
                 d="M4.75 19.25l4.05-.88L18.35 8.82a2.14 2.14 0 000-3.03l-.14-.14a2.14 2.14 0 00-3.03 0L5.63 15.2l-.88 4.05z"
@@ -100,6 +107,7 @@
             </svg>
           </button>
           <InlineDeleteConfirm
+            v-if="!activeReadOnly"
             class="header-delete-confirm header-action-delete"
             :label="t('keyEditor.delete')"
             :confirm-text="t('keyEditor.confirmDelete')"
@@ -139,6 +147,11 @@
         <button class="btn-xs" :disabled="!canConfirmRename" @click="doRename">{{ t('keyEditor.renameConfirm') }}</button>
         <button class="btn-xs" @click="cancelRename">{{ t('keyEditor.renameCancel') }}</button>
         <span v-if="renameMsg" class="rename-msg">{{ renameMsg }}</span>
+      </div>
+
+      <!-- 保护模式提示：写操作会被后端拒绝，先说明原因 -->
+      <div v-if="activeReadOnly" class="readonly-banner">
+        🔒 {{ t('keyEditor.readOnlyBanner') }}
       </div>
 
       <!-- Value 编辑器（按类型分发） -->
@@ -235,11 +248,14 @@ async function saveTTL() {
 const renamingKey = ref(false)
 const newKeyName = ref('')
 const renameMsg = ref('')
+// 保护模式：后端会拒绝写操作，界面同步禁用，避免点了才报错
+const activeReadOnly = computed(() => connectionsStore.isReadOnly(workspaceStore.activeConnID))
 const canConfirmRename = computed(() => {
   const next = newKeyName.value.trim()
   return !!next && next !== (selectedKey.value || '')
 })
 function startRename() {
+  if (activeReadOnly.value) return
   newKeyName.value = selectedKey.value
   renamingKey.value = true
   renameMsg.value = ''
@@ -282,6 +298,7 @@ async function refreshKey() {
 }
 
 async function doDelete() {
+  if (activeReadOnly.value) return
   await workspaceStore.deleteCurrentKey()
 }
 
@@ -551,6 +568,29 @@ onBeforeUnmount(() => {
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+.ttl-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.readonly-chip {
+  font-size: 11px;
+  line-height: 1;
+  cursor: default;
+}
+.readonly-banner {
+  margin: 0 12px 8px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  background: rgba(254, 243, 199, 0.6);
+  color: #92400e;
+  font-size: 12px;
+}
+.key-editor.theme-dark .readonly-banner {
+  border-color: rgba(217, 119, 6, 0.6);
+  background: rgba(120, 53, 15, 0.32);
+  color: #fcd34d;
 }
 .key-editor.theme-dark .ttl-chip {
   border-color: rgba(71, 85, 105, 0.96);

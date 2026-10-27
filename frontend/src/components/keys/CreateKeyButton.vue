@@ -1,6 +1,11 @@
 <template>
   <div ref="wrapRef" class="create-key-wrap" :class="`theme-${settingsStore.themeMode || 'light'}`">
-    <button class="create-key-btn" :title="t('keyTree.createKey')" @click="toggleOpen">
+    <button
+      class="create-key-btn"
+      :title="readOnly ? t('keyEditor.readOnlyHint') : t('keyTree.createKey')"
+      :disabled="readOnly"
+      @click="toggleOpen"
+    >
       <span>+</span>
     </button>
 
@@ -86,12 +91,15 @@
 </template>
 
 <script setup>
-import { reactive, ref, nextTick } from 'vue'
+import { computed, reactive, ref, nextTick } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
+import { useConnectionsStore } from '../../stores/connections.js'
 import { useI18n } from '../../i18n/index.js'
 
 const workspaceStore = useWorkspaceStore()
+const connectionsStore = useConnectionsStore()
+const readOnly = computed(() => connectionsStore.isReadOnly(workspaceStore.activeConnID))
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
@@ -202,6 +210,10 @@ async function submit() {
   box-sizing: border-box;
   box-shadow: 0 8px 16px rgba(191, 219, 254, 0.16);
   transition: all 0.16s ease;
+}
+.create-key-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .create-key-btn span {
   font-size: 16px;

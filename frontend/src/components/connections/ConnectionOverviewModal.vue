@@ -108,7 +108,7 @@
 
 <script setup>
 import { Teleport, computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { executeRedisCommand, getConnectionOverview } from '../../api/wails.js'
+import { executeRedisCommand, executeRedisCommandForce, getConnectionOverview } from '../../api/wails.js'
 import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
@@ -368,7 +368,22 @@ async function runCommand() {
   running.value = true
 
   try {
-    const result = await executeRedisCommand(props.connId, text)
+    let result = await executeRedisCommand(props.connId, text)
+    if (result?.blocked) {
+      const confirmed = window.confirm(t('sidebar.readOnlyCommandConfirm').replace('{cmd}', text))
+      if (!confirmed) {
+        consoleHistory.value.push({
+          prompt: promptBeforeRun,
+          command: text,
+          success: false,
+          meta: '',
+          output: t('keyEditor.readOnlyHint'),
+        })
+        command.value = ''
+        return
+      }
+      result = await executeRedisCommandForce(props.connId, text)
+    }
     let connectionFailureReported = false
     if (result.success) {
       connectionsStore.reportConnectionSuccess(props.connId)

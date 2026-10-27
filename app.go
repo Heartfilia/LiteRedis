@@ -241,6 +241,9 @@ func (a *App) GetKeyInfo(connID string, key string) (config.RedisKey, error) {
 
 // DeleteKey 删除 key
 func (a *App) DeleteKey(connID string, key string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -254,6 +257,9 @@ func (a *App) DeleteKey(connID string, key string) config.OperationResult {
 
 // RenameKey 重命名 key
 func (a *App) RenameKey(connID, oldKey, newKey string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -267,6 +273,9 @@ func (a *App) RenameKey(connID, oldKey, newKey string) config.OperationResult {
 
 // SetTTL 设置 key TTL
 func (a *App) SetTTL(connID, key string, ttlSec int64) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -311,8 +320,27 @@ func (a *App) GetConnectionDB(connID string) (int, error) {
 	return db, nil
 }
 
+// errReadOnly 保护模式下拒绝写操作的统一错误
+var errReadOnly = errors.New("当前连接处于保护模式，已阻止写操作")
+
+// ensureWritable 在所有写操作入口校验连接是否处于保护模式。
+// 只靠前端置灰不够可靠，后端必须兜底，避免误调用真的改到数据。
+func (a *App) ensureWritable(connID string) error {
+	cfg, _, err := a.manager.GetConnectionState(connID)
+	if err != nil {
+		return err
+	}
+	if cfg.ReadOnly {
+		return errReadOnly
+	}
+	return nil
+}
+
 // BatchDeleteKeys 批量删除 key
 func (a *App) BatchDeleteKeys(connID string, keys []string) config.BatchKeyResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.BatchKeyResult{Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.BatchKeyResult{Message: err.Error()}
@@ -332,6 +360,9 @@ func (a *App) BatchDeleteKeys(connID string, keys []string) config.BatchKeyResul
 
 // BatchSetKeysTTL 批量设置 TTL，ttlSec < 0 表示永久
 func (a *App) BatchSetKeysTTL(connID string, keys []string, ttlSec int64) config.BatchKeyResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.BatchKeyResult{Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.BatchKeyResult{Message: err.Error()}
@@ -348,6 +379,9 @@ func (a *App) BatchSetKeysTTL(connID string, keys []string, ttlSec int64) config
 
 // BatchRenamePrefix 批量替换选中 key 的前缀
 func (a *App) BatchRenamePrefix(connID string, keys []string, oldPrefix, newPrefix string) config.BatchKeyResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.BatchKeyResult{Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.BatchKeyResult{Message: err.Error()}
@@ -446,6 +480,26 @@ func (a *App) CancelMemoryScan() config.OperationResult {
 }
 
 func (a *App) ExecuteRedisCommand(connID, command string) (config.RedisConsoleResult, error) {
+	if cfg, _, err := a.manager.GetConnectionState(connID); err == nil && cfg.ReadOnly {
+		if !redisbackend.IsReadOnlyCommandAllowed(command) {
+			// 不返回错误，方便前端识别为"需要确认"而不是执行失败
+			return config.RedisConsoleResult{
+				Success: false,
+				Command: command,
+				Blocked: true,
+				Error:   "当前连接处于保护模式，该命令可能导致写入，需要确认后才能执行",
+			}, nil
+		}
+	}
+	return a.executeRedisCommand(connID, command)
+}
+
+// ExecuteRedisCommandForce 保护模式下的二次确认入口，前端确认后调用
+func (a *App) ExecuteRedisCommandForce(connID, command string) (config.RedisConsoleResult, error) {
+	return a.executeRedisCommand(connID, command)
+}
+
+func (a *App) executeRedisCommand(connID, command string) (config.RedisConsoleResult, error) {
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.RedisConsoleResult{}, err
@@ -494,6 +548,9 @@ func (a *App) SearchValue(connID, key, keyType, pattern string, exact bool, curs
 
 // SetString 设置 string
 func (a *App) SetString(connID, key, value string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -506,6 +563,9 @@ func (a *App) SetString(connID, key, value string) config.OperationResult {
 
 // CreateKey 创建一个新 key。
 func (a *App) CreateKey(connID string, req config.CreateKeyRequest) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -520,6 +580,9 @@ func (a *App) CreateKey(connID string, req config.CreateKeyRequest) config.Opera
 
 // HSet 设置 hash field
 func (a *App) HSet(connID, key, field, value string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -532,6 +595,9 @@ func (a *App) HSet(connID, key, field, value string) config.OperationResult {
 
 // HDel 删除 hash field
 func (a *App) HDel(connID, key, field string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -544,6 +610,9 @@ func (a *App) HDel(connID, key, field string) config.OperationResult {
 
 // LPush 向 list 头部插入
 func (a *App) LPush(connID, key, value string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -556,6 +625,9 @@ func (a *App) LPush(connID, key, value string) config.OperationResult {
 
 // RPush 向 list 尾部插入
 func (a *App) RPush(connID, key, value string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -568,6 +640,9 @@ func (a *App) RPush(connID, key, value string) config.OperationResult {
 
 // LSet 设置 list 指定索引的值
 func (a *App) LSet(connID, key string, index int64, value string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -580,6 +655,9 @@ func (a *App) LSet(connID, key string, index int64, value string) config.Operati
 
 // LRem 删除 list 中匹配的元素
 func (a *App) LRem(connID, key string, count int64, value string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -592,6 +670,9 @@ func (a *App) LRem(connID, key string, count int64, value string) config.Operati
 
 // SAdd 向 set 添加成员
 func (a *App) SAdd(connID, key, member string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -604,6 +685,9 @@ func (a *App) SAdd(connID, key, member string) config.OperationResult {
 
 // SRem 从 set 删除成员
 func (a *App) SRem(connID, key, member string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -616,6 +700,9 @@ func (a *App) SRem(connID, key, member string) config.OperationResult {
 
 // RenameSetMember 原子重命名 set 成员
 func (a *App) RenameSetMember(connID, key, source, destination string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -630,6 +717,9 @@ func (a *App) RenameSetMember(connID, key, source, destination string) config.Op
 
 // ZAdd 向 zset 添加成员
 func (a *App) ZAdd(connID, key, member string, score float64) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -642,6 +732,9 @@ func (a *App) ZAdd(connID, key, member string, score float64) config.OperationRe
 
 // ZRem 从 zset 删除成员
 func (a *App) ZRem(connID, key, member string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
@@ -654,6 +747,9 @@ func (a *App) ZRem(connID, key, member string) config.OperationResult {
 
 // RenameZSetMember 原子重命名 zset 成员并保留当前 score
 func (a *App) RenameZSetMember(connID, key, source, destination string) config.OperationResult {
+	if err := a.ensureWritable(connID); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}

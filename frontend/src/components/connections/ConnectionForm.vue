@@ -35,6 +35,12 @@
         <input type="checkbox" v-model="form.isCluster" />
       </div>
 
+      <div class="form-group toggle-row">
+        <label>{{ t('connManager.readOnly') }}</label>
+        <input type="checkbox" v-model="form.readOnly" />
+      </div>
+      <div class="field-hint">{{ t('connManager.readOnlyHint') }}</div>
+
       <template v-if="!form.isCluster">
         <div class="form-row">
           <div class="form-group flex1">
@@ -274,6 +280,7 @@ const defaultForm = () => ({
   tlsEnabled: false,
   tlsSkipVerify: false,
   tlsCaFile: '',
+  readOnly: false,
   db: 0,
   isCluster: false,
   allowClusterScan: false,
@@ -331,6 +338,7 @@ function snapshotValue() {
     tlsEnabled: !!form.tlsEnabled,
     tlsSkipVerify: !!form.tlsSkipVerify,
     tlsCaFile: form.tlsCaFile || '',
+    readOnly: !!form.readOnly,
     db: form.db || 0,
     isCluster: !!form.isCluster,
     allowClusterScan: !!form.allowClusterScan,
@@ -365,6 +373,7 @@ watch(() => props.connection, (conn) => {
       tlsEnabled: conn.tlsEnabled ?? conn.tls_enabled ?? false,
       tlsSkipVerify: conn.tlsSkipVerify ?? conn.tls_skip_verify ?? false,
       tlsCaFile: conn.tlsCaFile ?? conn.tls_ca_file ?? '',
+      readOnly: conn.readOnly ?? conn.read_only ?? false,
       allowClusterScan: conn.allowClusterScan ?? conn.allow_cluster_scan ?? false,
       proxyEnabled: conn.proxyEnabled ?? conn.proxy_enabled,
       proxyUrl: conn.proxyUrl ?? conn.proxy_url ?? '',
@@ -446,6 +455,7 @@ function buildCfg() {
     tls_enabled: !!form.tlsEnabled,
     tls_skip_verify: !!form.tlsSkipVerify,
     tls_ca_file: form.tlsEnabled ? (form.tlsCaFile || '').trim() : '',
+    read_only: !!form.readOnly,
     db: form.db || 0,
     is_cluster: form.isCluster,
     allow_cluster_scan: !!form.allowClusterScan,

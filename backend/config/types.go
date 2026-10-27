@@ -15,6 +15,7 @@ type ConnectionConfig struct {
 	TLSEnabled       bool       `json:"tls_enabled"`           // 使用 TLS/SSL 连接（rediss://）
 	TLSSkipVerify    bool       `json:"tls_skip_verify"`       // 跳过证书校验，自签证书时使用
 	TLSCAFile        string     `json:"tls_ca_file,omitempty"` // 自定义 CA 证书路径
+	ReadOnly         bool       `json:"read_only"`             // 保护模式：阻止所有写操作
 	DB               int        `json:"db"`
 	IsCluster        bool       `json:"is_cluster"`
 	AllowClusterScan bool       `json:"allow_cluster_scan"`
@@ -320,4 +321,6 @@ type RedisConsoleResult struct {
 	Output    string `json:"output,omitempty"`
 	Error     string `json:"error,omitempty"`
 	ElapsedMs int64  `json:"elapsed_ms"`
+	// Blocked 保护模式下命令被拦截，前端可确认后强制执行
+	Blocked bool `json:"blocked,omitempty"`
 }

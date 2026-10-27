@@ -145,6 +145,14 @@ export const useConnectionsStore = defineStore('connections', {
       return await this.reportConnectionFailure(id, error, 1)
     },
 
+    // 连接是否处于保护模式（只读）
+    isReadOnly(id) {
+      if (!id) return false
+      const conn = this.connections.find(item => item.id === id)
+      if (!conn) return false
+      return !!(conn.read_only ?? conn.readOnly)
+    },
+
     showGlobalToast(message, ok = true) {
       this.globalToast = message || ''
       this.globalToastOk = ok

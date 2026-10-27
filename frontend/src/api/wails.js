@@ -24,6 +24,7 @@ export const getConnectionDB = (connID) => callGo('GetConnectionDB', connID)
 export const scanMemoryReport = (connID, pattern, maxKeys) => callGo('ScanMemoryReport', connID, pattern, maxKeys)
 export const cancelMemoryScan = () => callGo('CancelMemoryScan')
 export const executeRedisCommand = (id, command) => callGo('ExecuteRedisCommand', id, command)
+export const executeRedisCommandForce = (id, command) => callGo('ExecuteRedisCommandForce', id, command)
 
 // ===== 本地数据提取 API =====
 export const publishKeyValue = (connID, kv, db, nonce) => callGo('PublishKeyValue', connID, kv, db, nonce)
