@@ -63,12 +63,13 @@ function collectExpandableNodePaths(treeData = [], output = []) {
 
 const SHORTCUT_STORAGE_KEY = 'liteRedis_shortcuts'
 
+// 只持久化收藏；最近访问是本次运行期间的临时数据，关掉应用即清空
 function loadShortcuts() {
   try {
     const raw = localStorage.getItem(SHORTCUT_STORAGE_KEY)
     if (!raw) return { favorites: {}, recent: {} }
     const parsed = JSON.parse(raw)
-    return { favorites: parsed.favorites || {}, recent: parsed.recent || {} }
+    return { favorites: parsed.favorites || {}, recent: {} }
   } catch (e) {
     return { favorites: {}, recent: {} }
   }
@@ -102,7 +103,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       selectedKeys: [],
       // Shift 连选的锚点
       selectionAnchor: null,
-      // 收藏 / 最近访问（按「连接|DB」维度存 localStorage）
+      // 收藏持久化到 localStorage按；最近访问只存在内存里，关闭应用即清空
       shortcuts: loadShortcuts(),
       keyValue: null,
       keyValueLoading: false,
@@ -816,7 +817,8 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     _persistShortcuts() {
       try {
-        localStorage.setItem(SHORTCUT_STORAGE_KEY, JSON.stringify(this.shortcuts))
+        // 只写收藏，最近访问不落盘
+        localStorage.setItem(SHORTCUT_STORAGE_KEY, JSON.stringify({ favorites: this.shortcuts.favorites }))
       } catch (e) {}
     },
 
@@ -837,7 +839,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       const scope = this.shortcutScope
       const current = this.shortcuts.recent[scope] || []
       if (current[0] === key) return
-      const next = [key, ...current.filter(item => item !== key)].slice(0, 12)
+      const next = [key, ...current.filter(item => item !== key)].slice(0, 11)
       this.shortcuts = {
         ...this.shortcuts,
         recent: { ...this.shortcuts.recent, [scope]: next },
