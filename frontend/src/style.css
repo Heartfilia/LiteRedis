@@ -58,6 +58,8 @@ input[type="checkbox"] {
   flex: 0 0 auto;
   /* 表单里的 input 通用样式会给 6px/9px 内边距，会把 14px 的框体内容区挤没，勾也看不见 */
   padding: 0 !important;
+  /* 同理，通用的 input 圆角（如 12px）套在 16px 的框体上会变成圆形，这里统一成小圆角 */
+  border-radius: 4px !important;
   border-radius: 4px;
   border: 1.5px solid #cbd5e1;
   background: #fff;
