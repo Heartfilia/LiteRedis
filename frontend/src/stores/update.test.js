@@ -221,3 +221,42 @@ test('安装过程中抛异常：状态复位，可再次重试', async () => {
   await store.runPrimaryAction()
   assert.equal(state.start, 1, '异常后允许重试')
 })
+test('restarting getter 边界：必须同时满足 updating 与 stage=restart', async () => {
+  resetMocks()
+  const store = freshStore()
+
+  // 默认态
+  assert.equal(store.restarting, false, '初始状态不应是重启态')
+
+  // 各阶段但未在更新
+  for (const stage of ['download', 'verify', 'install', 'restart']) {
+    store.stage = stage
+    store.updating = false
+    assert.equal(store.restarting, false, `未在更新时 stage=${stage} 不应判定为重启态`)
+  }
+
+  // 更新中，非重启阶段
+  store.updating = true
+  for (const stage of ['download', 'verify', 'install', '']) {
+    store.stage = stage
+    assert.equal(store.restarting, false, `stage=${stage || '(空)'} 不应判定为重启态`)
+  }
+
+  // 大小写敏感：只认小写 restart
+  store.stage = 'Restart'
+  assert.equal(store.restarting, false, 'stage 大小写不匹配时不应判定为重启态')
+
+  // 唯一致真组合
+  store.stage = 'restart'
+  store.updating = true
+  assert.equal(store.restarting, true)
+
+  // 检查中不干扰
+  store.checking = true
+  assert.equal(store.restarting, true, 'checking 不应影响重启态判定')
+  store.checking = false
+
+  // 残留 restart 阶段但更新已结束（例如退出失败后手动复位）→ 按钮必须能恢复
+  store.updating = false
+  assert.equal(store.restarting, false, 'updating 复位后重启态必须结束')
+})
