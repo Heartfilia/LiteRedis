@@ -22,6 +22,11 @@ export const useUpdateStore = defineStore('update', {
     listening: false,
   }),
 
+  getters: {
+    // 已安装完成、等待应用自行退出重启的阶段
+    restarting: (state) => state.updating && state.stage === 'restart',
+  },
+
   actions: {
     ensureListener() {
       if (this.listening) return
@@ -54,6 +59,8 @@ export const useUpdateStore = defineStore('update', {
 
     onProgress(progress) {
       if (!progress || !this.updating) return
+      // 已进入重启阶段，忽略迟到的事件，避免按钮从「重启中」跳回「更新中 x%」
+      if (this.stage === 'restart') return
       const percent = Number(progress.percent)
       this.percent = Math.max(0, Math.min(100, Math.round(Number.isFinite(percent) ? percent : 0)))
       if (progress.stage) this.stage = progress.stage

@@ -373,7 +373,7 @@
           @click="handleVersionClick"
         >
           {{ updateStore.updating
-            ? (updateStore.stage === 'restart' ? t('settings.updateRestarting') : `${t('settings.updating')} ${updateStore.percent}%`)
+            ? (updateStore.restarting ? t('settings.updateRestarting') : `${t('settings.updating')} ${updateStore.percent}%`)
             : (updateStore.checking
               ? t('settings.checkingUpdate')
               : (updateStore.hasUpdate ? t('settings.updateNow') : `${t('settings.version')} ${appVersion}`)) }}
