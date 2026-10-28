@@ -352,10 +352,10 @@
     <Teleport to="body">
       <Transition name="toast">
         <div
-          v-if="msg"
+          v-if="displayMsg"
           class="settings-toast"
-          :class="[ok ? 'ok' : 'err', `theme-${settingsStore.themeMode || 'light'}`]"
-        >{{ msg }}</div>
+          :class="[displayOk ? 'ok' : 'err', `theme-${settingsStore.themeMode || 'light'}`]"
+        >{{ displayMsg }}</div>
       </Transition>
     </Teleport>
 
@@ -368,15 +368,15 @@
         </button>
         <button
           class="version-box"
-          :disabled="checkingUpdate || updating"
-          :title="hasUpdate ? t('settings.updateNow') : t('settings.checkUpdate')"
+          :disabled="updateStore.checking || updateStore.updating"
+          :title="updateStore.hasUpdate ? t('settings.updateNow') : t('settings.checkUpdate')"
           @click="handleVersionClick"
         >
-          {{ updating
-            ? (updateStage === 'restart' ? t('settings.updateRestarting') : `${t('settings.updating')} ${updatePercent}%`)
-            : (checkingUpdate
+          {{ updateStore.updating
+            ? (updateStore.stage === 'restart' ? t('settings.updateRestarting') : `${t('settings.updating')} ${updateStore.percent}%`)
+            : (updateStore.checking
               ? t('settings.checkingUpdate')
-              : (hasUpdate ? t('settings.updateNow') : `${t('settings.version')} ${appVersion}`)) }}
+              : (updateStore.hasUpdate ? t('settings.updateNow') : `${t('settings.version')} ${appVersion}`)) }}
         </button>
       </div>
       <div class="footer-actions">
@@ -389,14 +389,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, onBeforeUnmount, onMounted } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
+import { useUpdateStore } from '../../stores/update.js'
 import { useI18n } from '../../i18n/index.js'
-import { getAppVersion, checkLatestRelease, startUpdate, getLocalAPIInfo, regenerateLocalAPIToken } from '../../api/wails.js'
+import { getAppVersion, getLocalAPIInfo, regenerateLocalAPIToken } from '../../api/wails.js'
 import { refreshLocalAPIRuntime } from '../../services/browserExtract.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
-import { BrowserOpenURL, EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime.js'
+import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 
 const { t, setLanguage } = useI18n()
 
@@ -427,22 +428,19 @@ const form = reactive({
 })
 
 const saving = ref(false)
-const checkingUpdate = ref(false)
-const updating = ref(false)
-const updatePercent = ref(0)
-// download / verify / install / restart，用于按钮文案
-const updateStage = ref('download')
 const appVersion = ref('dev')
-const hasUpdate = ref(false)
+const updateStore = useUpdateStore()
 const msg = ref('')
 const ok = ref(true)
+// 设置面板自己的提示优先，其次是更新模块的全局提示（面板关掉再打开也能看到）
+const displayMsg = computed(() => msg.value || updateStore.message)
+const displayOk = computed(() => (msg.value ? ok.value : updateStore.messageOk))
 const saveFlashing = ref(false)
 const errorFlashing = ref(false)
 const titleTapCount = ref(0)
 let titleTapTimer = null
 let saveFlashTimer = null
 let errorFlashTimer = null
-let messageTimer = null
 const requestGuard = createRequestGuard(() => ({}))
 const COUNT_ERROR_TEXT = '只允许输入1到10000'
 const countFieldTouched = reactive({
@@ -464,17 +462,15 @@ onMounted(async () => {
     appVersion.value = 'dev'
   }
   await refreshLocalAPIInfo()
-  EventsOn('update:progress', handleUpdateProgress)
+  updateStore.ensureListener()
 })
 
 onBeforeUnmount(() => {
   if (regenTimer) clearTimeout(regenTimer)
-  EventsOff('update:progress')
   requestGuard.invalidateAll()
   if (titleTapTimer) clearTimeout(titleTapTimer)
   if (saveFlashTimer) clearTimeout(saveFlashTimer)
   if (errorFlashTimer) clearTimeout(errorFlashTimer)
-  if (messageTimer) clearTimeout(messageTimer)
   if (tokenCopiedTimer) clearTimeout(tokenCopiedTimer)
 })
 
@@ -721,116 +717,11 @@ async function regenerateToken() {
 }
 
 async function handleVersionClick() {
-  if (hasUpdate.value) {
-    await installUpdate()
+  if (updateStore.hasUpdate) {
+    await updateStore.install()
     return
   }
-  await checkUpdate()
-}
-
-function clearMessageTimer() {
-  if (!messageTimer) return
-  clearTimeout(messageTimer)
-  messageTimer = null
-}
-
-function scheduleMessageClear() {
-  clearMessageTimer()
-  messageTimer = setTimeout(() => {
-    msg.value = ''
-    messageTimer = null
-  }, 3000)
-}
-
-async function checkUpdate() {
-  const request = requestGuard.begin('update')
-  checkingUpdate.value = true
-  clearMessageTimer()
-  msg.value = ''
-  try {
-    const result = await checkLatestRelease()
-    if (!requestGuard.isCurrent(request)) return
-    if (result.error) {
-      hasUpdate.value = false
-      ok.value = false
-      msg.value = result.error || t('settings.updateFailed')
-      scheduleMessageClear()
-      return
-    }
-    ok.value = true
-    if (result.need_update) {
-      hasUpdate.value = true
-      msg.value = t('settings.updateAvailable').replace('{version}', `v${result.latest}`)
-      scheduleMessageClear()
-      return
-    }
-    hasUpdate.value = false
-    msg.value = t('settings.latestVersion')
-    scheduleMessageClear()
-  } catch (e) {
-    if (!requestGuard.isCurrent(request)) return
-    hasUpdate.value = false
-    ok.value = false
-    msg.value = e.message || String(e) || t('settings.updateFailed')
-    scheduleMessageClear()
-  } finally {
-    if (requestGuard.isCurrent(request)) checkingUpdate.value = false
-    requestGuard.finish(request)
-  }
-}
-
-function handleUpdateProgress(progress) {
-  if (!progress || !updating.value) return
-  updatePercent.value = Math.max(0, Math.min(100, Math.round(progress.percent || 0)))
-  if (progress.stage) updateStage.value = progress.stage
-  clearMessageTimer()
-  ok.value = true
-  if (progress.stage === 'download') {
-    msg.value = t('settings.updateDownloading').replace('{percent}', updatePercent.value)
-  } else if (progress.stage === 'verify') {
-    msg.value = t('settings.updateVerifying')
-  } else if (progress.stage === 'install') {
-    msg.value = t('settings.updateInstalling')
-  }
-}
-
-async function installUpdate() {
-  const request = requestGuard.begin('update')
-  // 更新期间固定住按钮状态，避免检查中的请求把按钮一直卡在 disabled
-  checkingUpdate.value = false
-  updating.value = true
-  updateStage.value = 'download'
-  updatePercent.value = 0
-  clearMessageTimer()
-  msg.value = ''
-  // 安装成功后应用会自行退出重启，此时不要复位状态，否则按钮会闪回版本号
-  let keepUpdating = false
-  try {
-    const result = await startUpdate()
-    if (!requestGuard.isCurrent(request)) return
-    ok.value = !!result.success
-    if (result.success && result.needs_restart) {
-      keepUpdating = true
-      updateStage.value = 'restart'
-      updatePercent.value = 100
-      hasUpdate.value = false
-      clearMessageTimer()
-      msg.value = result.message || t('settings.updateRestarting')
-    } else {
-      msg.value = result.message || (result.success ? t('settings.updateStarted') : t('settings.updateFailed'))
-      if (result.success) {
-        hasUpdate.value = false
-        clearMessageTimer()
-      }
-    }
-  } catch (e) {
-    if (!requestGuard.isCurrent(request)) return
-    ok.value = false
-    msg.value = e?.message || String(e) || t('settings.updateFailed')
-  } finally {
-    if (requestGuard.isCurrent(request) && !keepUpdating) updating.value = false
-    requestGuard.finish(request)
-  }
+  await updateStore.check()
 }
 
 function openGitHub() {
