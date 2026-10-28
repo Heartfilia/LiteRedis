@@ -374,20 +374,6 @@
         >
           {{ updating ? `${t('settings.updating')} ${updatePercent}%` : (hasUpdate ? t('settings.updateNow') : `${t('settings.version')} ${appVersion}`) }}
         </button>
-        <span
-          v-if="hasUpdate"
-          class="mini-icon"
-          :title="t('settings.openRelease')"
-          role="button"
-          tabindex="0"
-          @click="openRelease"
-          @keydown.enter.prevent="openRelease"
-          @keydown.space.prevent="openRelease"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 2C6.48 2 2 6.58 2 12.24c0 4.52 2.87 8.35 6.84 9.78.5.09.68-.22.68-.48 0-.24-.01-.87-.01-1.71-2.78.62-3.37-1.35-3.37-1.35-.46-1.18-1.12-1.49-1.12-1.49-.92-.64.07-.63.07-.63 1.02.07 1.56 1.07 1.56 1.07.9 1.57 2.36 1.12 2.94.86.09-.67.36-1.12.66-1.38-2.22-.26-4.56-1.15-4.56-5.13 0-1.13.39-2.06 1.03-2.78-.1-.26-.45-1.3.1-2.72 0 0 .84-.28 2.75 1.06a9.2 9.2 0 0 1 5 0c1.9-1.34 2.74-1.06 2.74-1.06.55 1.42.2 2.46.1 2.72.64.72 1.03 1.65 1.03 2.78 0 3.99-2.34 4.87-4.57 5.12.36.32.68.95.68 1.92 0 1.39-.01 2.5-.01 2.84 0 .26.18.58.69.48A10.55 10.55 0 0 0 22 12.24C22 6.58 17.52 2 12 2z"/>
-          </svg>
-        </span>
       </div>
       <div class="footer-actions">
         <button class="btn-cancel" @click="reset">{{ t('settings.reset') }}</button>
@@ -831,9 +817,6 @@ function openGitHub() {
   BrowserOpenURL('https://github.com/Heartfilia/LiteRedis')
 }
 
-function openRelease() {
-  BrowserOpenURL('https://github.com/Heartfilia/LiteRedis/releases/latest')
-}
 </script>
 
 <style scoped>
@@ -1188,31 +1171,6 @@ function openRelease() {
   transition: background 0.12s, border-color 0.12s;
 }
 .btn-cancel:hover { background: #f3f4f6; border-color: #9ca3af; }
-.mini-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  color: #64748b;
-  border-radius: 999px;
-  cursor: pointer;
-  flex: 0 0 auto;
-  transition: color 0.12s, background 0.12s;
-}
-.mini-icon:hover {
-  color: #111827;
-  background: rgba(255, 255, 255, 0.6);
-}
-.mini-icon svg {
-  width: 14px;
-  height: 14px;
-  fill: currentColor;
-}
-.mini-icon:focus-visible {
-  outline: 2px solid #93c5fd;
-  outline-offset: 1px;
-}
 .version-box:hover {
   color: #374151;
   background: rgba(255, 255, 255, 0.92);
@@ -1443,12 +1401,4 @@ function openRelease() {
   border-color: #60a5fa;
 }
 
-.settings-panel.theme-dark .mini-icon {
-  color: #94a3b8;
-}
-
-.settings-panel.theme-dark .mini-icon:hover {
-  color: #e2e8f0;
-  background: rgba(30, 41, 59, 0.9);
-}
 </style>
