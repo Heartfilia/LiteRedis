@@ -103,43 +103,53 @@ let errorFlashTimer = null
 const rendered = ref(props.show)
 const closing = ref(false)
 const modalEl = ref(null)
-const openOrigin = ref('50% 50%')
-const openScale = ref(0.86)
+// 起始位移 + 缩放：弹窗先缩成一个小卡片落在触发的编辑按钮上，再滑到中间放大
+let animFrom = { dx: 0, dy: 0, scale: 0.94 }
 let closeTimer = null
+let openFrameA = 0
+let openFrameB = 0
 
-function measureAnchor() {
+function computeFrom() {
   const el = modalEl.value
-  const rect = el ? el.getBoundingClientRect() : null
   const a = props.anchor
-  if (!rect || !rect.width || !rect.height) {
-    openOrigin.value = '50% 50%'
-    openScale.value = 0.88
-    return
-  }
-  if (!a || !a.width) {
-    openOrigin.value = '50% 50%'
-    openScale.value = 0.9
-    return
-  }
-  const originX = a.left + a.width / 2 - rect.left
-  const originY = a.top + a.height / 2 - rect.top
-  openOrigin.value = `${originX}px ${originY}px`
-  // 以编辑按钮尺寸为起点放大，限制下限避免缩成一个点
-  openScale.value = Math.max(0.05, Math.min(0.32, (a.width * 1.5) / rect.width))
+  if (!el) return { dx: 0, dy: 0, scale: 0.94 }
+  const rect = el.getBoundingClientRect()
+  if (!rect.width || !rect.height || !a || !a.width) return { dx: 0, dy: 0, scale: 0.94 }
+  const dx = a.left + a.width / 2 - (rect.left + rect.width / 2)
+  const dy = a.top + a.height / 2 - (rect.top + rect.height / 2)
+  const scale = Math.max(0.12, Math.min(0.34, (a.width * 2.2) / rect.width))
+  return { dx, dy, scale }
+}
+
+function applyFrom(from) {
+  const el = modalEl.value
+  if (!el) return
+  el.style.transformOrigin = '50% 50%'
+  el.style.transform = `translate(${from.dx}px, ${from.dy}px) scale(${from.scale})`
+  el.style.opacity = '0'
 }
 
 function playOpen() {
   const el = modalEl.value
   if (!el) return
-  measureAnchor()
-  el.style.transformOrigin = openOrigin.value
+  cancelAnimationFrame(openFrameA)
+  cancelAnimationFrame(openFrameB)
+  // 先还原到最终位置再测量，避免上一次收回动画残留的 transform 影响定位
   el.style.transition = 'none'
-  el.style.transform = `scale(${openScale.value})`
-  el.style.opacity = '0'
-  void el.offsetWidth
-  el.style.transition = 'transform 260ms cubic-bezier(0.22, 0.9, 0.24, 1), opacity 170ms ease'
-  el.style.transform = 'scale(1)'
+  el.style.transform = 'none'
   el.style.opacity = '1'
+  void el.offsetWidth
+  animFrom = computeFrom()
+  applyFrom(animFrom)
+  // 先让起始帧真正绘制出来，再开始过渡，避免完整尺寸闪一帧
+  void el.offsetWidth
+  openFrameA = requestAnimationFrame(() => {
+    openFrameB = requestAnimationFrame(() => {
+      el.style.transition = 'transform 300ms cubic-bezier(0.2, 0.84, 0.28, 1), opacity 160ms ease-out'
+      el.style.transform = 'translate(0px, 0px) scale(1)'
+      el.style.opacity = '1'
+    })
+  })
 }
 
 function resetModalStyle() {
@@ -154,6 +164,8 @@ function resetModalStyle() {
 function playClose() {
   const el = modalEl.value
   closing.value = true
+  cancelAnimationFrame(openFrameA)
+  cancelAnimationFrame(openFrameB)
   const finish = () => {
     rendered.value = false
     closing.value = false
@@ -163,11 +175,11 @@ function playClose() {
     finish()
     return
   }
-  el.style.transition = 'transform 200ms cubic-bezier(0.4, 0, 0.75, 0.2), opacity 170ms ease'
-  el.style.transform = `scale(${openScale.value})`
+  el.style.transition = 'transform 210ms cubic-bezier(0.4, 0, 0.72, 0.24), opacity 180ms ease-in'
+  el.style.transform = `translate(${animFrom.dx}px, ${animFrom.dy}px) scale(${animFrom.scale})`
   el.style.opacity = '0'
   if (closeTimer) clearTimeout(closeTimer)
-  closeTimer = setTimeout(finish, 205)
+  closeTimer = setTimeout(finish, 215)
 }
 
 watch(() => props.show, async (v) => {
@@ -192,6 +204,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   if (closeTimer) clearTimeout(closeTimer)
+  cancelAnimationFrame(openFrameA)
+  cancelAnimationFrame(openFrameB)
 })
 
 // ---- 内容 / 保存 ----

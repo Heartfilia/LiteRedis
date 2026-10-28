@@ -94,10 +94,7 @@ const valueClass = computed(() => {
 const displayValue = computed(() => {
   const value = props.data
   if (value === null) return 'null'
-  if (typeof value === 'string') {
-    const text = value.length > 200 ? value.slice(0, 200) + '…' : value
-    return '"' + text + '"'
-  }
+  if (typeof value === 'string') return '"' + value + '"'
   return String(value)
 })
 
@@ -213,19 +210,26 @@ onBeforeUnmount(() => {
 .json-row:hover {
   background: rgba(148, 163, 184, 0.12);
 }
+/* 自动换行：整行改为文本流，只折 value，key 名称保持完整不拆 */
 .json-row.is-wrap {
+  display: block;
   white-space: normal;
-  align-items: flex-start;
 }
 .json-row.is-wrap .json-caret {
-  padding-top: 1px;
+  display: inline-block;
+  width: 10px;
+  margin-right: 2px;
 }
-.json-row.is-wrap .json-key,
+.json-row.is-wrap .json-sep {
+  margin-right: 3px;
+}
+.json-row.is-wrap .json-key {
+  white-space: nowrap;
+}
 .json-row.is-wrap .json-value {
-  min-width: 0;
+  white-space: pre-wrap;
   word-break: break-all;
   overflow-wrap: anywhere;
-  white-space: pre-wrap;
 }
 .json-caret {
   width: 10px;
