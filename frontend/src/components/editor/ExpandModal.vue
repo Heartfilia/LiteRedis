@@ -51,9 +51,7 @@
           </div>
         </div>
         <div class="expand-body">
-          <div v-if="treeMode" class="json-view" :class="themeClass">
-            <JsonTree :data="treeData" :depth="0" />
-          </div>
+          <JsonViewer v-if="treeMode" :data="treeData" />
           <textarea
             v-else-if="editable"
             v-model="localContent"
@@ -73,7 +71,7 @@ import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
-import JsonTree from '../common/JsonTree.vue'
+import JsonViewer from '../common/JsonViewer.vue'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
@@ -574,33 +572,6 @@ async function copy() {
 .expand-textarea:disabled {
   background: #f9fafb;
   color: #9ca3af;
-}
-.json-view {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 10px 12px;
-  border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.9);
-  --json-key: #1d4ed8;
-  --json-sep: #94a3b8;
-  --json-string: #15803d;
-  --json-number: #b45309;
-  --json-boolean: #a21caf;
-  --json-null: #94a3b8;
-  --json-summary: #64748b;
-}
-.json-view.theme-dark {
-  border-color: rgba(71, 85, 105, 0.96);
-  background: rgba(15, 23, 42, 0.75);
-  --json-key: #93c5fd;
-  --json-sep: #64748b;
-  --json-string: #86efac;
-  --json-number: #fcd34d;
-  --json-boolean: #f0abfc;
-  --json-null: #94a3b8;
-  --json-summary: #94a3b8;
 }
 .expand-overlay.theme-dark .btn-save-modal.success-flash {
   background: linear-gradient(135deg, rgba(9, 59, 44, 0.98), rgba(13, 78, 58, 0.96));

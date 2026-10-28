@@ -2,9 +2,7 @@
   <div class="string-editor" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <FloatingMessage :message="msg" :success="ok" />
     <div v-if="props.keyValue?.truncated" class="truncated-hint">⚠️ {{ t('keyEditor.stringTruncated') }}</div>
-    <div v-if="treeMode" class="json-view" :class="`theme-${settingsStore.themeMode || 'light'}`">
-      <JsonTree :data="treeData" :depth="0" />
-    </div>
+    <JsonViewer v-if="treeMode" :data="treeData" />
     <textarea v-else v-model="localVal" rows="10" :disabled="saving" />
     <div class="editor-actions">
       <button
@@ -46,7 +44,7 @@ import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
 import { setString } from '../../api/wails.js'
 import FloatingMessage from '../common/FloatingMessage.vue'
-import JsonTree from '../common/JsonTree.vue'
+import JsonViewer from '../common/JsonViewer.vue'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
 import './editorShared.css'
 
@@ -268,33 +266,6 @@ async function save() {
   border: 1px solid rgba(251, 191, 36, 0.35);
   border-radius: 6px;
   padding: 5px 10px;
-}
-.json-view {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 10px 12px;
-  border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.9);
-  --json-key: #1d4ed8;
-  --json-sep: #94a3b8;
-  --json-string: #15803d;
-  --json-number: #b45309;
-  --json-boolean: #a21caf;
-  --json-null: #94a3b8;
-  --json-summary: #64748b;
-}
-.json-view.theme-dark {
-  border-color: rgba(71, 85, 105, 0.96);
-  background: rgba(15, 23, 42, 0.75);
-  --json-key: #93c5fd;
-  --json-sep: #64748b;
-  --json-string: #86efac;
-  --json-number: #fcd34d;
-  --json-boolean: #f0abfc;
-  --json-null: #94a3b8;
-  --json-summary: #94a3b8;
 }
 textarea {
   flex: 1; resize: none; padding: 10px 12px;
