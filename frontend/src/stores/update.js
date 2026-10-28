@@ -26,7 +26,12 @@ export const useUpdateStore = defineStore('update', {
     ensureListener() {
       if (this.listening) return
       this.listening = true
-      EventsOn('update:progress', (progress) => this.onProgress(progress))
+      try {
+        EventsOn('update:progress', (progress) => this.onProgress(progress))
+      } catch (e) {
+        // 非 Wails 环境（单测 / 浏览器预览）里没有 runtime，忽略即可
+        this.listening = false
+      }
     },
 
     setMessage(text, ok = true, clearAfter = 0) {
@@ -59,6 +64,16 @@ export const useUpdateStore = defineStore('update', {
       } else if (progress.stage === 'install') {
         this.setMessage(t('settings.updateInstalling'), true, 0)
       }
+    },
+
+    // 版本按钮的唯一入口：有更新就安装，否则检查；检查/更新进行中直接忽略
+    async runPrimaryAction() {
+      if (this.checking || this.updating) return
+      if (this.hasUpdate) {
+        await this.install()
+        return
+      }
+      await this.check()
     },
 
     async check() {

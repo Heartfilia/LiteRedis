@@ -717,11 +717,7 @@ async function regenerateToken() {
 }
 
 async function handleVersionClick() {
-  if (updateStore.hasUpdate) {
-    await updateStore.install()
-    return
-  }
-  await updateStore.check()
+  await updateStore.runPrimaryAction()
 }
 
 function openGitHub() {
