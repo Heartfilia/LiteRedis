@@ -66,7 +66,7 @@
                   <button class="btn-tiny" :class="{ copied: copiedMember === m.member }" @click="copyMember(m.member)">
                     {{ copiedMember === m.member ? '✓' : t('keyEditor.copy') }}
                   </button>
-                  <button class="btn-tiny" @click="openEdit(m)">{{ t('keyEditor.edit') }}</button>
+                  <button class="btn-tiny" @click="openEdit(m, $event)">{{ t('keyEditor.edit') }}</button>
                   <InlineDeleteConfirm
                     :label="t('keyEditor.delete')"
                     :confirm-text="t('keyEditor.confirmDelete')"
@@ -109,7 +109,7 @@
       </span>
     </div>
 
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" @close="expandShow = false" @save="saveFromModal" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
     <ExtractMenu
       :visible="extractMenu.visible"
       :x="extractMenu.x"
@@ -138,6 +138,7 @@ import FloatingMessage from '../common/FloatingMessage.vue'
 import ExtractMenu from '../common/ExtractMenu.vue'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
 import { openBrowserExtract, copyExtractLink } from '../../services/browserExtract.js'
+import { anchorRect } from '../../utils/anchor.js'
 import './editorShared.css'
 
 const props = defineProps({ keyValue: Object })
@@ -227,6 +228,7 @@ const expandTitle = ref('')
 const expandContent = ref('')
 const expandEditable = ref(false)
 const expandSaving = ref(false)
+const expandAnchor = ref(null)
 const editModalMember = ref('')
 const editModalScore = ref(0)
 
@@ -539,7 +541,8 @@ function clearSearch() {
 function startEdit(m) { editingMember.value = m.member; editScore.value = m.score }
 function cancelEdit() { editingMember.value = null }
 
-function openEdit(m) {
+function openEdit(m, event) {
+  expandAnchor.value = anchorRect(event)
   expandTitle.value = 'member'
   expandContent.value = m.member
   editModalMember.value = m.member

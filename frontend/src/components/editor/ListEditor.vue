@@ -68,7 +68,7 @@
         <div class="item-actions">
           <template v-if="editingIdx !== displayOriginalIndices[idx]">
             <button class="btn-tiny" :class="{ copied: copiedItem === item + idx }" @click="copyItem(item, idx)">{{ copiedItem === item + idx ? '✓' : t('keyEditor.copy') }}</button>
-            <button v-if="searchResults === null && sortOrder === 'none'" class="btn-tiny" @click="openEdit(displayOriginalIndices[idx], item)">{{ t('keyEditor.edit') }}</button>
+            <button v-if="searchResults === null && sortOrder === 'none'" class="btn-tiny" @click="openEdit(displayOriginalIndices[idx], item, $event)">{{ t('keyEditor.edit') }}</button>
             <InlineDeleteConfirm
               :label="t('keyEditor.delete')"
               :confirm-text="t('keyEditor.confirmDelete')"
@@ -108,7 +108,7 @@
       </span>
     </div>
 
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" @close="expandShow = false" @save="saveFromModal" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
     <ExtractMenu
       :visible="extractMenu.visible"
       :x="extractMenu.x"
@@ -137,6 +137,7 @@ import FloatingMessage from '../common/FloatingMessage.vue'
 import ExtractMenu from '../common/ExtractMenu.vue'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
 import { openBrowserExtract, copyExtractLink } from '../../services/browserExtract.js'
+import { anchorRect } from '../../utils/anchor.js'
 import './editorShared.css'
 
 const props = defineProps({ keyValue: Object })
@@ -194,6 +195,7 @@ const expandTitle = ref('')
 const expandContent = ref('')
 const expandEditable = ref(false)
 const expandSaving = ref(false)
+const expandAnchor = ref(null)
 const editModalIdx = ref(-1)
 
 // 服务端分页状态
@@ -455,8 +457,9 @@ function startEdit(idx, val) {
 }
 function cancelEdit() { editingIdx.value = -1 }
 
-function openEdit(idx, val) {
+function openEdit(idx, val, event) {
   if (idx === -1) return
+  expandAnchor.value = anchorRect(event)
   expandTitle.value = `item[${idx + 1}]`
   expandContent.value = val
   editModalIdx.value = idx

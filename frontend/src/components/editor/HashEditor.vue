@@ -265,7 +265,7 @@
               <div class="action-btns">
                 <template v-if="editingField !== field">
                   <button class="btn-tiny" :class="{ copied: copiedField === field }" @click="copyVal(val, field)">{{ copiedField === field ? '✓' : t('keyEditor.copy') }}</button>
-                  <button class="btn-tiny" @click="openEdit(field, val)">{{ t('keyEditor.edit') }}</button>
+                  <button class="btn-tiny" @click="openEdit(field, val, $event)">{{ t('keyEditor.edit') }}</button>
                   <InlineDeleteConfirm
                     :label="t('keyEditor.delete')"
                     :confirm-text="t('keyEditor.confirmDelete')"
@@ -308,7 +308,7 @@
       </span>
     </div>
 
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" @close="expandShow = false" @save="saveFromModal" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
     <ExtractMenu
       :visible="extractMenu.visible"
       :x="extractMenu.x"
@@ -337,6 +337,7 @@ import FloatingMessage from '../common/FloatingMessage.vue'
 import ExtractMenu from '../common/ExtractMenu.vue'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
 import { openBrowserExtract, copyExtractLink } from '../../services/browserExtract.js'
+import { anchorRect } from '../../utils/anchor.js'
 import './editorShared.css'
 
 const INT32_MIN = -2147483648
@@ -446,6 +447,7 @@ const expandTitle = ref('')
 const expandContent = ref('')
 const expandEditable = ref(false)
 const expandSaving = ref(false)
+const expandAnchor = ref(null)
 const editModalField = ref('')
 
 // 服务端分页状态
@@ -1169,7 +1171,8 @@ function cancelEdit() {
   editingField.value = null
 }
 
-function openEdit(field, val) {
+function openEdit(field, val, event) {
+  expandAnchor.value = anchorRect(event)
   expandTitle.value = field
   expandContent.value = val
   editModalField.value = field
