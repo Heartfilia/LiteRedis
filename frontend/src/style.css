@@ -27,6 +27,23 @@ html, body {
   overflow: hidden;
 }
 
+/* 界面元素默认不可选中（避免 Cmd/Ctrl+A 把按钮、列表文字一起选中），
+   输入框、可编辑区域、代码块和 JSON 内容仍然可以选择 */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+input,
+textarea,
+select,
+pre,
+code,
+[contenteditable="true"],
+.json-tree {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 * {
   box-sizing: border-box;
 }

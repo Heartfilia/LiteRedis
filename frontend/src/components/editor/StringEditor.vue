@@ -7,10 +7,16 @@
     <div class="editor-actions">
       <button
         class="btn-action btn-json"
+        :class="{ active: formatApplied }"
         :disabled="saving || (!formatApplied && !localVal.trim())"
         @click="toggleJson"
       >{{ formatApplied ? t('keyEditor.jsonRestore') : t('keyEditor.jsonFormat') }}</button>
-      <button class="btn-action btn-json" :disabled="saving || !localVal.trim()" @click="toggleTreeView">
+      <button
+        class="btn-action btn-json"
+        :class="{ active: treeMode }"
+        :disabled="saving || !localVal.trim()"
+        @click="toggleTreeView"
+      >
         {{ treeMode ? t('keyEditor.jsonTextView') : t('keyEditor.jsonTreeView') }}
       </button>
       <button class="btn-action" :class="{ copied }" @click="copyValue">{{ copied ? '✓ ' + t('keyEditor.copied') : t('keyEditor.copy') }}</button>
@@ -340,6 +346,24 @@ textarea:focus { border-color: rgba(96, 165, 250, 0.92); box-shadow: 0 0 0 3px r
   background: rgba(30, 41, 59, 0.96);
   border-color: #60a5fa;
   color: #e2e8f0;
+}
+/* 格式化 / 树形：触发状态高亮 */
+.btn-json.active {
+  background: rgba(219, 234, 254, 0.98);
+  border-color: rgba(96, 165, 250, 0.92);
+  color: #1d4ed8;
+  box-shadow: 0 0 0 1px rgba(191, 219, 254, 0.7) inset;
+}
+.btn-json.active:hover {
+  background: rgba(219, 234, 254, 1);
+  border-color: rgba(59, 130, 246, 0.95);
+  color: #1e40af;
+}
+.string-editor.theme-dark .btn-json.active {
+  background: rgba(30, 64, 175, 0.34);
+  border-color: rgba(96, 165, 250, 0.56);
+  color: #dbeafe;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.24) inset;
 }
 .btn-action:disabled {
   cursor: default;

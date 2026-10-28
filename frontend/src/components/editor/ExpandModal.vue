@@ -9,7 +9,7 @@
             <button
               v-if="editable && !saving"
               class="btn-json-modal"
-              :class="{ 'json-flash-error': jsonError }"
+              :class="{ 'json-flash-error': jsonError, active: formatApplied }"
               :disabled="!localContent.trim()"
               :title="formatApplied ? t('keyEditor.jsonRestore') : t('keyEditor.jsonFormat')"
               @click="toggleJson"
@@ -17,7 +17,7 @@
             <button
               v-if="editable && !saving"
               class="btn-json-modal"
-              :class="{ 'json-flash-error': jsonError }"
+              :class="{ 'json-flash-error': jsonError, active: treeMode }"
               :disabled="!localContent.trim()"
               :title="treeMode ? t('keyEditor.jsonTextView') : t('keyEditor.jsonTreeView')"
               @click="toggleTreeView"
@@ -493,6 +493,18 @@ async function copy() {
   color: #1e293b;
   transform: translateY(-1px);
 }
+/* 格式化 / 树形：触发状态高亮 */
+.btn-json-modal.active {
+  background: rgba(219, 234, 254, 0.98);
+  border-color: rgba(96, 165, 250, 0.92);
+  color: #1d4ed8;
+  box-shadow: 0 0 0 1px rgba(191, 219, 254, 0.7) inset;
+}
+.btn-json-modal.active:hover:not(:disabled) {
+  background: rgba(219, 234, 254, 1);
+  border-color: rgba(59, 130, 246, 0.95);
+  color: #1e40af;
+}
 .btn-json-modal.json-flash-error {
   background: rgba(255, 241, 242, 0.98);
   color: #b91c1c;
@@ -508,6 +520,12 @@ async function copy() {
   background: rgba(30, 41, 59, 0.96);
   border-color: #60a5fa;
   color: #e2e8f0;
+}
+.expand-overlay.theme-dark .btn-json-modal.active {
+  background: rgba(30, 64, 175, 0.34);
+  border-color: rgba(96, 165, 250, 0.56);
+  color: #dbeafe;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.24) inset;
 }
 .expand-overlay.theme-dark .btn-json-modal.json-flash-error {
   background: rgba(76, 20, 27, 0.98);
