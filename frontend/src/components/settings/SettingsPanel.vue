@@ -372,7 +372,11 @@
           :title="hasUpdate ? t('settings.updateNow') : t('settings.checkUpdate')"
           @click="handleVersionClick"
         >
-          {{ updating ? `${t('settings.updating')} ${updatePercent}%` : (hasUpdate ? t('settings.updateNow') : `${t('settings.version')} ${appVersion}`) }}
+          {{ updating
+            ? (updateStage === 'restart' ? t('settings.updateRestarting') : `${t('settings.updating')} ${updatePercent}%`)
+            : (checkingUpdate
+              ? t('settings.checkingUpdate')
+              : (hasUpdate ? t('settings.updateNow') : `${t('settings.version')} ${appVersion}`)) }}
         </button>
       </div>
       <div class="footer-actions">
@@ -426,6 +430,8 @@ const saving = ref(false)
 const checkingUpdate = ref(false)
 const updating = ref(false)
 const updatePercent = ref(0)
+// download / verify / install / restart，用于按钮文案
+const updateStage = ref('download')
 const appVersion = ref('dev')
 const hasUpdate = ref(false)
 const msg = ref('')
@@ -776,6 +782,7 @@ async function checkUpdate() {
 function handleUpdateProgress(progress) {
   if (!progress || !updating.value) return
   updatePercent.value = Math.max(0, Math.min(100, Math.round(progress.percent || 0)))
+  if (progress.stage) updateStage.value = progress.stage
   clearMessageTimer()
   ok.value = true
   if (progress.stage === 'download') {
@@ -789,26 +796,39 @@ function handleUpdateProgress(progress) {
 
 async function installUpdate() {
   const request = requestGuard.begin('update')
+  // 更新期间固定住按钮状态，避免检查中的请求把按钮一直卡在 disabled
+  checkingUpdate.value = false
   updating.value = true
+  updateStage.value = 'download'
   updatePercent.value = 0
   clearMessageTimer()
   msg.value = ''
+  // 安装成功后应用会自行退出重启，此时不要复位状态，否则按钮会闪回版本号
+  let keepUpdating = false
   try {
     const result = await startUpdate()
     if (!requestGuard.isCurrent(request)) return
     ok.value = !!result.success
-    msg.value = result.message || (result.success ? t('settings.updateStarted') : t('settings.updateFailed'))
-    if (result.success) {
+    if (result.success && result.needs_restart) {
+      keepUpdating = true
+      updateStage.value = 'restart'
+      updatePercent.value = 100
       hasUpdate.value = false
-      // 自动安装成功后应用会自行退出并重启，不再自动清除提示
       clearMessageTimer()
+      msg.value = result.message || t('settings.updateRestarting')
+    } else {
+      msg.value = result.message || (result.success ? t('settings.updateStarted') : t('settings.updateFailed'))
+      if (result.success) {
+        hasUpdate.value = false
+        clearMessageTimer()
+      }
     }
   } catch (e) {
     if (!requestGuard.isCurrent(request)) return
     ok.value = false
     msg.value = e?.message || String(e) || t('settings.updateFailed')
   } finally {
-    if (requestGuard.isCurrent(request)) updating.value = false
+    if (requestGuard.isCurrent(request) && !keepUpdating) updating.value = false
     requestGuard.finish(request)
   }
 }
