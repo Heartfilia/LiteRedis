@@ -24,6 +24,16 @@ jobs:
         with:
           node-version: '20'
 
+      # main.go 用 //go:embed all:frontend/dist，前端必须先构建，
+      # 否则 go vet / build / test 都会因为找不到 frontend/dist 而失败
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: frontend
+
+      - name: Frontend build
+        run: npm run build
+        working-directory: frontend
+
       - name: Go vet
         run: CGO_ENABLED=0 go vet ./...
 
@@ -33,14 +43,6 @@ jobs:
 
       - name: Go test
         run: CGO_ENABLED=0 go test -count=1 -timeout 300s ./...
-
-      - name: Install frontend deps
-        run: npm ci
-        working-directory: frontend
-
-      - name: Frontend build
-        run: npm run build
-        working-directory: frontend
 
       - name: Frontend unit tests
         run: node --test src/utils/*.test.js src/stores/*.test.js
