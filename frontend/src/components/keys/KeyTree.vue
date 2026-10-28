@@ -380,8 +380,8 @@ function syncDbBarNarrow() {
   if (!bar) return
   const inner = bar.querySelector('.db-bar-left-inner')
   const leftWidth = inner ? inner.getBoundingClientRect().width : 0
-  // 居中需要：底栏宽度 >= 2 * 左侧组宽度 + 左右内边距 24 + 两处间距 16 + 按钮 18
-  barNarrow.value = bar.clientWidth > 0 && bar.clientWidth < 2 * leftWidth + 58
+  // 居中需要：底栏宽度 >= 2 * 左侧组宽度 + 左右内边距 24 + 两处间距 16 + 按钮 22
+  barNarrow.value = bar.clientWidth > 0 && bar.clientWidth < 2 * leftWidth + 62
 }
 
 let dbBarObservedEl = null
@@ -848,34 +848,34 @@ function collapseVisibleTree() {
   flex-shrink: 0;
 }
 
-/* 加载更多：与同栏图标按钮一致的方形小按钮 */
+/* 加载更多：与右侧 key 内容面板底部按钮保持一致 */
 .btn-load-more {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  min-width: 18px;
-  height: 18px;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
   aspect-ratio: 1 / 1;
   box-sizing: border-box;
   padding: 0;
   background: transparent;
-  color: #94a3b8;
+  color: #64748b;
   border: 1px solid rgba(203, 213, 225, 0.95);
-  border-radius: 6px;
+  border-radius: 5px;
   cursor: pointer;
-  flex-shrink: 0;
+  flex: 0 0 auto;
   transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
 }
 .btn-load-more svg {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
   display: block;
 }
 .btn-load-more:hover:not(:disabled) {
+  background: #eff6ff;
   color: #2563eb;
   border-color: #93c5fd;
-  background: rgba(239, 246, 255, 0.72);
 }
 .btn-load-more.loading svg {
   opacity: 0.4;
@@ -886,18 +886,22 @@ function collapseVisibleTree() {
   50% { transform: translateY(2px); }
 }
 .btn-load-more:disabled {
-  opacity: 0.5;
+  color: #9ca3af;
+  border-color: #d1d5db;
   cursor: not-allowed;
-  background: transparent;
+  background: #f9fafb;
+  box-shadow: none;
 }
 .key-tree.theme-dark .btn-load-more {
+  background: transparent;
   color: #94a3b8;
   border-color: rgba(71, 85, 105, 0.95);
+  box-shadow: none;
 }
 .key-tree.theme-dark .btn-load-more:hover:not(:disabled) {
-  color: #dbeafe;
-  border-color: rgba(96, 165, 250, 0.6);
-  background: rgba(30, 41, 59, 0.9);
+  background: rgba(30, 58, 95, 0.6);
+  color: #bfdbfe;
+  border-color: rgba(59, 130, 246, 0.7);
 }
 .load-more-hint {
   font-size: 12px;
