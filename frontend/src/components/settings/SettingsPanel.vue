@@ -361,6 +361,11 @@
 
     <div class="settings-footer">
       <div class="footer-status">
+        <button class="git-link" title="GitHub" @click="openGitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+          </svg>
+        </button>
         <button
           class="version-box"
           :disabled="checkingUpdate || updating"
@@ -822,6 +827,10 @@ async function installUpdate() {
   }
 }
 
+function openGitHub() {
+  BrowserOpenURL('https://github.com/Heartfilia/LiteRedis')
+}
+
 function openRelease() {
   BrowserOpenURL('https://github.com/Heartfilia/LiteRedis/releases/latest')
 }
@@ -1074,6 +1083,42 @@ function openRelease() {
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+/* 左下角 GitHub 入口 */
+.git-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+.git-link svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+.git-link:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+.settings-panel.theme-dark .git-link {
+  background: rgba(15, 23, 42, 0.92);
+  border-color: rgba(71, 85, 105, 0.96);
+  color: #94a3b8;
+}
+.settings-panel.theme-dark .git-link:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: #60a5fa;
+  color: #e2e8f0;
 }
 .footer-actions {
   display: flex;
