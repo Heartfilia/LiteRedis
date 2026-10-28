@@ -119,7 +119,7 @@
       </div>
 
       <!-- DB 选择 + Key 统计 -->
-      <div class="db-bar">
+      <div ref="dbBarRef" class="db-bar" :class="{ 'bar-narrow': barNarrow }">
         <div class="db-bar-side db-bar-left">
           <div class="db-bar-left-inner" :class="{ 'cluster-align': activeConn?.is_cluster }">
             <template v-if="!activeConn?.is_cluster">
@@ -295,7 +295,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, ref, watch } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -368,6 +368,39 @@ watch(activeConnID, () => {
   dbCount.value = 16
   loadDatabaseCount()
 })
+
+// 底栏「加载更多」居中策略：宽度够时落在整条底栏中线；
+// 面板太窄、左侧按钮组会越过中线时，改为并入左侧图标组（间距 2px）
+const dbBarRef = ref(null)
+const barNarrow = ref(false)
+let dbBarObserver = null
+
+function syncDbBarNarrow() {
+  const bar = dbBarRef.value
+  if (!bar) return
+  const inner = bar.querySelector('.db-bar-left-inner')
+  const leftWidth = inner ? inner.getBoundingClientRect().width : 0
+  // 居中需要：底栏宽度 >= 2 * 左侧组宽度 + 左右内边距 24 + 两处间距 16 + 按钮 18
+  barNarrow.value = bar.clientWidth > 0 && bar.clientWidth < 2 * leftWidth + 58
+}
+
+let dbBarObservedEl = null
+function ensureDbBarObserver() {
+  const bar = dbBarRef.value
+  if (!bar || typeof ResizeObserver === 'undefined' || dbBarObservedEl === bar) return
+  if (dbBarObserver) dbBarObserver.disconnect()
+  dbBarObserver = new ResizeObserver(syncDbBarNarrow)
+  dbBarObserver.observe(bar)
+  dbBarObservedEl = bar
+}
+
+function syncDbBarLayout() {
+  ensureDbBarObserver()
+  syncDbBarNarrow()
+}
+
+onMounted(syncDbBarLayout)
+onUpdated(syncDbBarLayout)
 
 function openMoreMenu(event) {
   if (readOnly.value || !workspaceStore.selectedKeys.length) return
@@ -507,6 +540,11 @@ watch(() => moreMenu.value.visible, (visible) => {
 
 onBeforeUnmount(() => {
   if (disposeMenuEscape) disposeMenuEscape()
+  if (dbBarObserver) {
+    dbBarObserver.disconnect()
+    dbBarObserver = null
+    dbBarObservedEl = null
+  }
   document.removeEventListener('click', closeMoreMenu)
 })
 document.addEventListener('click', closeMoreMenu)
@@ -914,6 +952,16 @@ function collapseVisibleTree() {
 .db-bar-right {
   justify-content: flex-end;
   min-width: 0;
+}
+/* 窄面板：左侧按钮组会越过中线，加载更多改为并入左侧图标组，不再单独居中 */
+.db-bar.bar-narrow .db-bar-left {
+  flex: 0 0 auto;
+}
+.db-bar.bar-narrow .db-bar-center {
+  margin-left: -6px;
+}
+.db-bar.bar-narrow .db-bar-right {
+  flex: 1 1 auto;
 }
 .db-select {
   width: 46px;
