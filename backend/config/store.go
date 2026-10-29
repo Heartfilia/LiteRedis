@@ -72,8 +72,44 @@ func loadStore() (*ConfigStore, error) {
 		store.Settings.LocalAPIEnabled = false
 		store.Settings.ScanDefaultMigrated = true
 	}
+	ensureUniqueConnectionNames(&store)
 	ensureConnectionOrder(&store)
 	return &store, nil
+}
+
+// ensureUniqueConnectionNames 一次性整理历史数据：同一分组下的重名连接自动加序号后缀，
+// 保证「同组名称唯一」的规则对老配置同样成立（结果会在下一次保存时落盘）
+func ensureUniqueConnectionNames(store *ConfigStore) {
+	if len(store.Connections) < 2 {
+		return
+	}
+	seen := make(map[string]struct{}, len(store.Connections))
+	for i := range store.Connections {
+		conn := &store.Connections[i]
+		name := strings.TrimSpace(conn.Name)
+		group := strings.TrimSpace(conn.Group)
+		conn.Group = group
+		if name == "" {
+			// 空名字属于脏数据，留给用户自己改，这里不硬塞名字
+			continue
+		}
+		key := strings.ToLower(group) + "\x00" + strings.ToLower(name)
+		if _, exists := seen[key]; !exists {
+			seen[key] = struct{}{}
+			conn.Name = name
+			continue
+		}
+		for suffix := 2; ; suffix++ {
+			candidate := fmt.Sprintf("%s (%d)", name, suffix)
+			candidateKey := strings.ToLower(group) + "\x00" + strings.ToLower(candidate)
+			if _, taken := seen[candidateKey]; taken {
+				continue
+			}
+			seen[candidateKey] = struct{}{}
+			conn.Name = candidate
+			break
+		}
+	}
 }
 
 func backupCorruptStore(data []byte) (string, error) {

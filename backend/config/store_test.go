@@ -244,3 +244,49 @@ func TestReorderRejectsDuplicateNameInGroup(t *testing.T) {
 		t.Fatalf("plain reorder should be allowed: %v", err)
 	}
 }
+
+func TestLegacyDuplicateNamesAreNormalized(t *testing.T) {
+	path := useTestConfigPath(t)
+	payload := `{"version":1,"connections":[
+		{"id":"a","name":"dev","group":"A","host":"h","port":6379,"sort_order":0},
+		{"id":"b","name":" DEV ","group":" A ","host":"h","port":6379,"sort_order":1},
+		{"id":"c","name":"dev","group":"B","host":"h","port":6379,"sort_order":2}
+	],"settings":{}}`
+	if err := os.WriteFile(path, []byte(payload), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	conns, err := ListConnections()
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	got := map[string]string{}
+	for _, conn := range conns {
+		got[conn.ID] = conn.Name
+	}
+	if got["a"] != "dev" {
+		t.Fatalf("a should keep its name, got %q", got["a"])
+	}
+	if got["b"] != "DEV (2)" {
+		t.Fatalf("second duplicate should be renamed, got %q", got["b"])
+	}
+	if got["c"] != "dev" {
+		t.Fatalf("same name in another group must stay untouched, got %q", got["c"])
+	}
+
+	// 迁移后保存老连接不应该被同名挡住（自身被排除）
+	first := conns[0]
+	first.Host = "10.0.0.2"
+	if _, err := SaveConnection(first); err != nil {
+		t.Fatalf("saving migrated connection: %v", err)
+	}
+
+	// 保存后改名结果落盘
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "DEV (2)") {
+		t.Fatalf("expected renamed connection to be persisted, file: %s", data)
+	}
+}
