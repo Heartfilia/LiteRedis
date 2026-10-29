@@ -126,6 +126,19 @@ GOCACHE=/tmp/literedis-go-cache wails build \
 - `codesign --verify --deep --strict --verbose=2` 校验通过。
 - 本轮计划已全部完成，不再有“唯一未完成事项”。
 
+## 更新内容（what's new）维护约定
+
+版本更新后第一次打开应用会弹出「更新内容」弹窗，文案来源有两级：
+
+1. **本地** `frontend/src/changelog.js` 的 `RELEASE_NOTES`：key 是不带 `v` 的版本号（如 `0.7.0`），发布前在文件末尾补一条即可，优先级最高，不依赖网络。
+2. **在线兜底**：本地没有对应版本时，读 GitHub Release 说明；说明里只有 `Full Changelog` 时，自动改用「上一个发布 → 当前发布」的提交列表。
+
+约定：
+
+- 只有在明确要求时才更新 `changelog.js`，不要每轮改动都自动追加。
+- 开发环境（`AppVersion=dev`）每次启动都会弹，并用 `RELEASE_NOTES` 里最新加的一条做预览，不写入"已读"标记。
+- 正式版本弹过一次会写入配置里的 `last_seen_version`，同一版本不再出现。
+
 ## 工作区注意事项
 
 - 当前改动尚未提交，包含约 27 个已修改文件和多组新增测试；这是本轮优化成果，不是待清理文件。

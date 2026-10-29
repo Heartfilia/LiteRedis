@@ -40,6 +40,7 @@ import SettingsModal from './components/settings/SettingsModal.vue'
 import { useConnectionsStore } from './stores/connections.js'
 import { useSettingsStore } from './stores/settings.js'
 import { getAppVersion, getReleaseNotes, markVersionSeen } from './api/wails.js'
+import { RELEASE_NOTES } from './changelog.js'
 
 const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
@@ -59,6 +60,18 @@ provide('openSettings', () => { showSettings.value = true })
 const showWhatsNew = ref(false)
 const whatsNew = ref({ version: '', body: '', url: '' })
 
+// 版本号归一化：去掉前缀 v，便于和 changelog 里的 key 对应
+function notesKey(version) {
+  return String(version || '').replace(/^v/i, '').trim()
+}
+
+// changelog 里最后加的一条，开发环境每次启动都用它预览
+function latestLocalNotes() {
+  const keys = Object.keys(RELEASE_NOTES)
+  if (!keys.length) return ''
+  return RELEASE_NOTES[keys[keys.length - 1]] || ''
+}
+
 async function maybeShowWhatsNew() {
   let version = ''
   try {
@@ -66,9 +79,26 @@ async function maybeShowWhatsNew() {
   } catch (e) {
     return
   }
-  // 开发版（编译期 AppVersion 为 dev）不弹
-  if (!version || version.toLowerCase() === 'dev') return
+  // 开发版（编译期 AppVersion 为 dev）：每次启动都弹，方便确认文案和样式
+  if (!version || version.toLowerCase() === 'dev') {
+    const body = latestLocalNotes()
+    if (!body) return
+    whatsNew.value = { version: '', body, url: '' }
+    showWhatsNew.value = true
+    return
+  }
   if (settingsStore.lastSeenVersion === version) return
+  // 本地 changelog 优先，不受网络与 GitHub 限流影响
+  const localNotes = RELEASE_NOTES[notesKey(version)]
+  if (localNotes) {
+    whatsNew.value = {
+      version: notesKey(version),
+      body: localNotes,
+      url: 'https://github.com/Heartfilia/LiteRedis/releases/tag/v' + notesKey(version),
+    }
+    showWhatsNew.value = true
+    return
+  }
   try {
     const notes = await getReleaseNotes(version)
     // 拉不到说明就什么都不做，也不标记版本，下次启动继续尝试
@@ -83,6 +113,7 @@ async function maybeShowWhatsNew() {
 async function closeWhatsNew() {
   showWhatsNew.value = false
   const version = whatsNew.value.version
+  // 开发预览不记录，下次启动继续弹
   if (!version) return
   try {
     await markVersionSeen(version)

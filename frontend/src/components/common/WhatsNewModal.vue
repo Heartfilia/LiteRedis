@@ -5,7 +5,7 @@
         <div class="wn-header">
           <div class="wn-title-wrap">
             <span class="wn-title">{{ t('whatsNew.title') }}</span>
-            <span class="wn-version">v{{ version }}</span>
+            <span v-if="version" class="wn-version">v{{ version }}</span>
           </div>
           <button class="wn-close" :title="t('keyEditor.close')" @click="close">✕</button>
         </div>
