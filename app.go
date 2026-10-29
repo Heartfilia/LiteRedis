@@ -1018,6 +1018,14 @@ func (a *App) GetSettings() (config.AppSettings, error) {
 }
 
 // SaveSettings 保存全局设置
+// MarkVersionSeen 记录已经看过某个版本的更新说明，保证每个版本只提示一次
+func (a *App) MarkVersionSeen(version string) config.OperationResult {
+	if err := config.MarkVersionSeen(version); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
 func (a *App) SaveSettings(s config.AppSettings) config.OperationResult {
 	if err := config.SaveSettings(s); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}

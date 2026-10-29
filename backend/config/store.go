@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -359,6 +360,29 @@ func SaveSettings(s AppSettings) error {
 	if s.LocalAPIPort < 1024 || s.LocalAPIPort > 65535 {
 		s.LocalAPIPort = defaults.LocalAPIPort
 	}
+	// 保存设置时保留「已看过更新说明的版本」，避免每次应用设置把弹窗重新触发
+	if s.LastSeenVersion == "" {
+		s.LastSeenVersion = store.Settings.LastSeenVersion
+	}
 	store.Settings = s
+	return saveStore(store)
+}
+
+// MarkVersionSeen 记录用户已经看过某个版本的更新说明（每个版本只提示一次）
+func MarkVersionSeen(version string) error {
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return nil
+	}
+	storeMu.Lock()
+	defer storeMu.Unlock()
+	store, err := loadStore()
+	if err != nil {
+		return err
+	}
+	if store.Settings.LastSeenVersion == version {
+		return nil
+	}
+	store.Settings.LastSeenVersion = version
 	return saveStore(store)
 }

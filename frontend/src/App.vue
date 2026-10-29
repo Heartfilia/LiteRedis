@@ -8,6 +8,13 @@
       @close="showConnManager = false"
     />
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
+    <WhatsNewModal
+      v-if="showWhatsNew"
+      :version="whatsNew.version"
+      :body="whatsNew.body"
+      :url="whatsNew.url"
+      @close="closeWhatsNew"
+    />
     <Teleport to="body">
       <Transition name="app-toast">
         <div
@@ -28,9 +35,11 @@ import { installGlobalShortcuts } from './utils/shortcuts.js'
 import Sidebar from './components/layout/Sidebar.vue'
 import MainContent from './components/layout/MainContent.vue'
 import ConnectionManager from './components/connections/ConnectionManager.vue'
+import WhatsNewModal from './components/common/WhatsNewModal.vue'
 import SettingsModal from './components/settings/SettingsModal.vue'
 import { useConnectionsStore } from './stores/connections.js'
 import { useSettingsStore } from './stores/settings.js'
+import { getAppVersion, getReleaseNotes, markVersionSeen } from './api/wails.js'
 
 const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
@@ -46,13 +55,51 @@ provide('openConnManager', (connection = null) => {
 })
 provide('openSettings', () => { showSettings.value = true })
 
-onMounted(() => {
+// ---- 每个版本第一次打开时提示「更新内容」 ----
+const showWhatsNew = ref(false)
+const whatsNew = ref({ version: '', body: '', url: '' })
+
+async function maybeShowWhatsNew() {
+  let version = ''
+  try {
+    version = String((await getAppVersion()) || '').trim()
+  } catch (e) {
+    return
+  }
+  // 开发版（编译期 AppVersion 为 dev）不弹
+  if (!version || version.toLowerCase() === 'dev') return
+  if (settingsStore.lastSeenVersion === version) return
+  try {
+    const notes = await getReleaseNotes(version)
+    // 拉不到说明就什么都不做，也不标记版本，下次启动继续尝试
+    if (!notes || !notes.found || !String(notes.body || '').trim()) return
+    whatsNew.value = { version, body: notes.body, url: notes.url || '' }
+    showWhatsNew.value = true
+  } catch (e) {
+    // 静默失败，不打扰用户
+  }
+}
+
+async function closeWhatsNew() {
+  showWhatsNew.value = false
+  const version = whatsNew.value.version
+  if (!version) return
+  try {
+    await markVersionSeen(version)
+    settingsStore.lastSeenVersion = version
+  } catch (e) {
+    // 写失败最多下次再弹一次，不影响使用
+  }
+}
+
+onMounted(async () => {
   // Cmd/Ctrl+R 刷新当前 key，Esc 关闭最上层浮层
   installGlobalShortcuts()
   connectionsStore.loadConnections()
-  settingsStore.load()
+  await settingsStore.load()
   // 屏蔽原生右键菜单（输入框/可编辑区域保留，编辑器行首的自定义菜单另行处理）
   document.addEventListener('contextmenu', suppressContextMenu)
+  maybeShowWhatsNew()
 })
 
 function suppressContextMenu(e) {

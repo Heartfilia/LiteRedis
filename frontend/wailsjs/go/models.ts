@@ -22,6 +22,7 @@ export namespace config {
 	    local_api_port: number;
 	    proxy_enabled: boolean;
 	    proxy_url: string;
+	    last_seen_version: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
@@ -50,6 +51,7 @@ export namespace config {
 	        this.local_api_port = source["local_api_port"];
 	        this.proxy_enabled = source["proxy_enabled"];
 	        this.proxy_url = source["proxy_url"];
+	        this.last_seen_version = source["last_seen_version"];
 	    }
 	}
 	export class BatchKeyResult {
@@ -614,6 +616,26 @@ export namespace main {
 	        this.port = source["port"];
 	        this.token = source["token"];
 	        this.error = source["error"];
+	    }
+	}
+	export class ReleaseNotes {
+	    version: string;
+	    name: string;
+	    body: string;
+	    url: string;
+	    found: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReleaseNotes(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.name = source["name"];
+	        this.body = source["body"];
+	        this.url = source["url"];
+	        this.found = source["found"];
 	    }
 	}
 	export class UpdateResult {

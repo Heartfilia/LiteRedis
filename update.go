@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -90,10 +91,180 @@ type ReleaseAsset struct {
 
 type ReleaseInfo struct {
 	TagName    string         `json:"tag_name"`
+	Name       string         `json:"name"`
+	Body       string         `json:"body"`
 	HTMLURL    string         `json:"html_url"`
 	Assets     []ReleaseAsset `json:"assets"`
 	Prerelease bool           `json:"prerelease"`
 	Draft      bool           `json:"draft"`
+}
+
+// ReleaseNotes 某个版本的更新说明，用于「本次更新内容」弹窗
+type ReleaseNotes struct {
+	Version string `json:"version"`
+	Name    string `json:"name"`
+	Body    string `json:"body"`
+	URL     string `json:"url"`
+	Found   bool   `json:"found"`
+}
+
+func releaseNotesAPIURL(version string) string {
+	v := normalizeVersion(version)
+	if v == "" {
+		return ""
+	}
+	// 只保留版本号里可能出现的字符，避免把奇怪输入拼进 URL
+	cleaned := strings.Map(func(r rune) rune {
+		switch {
+		case r >= '0' && r <= '9',
+			r >= 'a' && r <= 'z',
+			r >= 'A' && r <= 'Z',
+			r == '.', r == '-', r == '+':
+			return r
+		}
+		return -1
+	}, v)
+	if cleaned == "" {
+		return ""
+	}
+	return "https://api.github.com/repos/Heartfilia/LiteRedis/releases/tags/v" + cleaned
+}
+
+const releasesRepoAPI = "https://api.github.com/repos/Heartfilia/LiteRedis"
+
+var compareLinkPattern = regexp.MustCompile(`github\.com/[^\s)]+/compare/([^\s)]+)`)
+
+// previousReleaseTag 取比当前 tag 更早的一个发布 tag（用于生成 compare 范围）
+func previousReleaseTag(ctx context.Context, currentTag string) string {
+	var releases []ReleaseInfo
+	if err := fetchGitHubReleaseJSON(ctx, releasesRepoAPI+"/releases?per_page=100", &releases); err != nil {
+		config.AppendDebugLog("[update] load release list for notes failed: %v", err)
+		return ""
+	}
+	for i, release := range releases {
+		if strings.EqualFold(release.TagName, currentTag) {
+			if i+1 < len(releases) {
+				return releases[i+1].TagName
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
+// releaseNotesCompareURL 从 release 说明里的 Full Changelog 链接解析出 compare API 地址
+func releaseNotesCompareURL(body string) string {
+	m := compareLinkPattern.FindStringSubmatch(body)
+	if len(m) < 2 {
+		return ""
+	}
+	return "https://api.github.com/repos/Heartfilia/LiteRedis/compare/" + m[1]
+}
+
+// hasMeaningfulNotes 判断 release 说明里除了标题和 Full Changelog 之外是否还有真正的内容
+func hasMeaningfulNotes(body string) bool {
+	for _, line := range strings.Split(body, "\n") {
+		text := strings.TrimSpace(line)
+		if text == "" || strings.HasPrefix(text, "#") {
+			continue
+		}
+		if strings.Contains(strings.ToLower(text), "full changelog") {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+type compareCommit struct {
+	SHA    string `json:"sha"`
+	Commit struct {
+		Message string `json:"message"`
+	} `json:"commit"`
+}
+
+type compareResponse struct {
+	Commits      []compareCommit `json:"commits"`
+	TotalCommits int             `json:"total_commits"`
+}
+
+// buildCommitNotes 把两次发布之间的提交整理成 Markdown 列表
+func buildCommitNotes(commits []compareCommit) string {
+	const limit = 40
+	var b strings.Builder
+	count := 0
+	for _, item := range commits {
+		message := strings.TrimSpace(item.Commit.Message)
+		if message == "" {
+			continue
+		}
+		first := strings.TrimSpace(strings.SplitN(message, "\n", 2)[0])
+		if first == "" || strings.HasPrefix(strings.ToLower(first), "merge ") {
+			continue
+		}
+		sha := item.SHA
+		if len(sha) > 7 {
+			sha = sha[:7]
+		}
+		if count == 0 {
+			b.WriteString("## 本次更新\n")
+		}
+		b.WriteString("* " + first + " (" + sha + ")\n")
+		count++
+		if count >= limit {
+			break
+		}
+	}
+	return b.String()
+}
+
+// GetReleaseNotes 读取指定版本的更新说明；拿不到时返回 Found=false，前端据此决定不弹窗
+func (a *App) GetReleaseNotes(version string) ReleaseNotes {
+	notes := ReleaseNotes{Version: normalizeVersion(version)}
+	if notes.Version == "" || strings.EqualFold(notes.Version, "dev") {
+		return notes
+	}
+	apiURL := releaseNotesAPIURL(version)
+	if apiURL == "" {
+		return notes
+	}
+	var release ReleaseInfo
+	if err := fetchGitHubReleaseJSON(a.ctx, apiURL, &release); err != nil {
+		config.AppendDebugLog("[update] load release notes failed: %v", err)
+		return notes
+	}
+	body := strings.TrimSpace(release.Body)
+	// GitHub 自动生成的说明常常只有一行 Full Changelog（而且链接里的上一个版本号
+	// 未必真实存在），这时用「上一个发布 → 当前发布」之间的提交列表兜底
+	if !hasMeaningfulNotes(body) {
+		currentTag := release.TagName
+		if currentTag == "" {
+			currentTag = "v" + notes.Version
+		}
+		var candidates []string
+		if compareURL := releaseNotesCompareURL(body); compareURL != "" {
+			candidates = append(candidates, compareURL)
+		}
+		if previous := previousReleaseTag(a.ctx, currentTag); previous != "" {
+			candidates = append(candidates, releasesRepoAPI+"/compare/"+previous+"..."+currentTag)
+		}
+		for _, compareURL := range candidates {
+			var cmp compareResponse
+			if err := fetchGitHubReleaseJSON(a.ctx, compareURL, &cmp); err != nil {
+				config.AppendDebugLog("[update] load compare commits failed (%s): %v", compareURL, err)
+				continue
+			}
+			if generated := buildCommitNotes(cmp.Commits); generated != "" {
+				body = generated
+				break
+			}
+		}
+	}
+	notes.Name = release.Name
+	notes.Body = body
+	notes.URL = release.HTMLURL
+	notes.Found = strings.TrimSpace(body) != ""
+	return notes
 }
 
 type UpdateResult struct {

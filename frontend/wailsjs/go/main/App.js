@@ -94,6 +94,10 @@ export function GetLocalAPIInfo() {
   return window['go']['main']['App']['GetLocalAPIInfo']();
 }
 
+export function GetReleaseNotes(arg1) {
+  return window['go']['main']['App']['GetReleaseNotes'](arg1);
+}
+
 export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
@@ -136,6 +140,10 @@ export function LSet(arg1, arg2, arg3, arg4) {
 
 export function ListConnections() {
   return window['go']['main']['App']['ListConnections']();
+}
+
+export function MarkVersionSeen(arg1) {
+  return window['go']['main']['App']['MarkVersionSeen'](arg1);
 }
 
 export function PingConnection(arg1) {

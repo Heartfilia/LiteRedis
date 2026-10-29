@@ -453,6 +453,12 @@ const messages = {
       retry: '重试',
       close: '关闭',
     },
+    whatsNew: {
+      title: '更新内容',
+      lead: '这个版本带来了以下变化：',
+      openRelease: '查看发布页',
+      gotIt: '我知道了',
+    },
   },
   en: {
     sidebar: {
@@ -905,6 +911,12 @@ const messages = {
       stoppedHint: 'stopped after 3 consecutive failures, check the connection and retry',
       retry: 'Retry',
       close: 'Close',
+    },
+    whatsNew: {
+      title: "What's new",
+      lead: 'This version includes the following changes:',
+      openRelease: 'View release',
+      gotIt: 'Got it',
     },
   },
 }

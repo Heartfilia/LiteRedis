@@ -415,3 +415,91 @@ func TestUpdateProxyHintRedactsCredentials(t *testing.T) {
 		t.Fatalf("password leaked: %s", redacted)
 	}
 }
+
+func TestReleaseNotesAPIURL(t *testing.T) {
+	const prefix = "https://api.github.com/repos/Heartfilia/LiteRedis/releases/tags/v"
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"1.2.3", prefix + "1.2.3"},
+		{"v1.2.3", prefix + "1.2.3"},
+		{"V1.2.3", prefix + "1.2.3"},
+		{"  v1.2.3  ", prefix + "1.2.3"},
+		{"v1.2.3-beta.1", prefix + "1.2.3-beta.1"},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := releaseNotesAPIURL(c.in); got != c.want {
+			t.Fatalf("releaseNotesAPIURL(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+
+	// 非法字符被过滤，不会拼出路径穿越
+	got := releaseNotesAPIURL("../../evil")
+	if strings.Contains(got, "/../") {
+		t.Fatalf("release notes url must not contain path traversal: %q", got)
+	}
+	if !strings.HasPrefix(got, prefix) {
+		t.Fatalf("unexpected release notes url: %q", got)
+	}
+}
+
+func TestHasMeaningfulNotes(t *testing.T) {
+	cases := []struct {
+		body string
+		want bool
+	}{
+		{"**Full Changelog**: https://github.com/o/r/compare/v1...v2", false},
+		{"## What's Changed\n\n**Full Changelog**: https://x/compare/v1...v2", false},
+		{"", false},
+		{"## What's Changed\n* Fix crash by @a\n", true},
+		{"* 修复某个问题", true},
+	}
+	for _, c := range cases {
+		if got := hasMeaningfulNotes(c.body); got != c.want {
+			t.Fatalf("hasMeaningfulNotes(%q) = %v, want %v", c.body, got, c.want)
+		}
+	}
+}
+
+func TestReleaseNotesCompareURL(t *testing.T) {
+	body := "**Full Changelog**: https://github.com/Heartfilia/LiteRedis/compare/v0.6.1...v0.6.2"
+	want := "https://api.github.com/repos/Heartfilia/LiteRedis/compare/v0.6.1...v0.6.2"
+	if got := releaseNotesCompareURL(body); got != want {
+		t.Fatalf("releaseNotesCompareURL = %q, want %q", got, want)
+	}
+	if got := releaseNotesCompareURL("no link here"); got != "" {
+		t.Fatalf("expected empty compare url, got %q", got)
+	}
+}
+
+func TestBuildCommitNotes(t *testing.T) {
+	var commits []compareCommit
+	add := func(sha, msg string) {
+		var c compareCommit
+		c.SHA = sha
+		c.Commit.Message = msg
+		commits = append(commits, c)
+	}
+	add("1234567890abcdef", "Add wrap toggle to JSON tree\n\nlong body")
+	add("abcdef1234567890", "Merge pull request #1 from x")
+	add("deadbeefdeadbeef", "Fix update flow")
+
+	out := buildCommitNotes(commits)
+	if !strings.Contains(out, "* Add wrap toggle to JSON tree (1234567)") {
+		t.Fatalf("missing first commit line: %q", out)
+	}
+	if strings.Contains(out, "Merge pull request") {
+		t.Fatalf("merge commits should be skipped: %q", out)
+	}
+	if !strings.Contains(out, "* Fix update flow (deadbee)") {
+		t.Fatalf("missing last commit line: %q", out)
+	}
+	if !strings.HasPrefix(out, "## 本次更新") {
+		t.Fatalf("missing heading: %q", out)
+	}
+	if got := buildCommitNotes(nil); got != "" {
+		t.Fatalf("empty commits should render empty, got %q", got)
+	}
+}

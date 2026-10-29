@@ -120,3 +120,49 @@ func TestSaveSettingsUsesDocumentedLoadDefaults(t *testing.T) {
 		t.Fatalf("load defaults = %+v, want %+v", got, want)
 	}
 }
+
+func TestMarkVersionSeenAndPreserveOnSave(t *testing.T) {
+	useTestConfigPath(t)
+
+	if err := MarkVersionSeen("v1.2.3"); err != nil {
+		t.Fatalf("MarkVersionSeen: %v", err)
+	}
+	settings, err := GetSettings()
+	if err != nil {
+		t.Fatalf("GetSettings: %v", err)
+	}
+	if settings.LastSeenVersion != "v1.2.3" {
+		t.Fatalf("expected last seen version v1.2.3, got %q", settings.LastSeenVersion)
+	}
+
+	// 前端保存设置时不会带这个字段，保存后必须保留原值
+	settings.LastSeenVersion = ""
+	settings.ProxyURL = "http://127.0.0.1:7890"
+	if err := SaveSettings(settings); err != nil {
+		t.Fatalf("SaveSettings: %v", err)
+	}
+	after, err := GetSettings()
+	if err != nil {
+		t.Fatalf("GetSettings after save: %v", err)
+	}
+	if after.LastSeenVersion != "v1.2.3" {
+		t.Fatalf("last seen version was cleared by SaveSettings: %q", after.LastSeenVersion)
+	}
+	if after.ProxyURL != "http://127.0.0.1:7890" {
+		t.Fatalf("unrelated setting not saved: %q", after.ProxyURL)
+	}
+}
+
+func TestMarkVersionSeenIgnoresBlank(t *testing.T) {
+	useTestConfigPath(t)
+	if err := MarkVersionSeen("   "); err != nil {
+		t.Fatalf("MarkVersionSeen(blank): %v", err)
+	}
+	settings, err := GetSettings()
+	if err != nil {
+		t.Fatalf("GetSettings: %v", err)
+	}
+	if settings.LastSeenVersion != "" {
+		t.Fatalf("blank version should not be stored, got %q", settings.LastSeenVersion)
+	}
+}

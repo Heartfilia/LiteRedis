@@ -36,6 +36,8 @@ export const useSettingsStore = defineStore('settings', {
     localApiPort: 64201,
     proxyEnabled: false,
     proxyUrl: '',
+    // 已看过更新说明的版本号，用于每个版本只弹一次「更新内容」
+    lastSeenVersion: '',
   }),
 
   actions: {
@@ -86,6 +88,7 @@ export const useSettingsStore = defineStore('settings', {
         this.localApiPort = s.local_api_port || 64201
         this.proxyEnabled = !!s.proxy_enabled
         this.proxyUrl = s.proxy_url || ''
+        this.lastSeenVersion = s.last_seen_version || ''
         setLanguage(this.language)
         this.loaded = true
         this.applyTheme()

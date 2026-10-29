@@ -49,6 +49,8 @@ export function GetKeyInfo(arg1:string,arg2:string):Promise<config.RedisKey>;
 
 export function GetLocalAPIInfo():Promise<main.LocalAPIInfo>;
 
+export function GetReleaseNotes(arg1:string):Promise<main.ReleaseNotes>;
+
 export function GetSettings():Promise<config.AppSettings>;
 
 export function GetSlowLog(arg1:string,arg2:number):Promise<Array<config.SlowLogEntry>>;
@@ -70,6 +72,8 @@ export function LRem(arg1:string,arg2:string,arg3:number,arg4:string):Promise<co
 export function LSet(arg1:string,arg2:string,arg3:number,arg4:string):Promise<config.OperationResult>;
 
 export function ListConnections():Promise<Array<config.ConnectionConfig>>;
+
+export function MarkVersionSeen(arg1:string):Promise<config.OperationResult>;
 
 export function PingConnection(arg1:string):Promise<config.OperationResult>;
 

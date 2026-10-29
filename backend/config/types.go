@@ -70,6 +70,8 @@ type AppSettings struct {
 	// 应用包更新代理：仅用于访问 GitHub 与下载安装包，不影响数据库连接
 	ProxyEnabled bool   `json:"proxy_enabled"` // 代理开关
 	ProxyURL     string `json:"proxy_url"`     // http://host:port 或 socks5://host:port
+	// LastSeenVersion 已经看过「更新内容」弹窗的版本号，用于每个版本只提示一次
+	LastSeenVersion string `json:"last_seen_version"`
 }
 
 const (
