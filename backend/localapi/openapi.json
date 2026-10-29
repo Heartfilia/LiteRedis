@@ -1,0 +1,63 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "LiteRedis Local API", "version": "1.0.0", "description": "本机调试接口（只读）。仅在「本地数据提取 API」与「允许通过 API 读取 Redis」都开启时可用。" },
+  "servers": [{ "url": "http://127.0.0.1:64201" }],
+  "components": {
+    "securitySchemes": {
+      "bearer": { "type": "http", "scheme": "bearer", "description": "关闭 token 校验时可不带" }
+    },
+    "schemas": {
+      "Envelope": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "data": { "type": "object" },
+          "error": { "type": "object", "properties": { "code": { "type": "string" }, "message": { "type": "string" } } },
+          "elapsed_ms": { "type": "integer" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": { "get": { "summary": "存活检查", "responses": { "200": { "description": "ok" } } } },
+    "/api/v1/connections": {
+      "post": {
+        "summary": "列出已连接的实例",
+        "security": [{ "bearer": [] }],
+        "responses": { "200": { "description": "实例列表" } }
+      }
+    },
+    "/api/v1/overview": {
+      "post": {
+        "summary": "实例概览（INFO 摘要）",
+        "security": [{ "bearer": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "example": { "conn": "conn-id", "db": 0 } } } },
+        "responses": { "200": { "description": "概览" } }
+      }
+    },
+    "/api/v1/keys": {
+      "post": {
+        "summary": "SCAN 扫描 key（游标分页）",
+        "security": [{ "bearer": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "example": { "conn": "conn-id", "pattern": "user:*", "count": 100, "cursor": 0 } } } },
+        "responses": { "200": { "description": "一页 key" } }
+      }
+    },
+    "/api/v1/key": {
+      "post": {
+        "summary": "读取单个 key 的类型/TTL/值（支持分页）",
+        "security": [{ "bearer": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "example": { "conn": "conn-id", "key": "user:1", "count": 100, "offset": 0, "cursor": 0 } } } },
+        "responses": { "200": { "description": "key 数据" } }
+      }
+    },
+    "/api/v1/command": {
+      "post": {
+        "summary": "执行只读命令（写命令会被拒绝）",
+        "security": [{ "bearer": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "example": { "conn": "conn-id", "command": "GET user:1" } } } },
+        "responses": { "200": { "description": "命令结果" } }
+      }
+    }
+  }
+}

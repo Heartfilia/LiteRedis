@@ -471,30 +471,45 @@ func TestStartFailureRecordsError(t *testing.T) {
 	srv.Stop()
 }
 
-func TestCorsWhitelist(t *testing.T) {
+func TestCrossOriginBlockedWithoutCors(t *testing.T) {
 	srv, ts := newTestServer(t)
 	publishTestSnapshot(t, srv)
 
-	// 白名单域名：响应带 Allow-Origin
-	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/info/"+encodeLocator(t, Locator{
-		Redis: "c1", DB: "3", Key: "mykey", Type: "hash", Position: "field1", Token: srv.Token(), Nonce: testNonce,
-	}), nil)
-	req.Header.Set("Origin", "https://json.litetools.top")
+	// 任何跨源请求（包括原来的 json.litetools.top）都直接 403，且不再回 CORS 头
+	for _, origin := range []string{"https://json.litetools.top", "https://evil.example.com"} {
+		req, _ := http.NewRequest(http.MethodGet, ts.URL+"/health", nil)
+		req.Header.Set("Origin", origin)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("origin %s: status = %d, want 403", origin, resp.StatusCode)
+		}
+		if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
+			t.Fatalf("origin %s: unexpected ACAO %q", origin, got)
+		}
+	}
+
+	// 同源（调试页面自己）放行，但同样不下发 CORS 头
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/health", nil)
+	req.Header.Set("Origin", ts.URL)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want 200", resp.StatusCode)
+		t.Fatalf("same-origin status = %d, want 200", resp.StatusCode)
 	}
-	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "https://json.litetools.top" {
-		t.Fatalf("ACAO = %q", got)
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("same-origin must not set ACAO, got %q", got)
 	}
 
-	// 预检请求：204 + 允许方法
+	// 预检不再返回任何 CORS 许可
 	req, _ = http.NewRequest(http.MethodOptions, ts.URL+"/health", nil)
-	req.Header.Set("Origin", "https://json.litetools.top")
+	req.Header.Set("Origin", ts.URL)
 	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -503,126 +518,8 @@ func TestCorsWhitelist(t *testing.T) {
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("preflight status = %d, want 204", resp.StatusCode)
 	}
-	if got := resp.Header.Get("Access-Control-Allow-Methods"); !strings.Contains(got, "GET") {
-		t.Fatalf("ACAM = %q", got)
-	}
-
-	// 非白名单域名：不带 CORS 头
-	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/health", nil)
-	req.Header.Set("Origin", "https://evil.example.com")
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
-		t.Fatalf("ACAO should be absent for non-whitelisted origin, got %q", got)
-	}
-
-	// 无 Origin（服务端回源）：不受影响
-	resp, err = http.Get(ts.URL + "/health")
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
-		t.Fatalf("ACAO should be absent without Origin, got %q", got)
-	}
-}
-
-func TestCorsHeadersOnErrorResponse(t *testing.T) {
-	srv, ts := newTestServer(t)
-	publishTestSnapshot(t, srv)
-
-	// 401 错误响应也必须带 CORS 头（网站提示项①）
-	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/info/badpayload", nil)
-	req.Header.Set("Origin", "https://json.litetools.top")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("status = %d", resp.StatusCode)
-	}
-	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "https://json.litetools.top" {
-		t.Fatalf("error response ACAO = %q, want https origin", got)
-	}
-
-	// 明文 http 源不再放行
-	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/health", nil)
-	req.Header.Set("Origin", "http://json.litetools.top")
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "" {
-		t.Fatalf("http origin should not be whitelisted, got ACAO %q", got)
-	}
-
-	// 405 也带
-	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/health", nil)
-	req.Header.Set("Origin", "https://json.litetools.top")
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want 405", resp.StatusCode)
-	}
-	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "https://json.litetools.top" {
-		t.Fatalf("405 ACAO = %q", got)
-	}
-
-	// 预检带 Allow-Headers
-	req, _ = http.NewRequest(http.MethodOptions, ts.URL+"/info/abc", nil)
-	req.Header.Set("Origin", "https://json.litetools.top")
-	req.Header.Set("Access-Control-Request-Headers", "authorization")
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if got := resp.Header.Get("Access-Control-Allow-Headers"); !strings.Contains(got, "Authorization") {
-		t.Fatalf("ACAH = %q", got)
-	}
-}
-
-func TestCorsPrivateNetworkAccess(t *testing.T) {
-	srv, ts := newTestServer(t)
-	publishTestSnapshot(t, srv)
-
-	// Chrome PNA 预检：带 Access-Control-Request-Private-Network 时响应必须含 ACA-PN
-	req, _ := http.NewRequest(http.MethodOptions, ts.URL+"/info/abc", nil)
-	req.Header.Set("Origin", "https://json.litetools.top")
-	req.Header.Set("Access-Control-Request-Method", "GET")
-	req.Header.Set("Access-Control-Request-Private-Network", "true")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("preflight status = %d, want 204", resp.StatusCode)
-	}
-	if got := resp.Header.Get("Access-Control-Allow-Private-Network"); got != "true" {
-		t.Fatalf("ACA-PN = %q, want true", got)
-	}
-
-	// 实际 GET 响应也带 ACA-PN
-	req, _ = http.NewRequest(http.MethodGet, ts.URL+"/info/"+encodeLocator(t, Locator{
-		Redis: "c1", DB: "3", Key: "mykey", Type: "hash", Position: "field1", Token: srv.Token(), Nonce: testNonce,
-	}), nil)
-	req.Header.Set("Origin", "https://json.litetools.top")
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if got := resp.Header.Get("Access-Control-Allow-Private-Network"); got != "true" {
-		t.Fatalf("GET ACA-PN = %q, want true", got)
+	if got := resp.Header.Get("Access-Control-Allow-Methods"); got != "" {
+		t.Fatalf("preflight must not allow methods, got %q", got)
 	}
 }
 

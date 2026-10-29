@@ -62,10 +62,13 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	_ = cleanupStaleUpdateDirs(os.TempDir(), time.Now().Add(-updateTempMaxAge))
 	// 启动本地数据提取 API（默认开启，失败不影响主功能）
-	if settings, err := config.GetSettings(); err == nil && settings.LocalAPIEnabled {
-		port := config.EffectiveLocalAPIPort(settings.LocalAPIPort)
-		if err := a.apiServer.Start(port); err != nil {
-			config.AppendDebugLog("[localapi] start failed: %v", err)
+	if settings, err := config.GetSettings(); err == nil {
+		a.configureLocalAPI(settings)
+		if settings.LocalAPIEnabled {
+			port := config.EffectiveLocalAPIPort(settings.LocalAPIPort)
+			if err := a.apiServer.Start(port); err != nil {
+				config.AppendDebugLog("[localapi] start failed: %v", err)
+			}
 		}
 	}
 	// 恢复上次窗口位置（X=-1 表示首次启动，让系统居中）
@@ -1030,7 +1033,8 @@ func (a *App) SaveSettings(s config.AppSettings) config.OperationResult {
 	if err := config.SaveSettings(s); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error()}
 	}
-	// 本地 API 开关/端口变化时重启服务
+	// 本地 API 开关/端口/调试开关变化时同步配置并重启服务
+	a.configureLocalAPI(s)
 	if err := a.apiServer.Apply(s); err != nil {
 		config.AppendDebugLog("[localapi] apply settings failed: %v", err)
 		return config.OperationResult{Success: false, Message: "设置已保存，但本地 API 服务启动失败: " + err.Error()}

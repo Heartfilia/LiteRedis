@@ -126,6 +126,27 @@ GOCACHE=/tmp/literedis-go-cache wails build \
 - `codesign --verify --deep --strict --verbose=2` 校验通过。
 - 本轮计划已全部完成，不再有“唯一未完成事项”。
 
+## 本地调试 API（127.0.0.1）
+
+设置 → 本地数据提取 API（需先在标题连点 5 次进开发者模式）里有三级开关：
+
+| 开关 | 作用 |
+|---|---|
+| 启用本地 API 服务 | 起 `127.0.0.1:<port>` 的 HTTP 服务，默认关 |
+| 允许通过 API 读取 Redis | 打开 `/api/v1/*`，直接查实例概览 / key / 只读命令，默认关 |
+| 关闭 Token 校验 | 纯本机自用时可关掉 `Authorization: Bearer`，默认开启校验 |
+
+接口（全部 POST + JSON body，响应统一 `{ok,data,error,elapsed_ms}`）：
+
+- `POST /api/v1/connections`：已连接实例列表（其它接口的 `conn` 用它）
+- `POST /api/v1/overview`：`{conn, db?}`
+- `POST /api/v1/keys`：`{conn, pattern, cursor, count}`，count 上限 500
+- `POST /api/v1/key`：`{conn, key, type?, cursor?, offset?, count?, zset_sort?, stream_start?}`
+- `POST /api/v1/command`：`{conn, command}`，只放行只读命令
+- `GET /docs`：自带的调试页面（开发者模式下可在设置里一键打开），`GET /openapi.json` 是它的 spec
+
+约束：只监听回环地址、校验 `Host` 必须是 127.0.0.1/localhost/[::1]、拒绝跨源 `Origin`、不下发任何 CORS 头、请求体上限 64KB、并发上限 8、单请求 30s 超时。`db` 参数只用于校验：和连接当前 DB 不一致时返回 409，避免 API 偷偷切库影响界面。
+
 ## 更新内容（what's new）维护约定
 
 版本更新后第一次打开应用会弹出「更新内容」弹窗，文案来源有两级：

@@ -20,19 +20,34 @@ import (
 	"LiteRedis/backend/config"
 )
 
-const requestTimeout = 5 * time.Second
+const (
+	requestTimeout = 30 * time.Second
+	// maxBodyBytes 单次请求体上限，避免把超大 JSON 一次塞进来
+	maxBodyBytes = 64 << 10
+	// maxConcurrentRequests 同时在跑的请求数上限
+	maxConcurrentRequests = 8
+)
 
-// corsAllowedOrigins 允许跨源读取的站点白名单（浏览器端 fetch 场景）。
-// 故意不开放 *：避免任意网页读取本地快照数据；也不放行明文 http 源。
-var corsAllowedOrigins = []string{
-	"https://json.litetools.top",
+// Options 本地 API 的运行开关
+type Options struct {
+	// RedisEnabled 允许 /api/v1/* 直接读取 Redis（默认关闭）
+	RedisEnabled bool
+	// AuthDisabled 关闭 token 校验（仅本机自用）
+	AuthDisabled bool
 }
 
-// Server 本地数据提取 API。只监听 127.0.0.1，只读，数据来自 KeyRegistry（UI 已加载快照）。
-// 故意不返回 CORS 头：浏览器页面无法跨源读取，仅本机非浏览器客户端（带 token）可访问。
+// Server 本地 API。只监听 127.0.0.1：
+//   - /api/{connID}/{key}、/info/*、/view/* 读 UI 已发布快照（原有能力）
+//   - /api/v1/* 直接读 Redis（需要显式开启，见 Options.RedisEnabled）
+//   - /docs、/openapi.json 提供本地调试页面
+//
+// 不返回任何 CORS 头：只有同源（/docs 页面）或非浏览器客户端能读响应。
 type Server struct {
 	registry *KeyRegistry
 	token    string
+	service  QueryService
+	opts     Options
+	slots    chan struct{}
 
 	mu       sync.Mutex
 	http     *http.Server
@@ -40,6 +55,7 @@ type Server struct {
 	port     int
 	lastErr  string // 最近一次 Start 失败原因，供设置面板展示
 	tokenMu  sync.RWMutex
+	optMu    sync.RWMutex
 }
 
 // Info 服务的运行时信息（设置面板展示用）
@@ -51,7 +67,31 @@ type Info struct {
 }
 
 func NewServer(registry *KeyRegistry) *Server {
-	return &Server{registry: registry, token: loadPersistedToken()}
+	return &Server{
+		registry: registry,
+		token:    loadPersistedToken(),
+		slots:    make(chan struct{}, maxConcurrentRequests),
+	}
+}
+
+// Configure 更新数据来源与运行开关（设置变更时调用）
+func (s *Server) Configure(service QueryService, opts Options) {
+	s.optMu.Lock()
+	s.service = service
+	s.opts = opts
+	s.optMu.Unlock()
+}
+
+func (s *Server) options() Options {
+	s.optMu.RLock()
+	defer s.optMu.RUnlock()
+	return s.opts
+}
+
+func (s *Server) queryService() QueryService {
+	s.optMu.RLock()
+	defer s.optMu.RUnlock()
+	return s.service
 }
 
 // Token 返回当前 token
@@ -226,33 +266,20 @@ func generateToken() (string, error) {
 }
 
 func (s *Server) handle(w http.ResponseWriter, req *http.Request) {
-	// CORS 白名单放行：仅匹配的 Origin 回写 Allow-Origin，其余请求不带 CORS 头
-	origin := req.Header.Get("Origin")
-	allowedOrigin := ""
-	for _, allowed := range corsAllowedOrigins {
-		if origin == allowed {
-			allowedOrigin = origin
-			break
-		}
+	// 只服务本机回环地址：拒绝 Host 不是 127.0.0.1/localhost/[::1] 的请求，
+	// 顺带防住 DNS rebinding（把恶意域名解析到本机后绕过同源限制）
+	if !isLoopbackHost(req.Host) {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "host not allowed"})
+		return
 	}
-	if allowedOrigin != "" {
-		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
-		w.Header().Add("Vary", "Origin")
-		// Chrome Private Network Access：公网页面请求本机回环地址时必需
-		w.Header().Set("Access-Control-Allow-Private-Network", "true")
-	}
-	if req.Method == http.MethodOptions {
-		if allowedOrigin != "" {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-			w.Header().Set("Access-Control-Max-Age", "86400")
-		}
-		w.WriteHeader(http.StatusNoContent)
+	// 浏览器跨源请求一律拒绝；/docs 页面自身同源，可以正常调用
+	if origin := req.Header.Get("Origin"); origin != "" && !isSameOrigin(origin, req.Host) {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "cross-origin request blocked"})
 		return
 	}
 
-	if req.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+	if req.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
@@ -261,6 +288,23 @@ func (s *Server) handle(w http.ResponseWriter, req *http.Request) {
 	case path == "/health":
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
+	case path == "/docs" || path == "/docs/":
+		s.handleDocs(w)
+		return
+	case path == "/openapi.json":
+		s.handleOpenAPI(w)
+		return
+	case strings.HasPrefix(path, "/api/v1/"):
+		s.handleV1(w, req, path)
+		return
+	}
+
+	if req.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	switch {
 	case strings.HasPrefix(path, "/info/"):
 		s.handleInfo(w, path[len("/info/"):])
 		return
@@ -272,7 +316,7 @@ func (s *Server) handle(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if !s.checkAuth(req) {
+	if !s.authorized(req) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
@@ -403,6 +447,37 @@ func decodeLocatorBase64(s string) ([]byte, error) {
 		normalized += strings.Repeat("=", 4-m)
 	}
 	return base64.URLEncoding.DecodeString(normalized)
+}
+
+// authorized 校验访问权限：关闭 token 校验时直接放行（仅限本机自用）
+func (s *Server) authorized(req *http.Request) bool {
+	if s.options().AuthDisabled {
+		return true
+	}
+	return s.checkAuth(req)
+}
+
+// isLoopbackHost 判断 Host 是否为本机回环地址（可带端口）
+func isLoopbackHost(hostport string) bool {
+	host := hostport
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		host = h
+	}
+	host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
+	switch strings.ToLower(host) {
+	case "127.0.0.1", "localhost", "::1":
+		return true
+	}
+	return false
+}
+
+// isSameOrigin 判断 Origin 是否就是本次请求自己的地址（/docs 页面调用自己）
+func isSameOrigin(origin, hostport string) bool {
+	origin = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(origin)), "/")
+	if origin == "" {
+		return false
+	}
+	return origin == "http://"+strings.ToLower(hostport)
 }
 
 // checkAuth 支持 Authorization: Bearer <token> 或 ?token=

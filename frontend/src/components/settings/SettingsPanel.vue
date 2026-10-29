@@ -321,6 +321,14 @@
             <span class="local-api-name">{{ t('settings.localApiDevPortHint') }}</span>
           </div>
           <div class="local-api-row" v-if="form.localApiEnabled">
+            <span class="local-api-name">{{ t('settings.localApiRedisRead') }}</span>
+            <input v-model="form.localApiRedisEnabled" type="checkbox" class="check-input" />
+          </div>
+          <div class="local-api-row" v-if="form.localApiEnabled && form.localApiRedisEnabled">
+            <span class="local-api-name">{{ t('settings.localApiAuthDisabled') }}</span>
+            <input v-model="form.localApiAuthDisabled" type="checkbox" class="check-input" />
+          </div>
+          <div class="local-api-row" v-if="form.localApiEnabled">
             <span class="local-api-name">{{ t('settings.localApiStatus') }}</span>
             <span :class="['local-api-status', localApiInfo.running ? 'running' : 'stopped']">
               {{ localApiInfo.running ? t('settings.localApiRunning') : t('settings.localApiStopped') }}
@@ -328,7 +336,11 @@
               <template v-else-if="localApiInfo.error">· {{ t('settings.localApiError') }}: {{ localApiInfo.error }}</template>
             </span>
           </div>
-          <div class="local-api-row" v-if="form.localApiEnabled && localApiInfo.token">
+          <div class="local-api-row" v-if="form.localApiEnabled && localApiInfo.running && form.localApiRedisEnabled">
+            <span class="local-api-name">{{ t('settings.localApiDebugPage') }}</span>
+            <button type="button" class="local-api-btn" @click="openApiDocs">{{ t('settings.localApiOpenDebug') }}</button>
+          </div>
+          <div class="local-api-row" v-if="form.localApiEnabled && localApiInfo.token && !form.localApiAuthDisabled">
             <span class="local-api-name">{{ t('settings.localApiToken') }}</span>
             <span class="local-api-token-box">
               <code class="local-api-token">{{ localApiInfo.token }}</code>
@@ -422,6 +434,8 @@ const form = reactive({
   watermarkDensity: 3,
   language: 'zh',
   localApiEnabled: false,
+  localApiRedisEnabled: false,
+  localApiAuthDisabled: false,
   localApiPort: 64201,
   proxyEnabled: false,
   proxyUrl: '',
@@ -495,6 +509,8 @@ function syncFromStore() {
   form.language = settingsStore.language
   form.localApiEnabled = settingsStore.localApiEnabled
   form.localApiPort = settingsStore.localApiPort
+  form.localApiRedisEnabled = settingsStore.localApiRedisEnabled
+  form.localApiAuthDisabled = settingsStore.localApiAuthDisabled
   form.proxyEnabled = settingsStore.proxyEnabled
   form.proxyUrl = settingsStore.proxyUrl
 }
@@ -720,6 +736,11 @@ async function regenerateToken() {
 
 async function handleVersionClick() {
   await updateStore.runPrimaryAction()
+}
+
+function openApiDocs() {
+  if (!localApiInfo.running) return
+  BrowserOpenURL('http://127.0.0.1:' + localApiInfo.port + '/docs')
 }
 
 function openGitHub() {

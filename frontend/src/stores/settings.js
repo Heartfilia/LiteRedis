@@ -34,6 +34,10 @@ export const useSettingsStore = defineStore('settings', {
     language: 'zh',
     localApiEnabled: false,
     localApiPort: 64201,
+    // 允许本地 API 直接读取 Redis（调试用，默认关）
+    localApiRedisEnabled: false,
+    // 关闭本地 API 的 token 校验（纯本机自用）
+    localApiAuthDisabled: false,
     proxyEnabled: false,
     proxyUrl: '',
     // 已看过更新说明的版本号，用于每个版本只弹一次「更新内容」
@@ -86,6 +90,8 @@ export const useSettingsStore = defineStore('settings', {
         this.language = s.language || 'zh'
         this.localApiEnabled = s.local_api_enabled === true
         this.localApiPort = s.local_api_port || 64201
+        this.localApiRedisEnabled = s.local_api_redis_enabled === true
+        this.localApiAuthDisabled = s.local_api_auth_disabled === true
         this.proxyEnabled = !!s.proxy_enabled
         this.proxyUrl = s.proxy_url || ''
         this.lastSeenVersion = s.last_seen_version || ''
@@ -118,6 +124,8 @@ export const useSettingsStore = defineStore('settings', {
         language: values.language,
         local_api_enabled: values.localApiEnabled,
         local_api_port: values.localApiPort,
+        local_api_redis_enabled: values.localApiRedisEnabled === true,
+        local_api_auth_disabled: values.localApiAuthDisabled === true,
         proxy_enabled: values.proxyEnabled,
         proxy_url: values.proxyUrl,
       }

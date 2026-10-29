@@ -23,6 +23,8 @@ export namespace config {
 	    proxy_enabled: boolean;
 	    proxy_url: string;
 	    last_seen_version: string;
+	    local_api_redis_enabled: boolean;
+	    local_api_auth_disabled: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
@@ -52,6 +54,8 @@ export namespace config {
 	        this.proxy_enabled = source["proxy_enabled"];
 	        this.proxy_url = source["proxy_url"];
 	        this.last_seen_version = source["last_seen_version"];
+	        this.local_api_redis_enabled = source["local_api_redis_enabled"];
+	        this.local_api_auth_disabled = source["local_api_auth_disabled"];
 	    }
 	}
 	export class BatchKeyResult {

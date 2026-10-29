@@ -72,6 +72,10 @@ type AppSettings struct {
 	ProxyURL     string `json:"proxy_url"`     // http://host:port 或 socks5://host:port
 	// LastSeenVersion 已经看过「更新内容」弹窗的版本号，用于每个版本只提示一次
 	LastSeenVersion string `json:"last_seen_version"`
+	// LocalAPIRedisEnabled 允许本地 API（/api/v1/*）直接读取 Redis 数据，默认关闭
+	LocalAPIRedisEnabled bool `json:"local_api_redis_enabled"`
+	// LocalAPIAuthDisabled 关闭本地 API 的 token 校验（纯本机自用场景），默认开启校验
+	LocalAPIAuthDisabled bool `json:"local_api_auth_disabled"`
 }
 
 const (
