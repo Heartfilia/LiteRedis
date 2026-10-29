@@ -318,7 +318,7 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
 }
 .app-toast-enter-active,
 .app-toast-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease, filter 0.22s ease;
+  transition: opacity var(--motion-slow) ease, transform var(--motion-slow) ease, filter var(--motion-slow) ease;
 }
 .app-toast-enter-from,
 .app-toast-leave-to {

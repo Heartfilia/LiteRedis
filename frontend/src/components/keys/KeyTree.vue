@@ -761,7 +761,7 @@ function collapseVisibleTree() {
 .search-section {
   margin-bottom: 10px;
   border: 1px solid rgba(226, 232, 240, 0.92);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 10px 18px rgba(148, 163, 184, 0.08);
   overflow: hidden;
@@ -812,8 +812,8 @@ function collapseVisibleTree() {
   padding: 0;
   flex-shrink: 0;
   line-height: 1;
-  border-radius: 999px;
-  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  border-radius: var(--radius-pill);
+  transition: background var(--motion-base) ease, color var(--motion-base) ease, transform var(--motion-base) ease;
 }
 .section-close:hover {
   color: #dc2626;
@@ -862,10 +862,10 @@ function collapseVisibleTree() {
   background: transparent;
   color: #64748b;
   border: 1px solid rgba(203, 213, 225, 0.95);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   flex: 0 0 auto;
-  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+  transition: color var(--motion-base) ease, background var(--motion-base) ease, border-color var(--motion-base) ease;
 }
 .btn-load-more svg {
   width: 12px;
@@ -979,7 +979,7 @@ function collapseVisibleTree() {
   background: rgba(255, 255, 255, 0.96);
   color: #1e293b;
   cursor: pointer;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  transition: border-color var(--motion-base) ease, box-shadow var(--motion-base) ease;
 }
 .key-tree.theme-dark .db-select {
   border-color: rgba(71, 85, 105, 0.96);
@@ -1005,12 +1005,12 @@ function collapseVisibleTree() {
   justify-content: center;
   padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: #94a3b8;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.16s ease, color 0.16s ease, opacity 0.16s ease;
+  transition: background var(--motion-base) ease, color var(--motion-base) ease, opacity var(--motion-base) ease;
   opacity: 0.78;
 }
 .tree-bulk-btn svg {
@@ -1075,7 +1075,7 @@ function collapseVisibleTree() {
   align-items: center;
   gap: 6px;
   padding: 3px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 12px;
   color: #334155;
@@ -1154,7 +1154,7 @@ function collapseVisibleTree() {
   margin: 6px 14px;
   height: 28px;
   padding: 0 8px;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(203, 213, 225, 0.96);
   background: #fff;
   color: #1e293b;
@@ -1177,7 +1177,7 @@ function collapseVisibleTree() {
 .more-btn {
   height: 26px;
   padding: 0 12px;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(147, 197, 253, 0.9);
   background: rgba(219, 234, 254, 0.8);
   color: #1d4ed8;
@@ -1213,7 +1213,7 @@ function collapseVisibleTree() {
 }
 .db-chip {
   height: 24px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(203, 213, 225, 0.9);
   background: #fff;
   color: #334155;
@@ -1256,7 +1256,7 @@ function collapseVisibleTree() {
 .batch-btn {
   height: 24px;
   padding: 0 10px;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(147, 197, 253, 0.8);
   background: #fff;
   color: #1d4ed8;

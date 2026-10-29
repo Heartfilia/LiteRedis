@@ -56,7 +56,7 @@
   height: var(--editor-control-height);
   padding: 0;
   border: 1px solid var(--editor-strong-border);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   background: var(--editor-soft-bg);
   color: #374151;
@@ -64,7 +64,7 @@
   font-weight: 800;
   line-height: 1;
   box-sizing: border-box;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+  transition: background var(--motion-base) ease, border-color var(--motion-base) ease, color var(--motion-base) ease, transform var(--motion-base) ease, box-shadow var(--motion-base) ease;
 }
 
 .btn-add:hover {
@@ -81,7 +81,7 @@
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--editor-surface-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--editor-surface-bg);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
@@ -156,14 +156,14 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+  transition: background var(--motion-base) ease, color var(--motion-base) ease, border-color var(--motion-base) ease, transform var(--motion-base) ease;
 }
 .icon-search-btn {
   min-width: var(--editor-control-height);
   width: var(--editor-control-height);
   padding: 0;
   flex: 0 0 var(--editor-control-height);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
 }
 .icon-search-btn svg {
   display: block;
@@ -222,7 +222,7 @@
   height: var(--editor-chip-height);
   margin-left: auto;
   padding: 0 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(248, 250, 252, 0.92);
   color: var(--editor-muted);
   font-size: 11px;
@@ -235,7 +235,7 @@
   gap: 6px;
   padding: 7px;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.95));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(226, 232, 240, 0.96);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
 }
@@ -282,7 +282,7 @@
   font-weight: 600;
   background: var(--editor-soft-bg);
   color: #475569;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  transition: background var(--motion-base) ease, border-color var(--motion-base) ease, color var(--motion-base) ease, transform var(--motion-base) ease;
 }
 
 .add-row-btn:hover {
@@ -319,9 +319,9 @@
   background: transparent;
   color: #64748b;
   border: 1px solid rgba(203, 213, 225, 0.95);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+  transition: color var(--motion-base) ease, background var(--motion-base) ease, border-color var(--motion-base) ease;
 }
 
 .btn-load-more svg {
@@ -361,7 +361,7 @@
   min-height: 24px;
   padding: 0 9px;
   border: 1px solid var(--editor-strong-border);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--editor-soft-bg);
   color: #475569;
   font-size: 10.5px;
@@ -369,7 +369,7 @@
   line-height: 1;
   cursor: pointer;
   box-sizing: border-box;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  transition: background var(--motion-base) ease, border-color var(--motion-base) ease, color var(--motion-base) ease, transform var(--motion-base) ease;
 }
 
 .btn-tiny:hover {

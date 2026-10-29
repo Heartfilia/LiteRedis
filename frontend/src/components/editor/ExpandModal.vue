@@ -379,7 +379,7 @@ async function copy() {
 }
 .expand-modal {
   background: white;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   width: min(1160px, 94vw);
   height: min(88vh, 920px);
   max-height: 92vh;
@@ -428,7 +428,7 @@ async function copy() {
   font-size: 11px;
   line-height: 1;
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(220, 252, 231, 0.9);
   color: #15803d;
   border: 1px solid rgba(134, 239, 172, 0.8);
@@ -469,14 +469,14 @@ async function copy() {
   background: rgba(255, 255, 255, 0.94);
   color: #475569;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 11px;
   line-height: 1;
   font-weight: 600;
   cursor: pointer;
   min-width: 34px;
   box-sizing: border-box;
-  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.12s;
+  transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast), transform var(--motion-fast);
 }
 .btn-json-modal {
   font-size: 10.5px;
@@ -589,7 +589,7 @@ async function copy() {
   resize: vertical;
   padding: 12px 14px;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-family: monospace;
   font-size: 13px;
   line-height: 1.7;
@@ -694,5 +694,13 @@ async function copy() {
   38% { transform: translateY(-1px) scale(1.015); }
   72% { transform: translateY(0) scale(0.995); }
   100% { transform: translateY(0) scale(1); }
+}
+
+/* 按下时回落到原位，避免只有抬起没有按下反馈 */
+.btn-save-modal:active:not(:disabled),
+.btn-copy-modal:active:not(:disabled),
+.btn-close-modal:active:not(:disabled),
+.btn-json-modal:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
 }
 </style>

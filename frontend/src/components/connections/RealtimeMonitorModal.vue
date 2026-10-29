@@ -394,7 +394,7 @@ onBeforeUnmount(() => {
 .monitor-interval {
   height: 28px;
   padding: 0 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(203, 213, 225, 0.96);
   background: #fff;
   color: #1e293b;
@@ -409,7 +409,7 @@ onBeforeUnmount(() => {
   font-size: 15px;
   cursor: pointer;
   padding: 4px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   line-height: 1;
 }
 
@@ -427,7 +427,7 @@ onBeforeUnmount(() => {
 .monitor-tab {
   height: 26px;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: transparent;
   color: #64748b;
@@ -452,7 +452,7 @@ onBeforeUnmount(() => {
 .slowlog-refresh {
   height: 24px;
   padding: 0 10px;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(203, 213, 225, 0.96);
   background: #fff;
   color: #475569;
@@ -479,7 +479,7 @@ onBeforeUnmount(() => {
   gap: 8px;
   align-items: center;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 12px;
   color: #334155;
@@ -541,7 +541,7 @@ onBeforeUnmount(() => {
   margin-left: 8px;
   height: 22px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid currentColor;
   background: transparent;
   color: inherit;
@@ -558,7 +558,7 @@ onBeforeUnmount(() => {
 
 .metric-card {
   padding: 12px 14px 8px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(226, 232, 240, 0.96);
   background: rgba(248, 250, 252, 0.86);
 }
@@ -590,7 +590,7 @@ onBeforeUnmount(() => {
 
 .memory-card {
   padding: 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(226, 232, 240, 0.96);
   background: rgba(248, 250, 252, 0.86);
 }
@@ -611,14 +611,14 @@ onBeforeUnmount(() => {
 
 .memory-track {
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(226, 232, 240, 0.9);
   overflow: hidden;
 }
 
 .memory-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(90deg, #60a5fa, #2563eb);
   transition: width 0.35s ease;
 }

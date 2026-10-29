@@ -198,7 +198,7 @@ async function copyEntry(entry) {
   background: rgba(236, 254, 255, 0.96);
   color: #0e7490;
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-size: 10px;
   min-width: 24px;
   text-align: center;
@@ -214,11 +214,11 @@ async function copyEntry(entry) {
   background: rgba(255, 255, 255, 0.94);
   color: #475569;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 10.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.12s;
+  transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast), transform var(--motion-fast);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -237,7 +237,7 @@ async function copyEntry(entry) {
   gap: 4px;
   background: rgba(236, 254, 255, 0.84);
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(207, 250, 254, 0.96);
   min-width: 0;
 }
@@ -310,5 +310,11 @@ async function copyEntry(entry) {
 
 .stream-editor.theme-dark .field-val {
   color: #cbd5e1;
+}
+
+/* 按下时回落到原位，避免只有抬起没有按下反馈 */
+.btn-entry-copy:active:not(:disabled),
+.btn-load-more:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
 }
 </style>

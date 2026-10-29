@@ -80,7 +80,7 @@ onBeforeUnmount(() => {
 
 .float-toast-enter-active,
 .float-toast-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease, filter 0.22s ease;
+  transition: opacity var(--motion-slow) ease, transform var(--motion-slow) ease, filter var(--motion-slow) ease;
 }
 
 .float-toast-enter-from,

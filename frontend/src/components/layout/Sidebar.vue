@@ -749,7 +749,7 @@ async function disconnectConn(id) {
   flex-direction: column;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.22s ease, transform 0.22s ease;
+  transition: opacity var(--motion-slow) ease, transform var(--motion-slow) ease;
   will-change: opacity, transform;
 }
 .sidebar-collapsed-layer {
@@ -786,7 +786,7 @@ async function disconnectConn(id) {
 .collapsed-conn-icon {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -795,7 +795,7 @@ async function disconnectConn(id) {
   font-weight: 700;
   cursor: pointer;
   flex-shrink: 0;
-  transition: opacity 0.15s, box-shadow 0.15s;
+  transition: opacity var(--motion-base), box-shadow var(--motion-base);
   opacity: 0.72;
   user-select: none;
 }
@@ -811,7 +811,7 @@ async function disconnectConn(id) {
   background: transparent;
   color: #64748b;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   width: 28px;
   height: 28px;
   font-size: 11px;
@@ -822,7 +822,7 @@ async function disconnectConn(id) {
   flex-shrink: 0;
   margin-top: 6px;
   box-shadow: none;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background var(--motion-base) ease, color var(--motion-base) ease, border-color var(--motion-base) ease;
 }
 .btn-expand-glyph {
   width: 12px;
@@ -899,8 +899,8 @@ async function disconnectConn(id) {
   height: 22px;
   min-width: 22px;
   min-height: 22px;
-  border-radius: 6px;
-  transition: color 0.15s, background 0.15s;
+  border-radius: var(--radius-sm);
+  transition: color var(--motion-base), background var(--motion-base);
   text-decoration: none;
   box-sizing: border-box;
   overflow: hidden;
@@ -914,7 +914,7 @@ async function disconnectConn(id) {
   line-height: 1;
   flex-shrink: 0;
   transform-origin: center center;
-  transition: transform 0.16s ease;
+  transition: transform var(--motion-base) ease;
 }
 .sidebar-link-glyph svg {
   display: block;
@@ -965,7 +965,7 @@ async function disconnectConn(id) {
   background: transparent;
   color: #64748b;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   width: 24px; height: 24px;
   min-width: 24px; min-height: 24px;
   font-size: 14px; line-height: 1;
@@ -974,7 +974,7 @@ async function disconnectConn(id) {
   box-sizing: border-box;
   overflow: hidden;
   box-shadow: none;
-  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  transition: background var(--motion-base), color var(--motion-base), border-color var(--motion-base), box-shadow var(--motion-base);
 }
 .btn-icon:hover {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.96));
@@ -990,7 +990,7 @@ async function disconnectConn(id) {
   justify-content: center;
   line-height: 1;
   transform-origin: center center;
-  transition: transform 0.16s ease;
+  transition: transform var(--motion-base) ease;
 }
 .btn-icon-glyph svg {
   width: 14px;
@@ -1093,12 +1093,12 @@ async function disconnectConn(id) {
   align-items: center;
   padding: 5px 10px;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin: 2px 8px;
   position: relative;
   overflow: visible;
   border: 1px solid transparent;
-  transition: background 0.14s, border-color 0.14s, box-shadow 0.14s;
+  transition: background var(--motion-fast), border-color var(--motion-fast), box-shadow var(--motion-fast);
 }
 .conn-item.drop-before,
 .conn-item.drop-after {
@@ -1140,7 +1140,7 @@ async function disconnectConn(id) {
   right: 0;
   height: 2px;
   background: #69b1ff;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   box-shadow: 0 0 0 1px rgba(30, 42, 58, 0.45), 0 0 10px rgba(105, 177, 255, 0.35);
 }
 .conn-item.cross-group-preview .drop-indicator::before {
@@ -1201,7 +1201,7 @@ async function disconnectConn(id) {
 .conn-avatar {
   width: 20px;
   height: 20px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1261,7 +1261,7 @@ async function disconnectConn(id) {
   transform: translateY(-50%);
   gap: 2px;
   padding: 2px 3px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.14);
   z-index: 2;
@@ -1280,7 +1280,7 @@ async function disconnectConn(id) {
   height: 22px;
   min-height: 22px;
   padding: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1309,11 +1309,11 @@ async function disconnectConn(id) {
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(203, 213, 225, 0.96);
   color: #64748b;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 1px 5px;
   font-size: 11px;
   cursor: pointer;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  transition: background var(--motion-base) ease, border-color var(--motion-base) ease, color var(--motion-base) ease;
 }
 .btn-tiny:hover {
   background: #eff6ff;
@@ -1410,8 +1410,8 @@ async function disconnectConn(id) {
 /* 未分组拖拽区域 */
 .ungrouped-zone {
   position: relative;
-  border-radius: 4px;
-  transition: background 0.15s;
+  border-radius: var(--radius-xs);
+  transition: background var(--motion-base);
   padding: 1px 0;
 }
 .ungrouped-zone.drag-over { background: rgba(219, 234, 254, 0.68); }
@@ -1423,7 +1423,7 @@ async function disconnectConn(id) {
   color: #8ec5ff;
   background: rgba(78, 154, 241, 0.16);
   border: 1px solid rgba(78, 154, 241, 0.35);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 6px;
   line-height: 1.5;
 }
@@ -1450,10 +1450,10 @@ async function disconnectConn(id) {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin: 1px 8px;
   user-select: none;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--motion-base), border-color var(--motion-base);
   border: 1px solid transparent;
 }
 .group-header:hover {
@@ -1532,7 +1532,7 @@ async function disconnectConn(id) {
   z-index: 2000;
   background: white;
   border: 1px solid #e0e0e0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   box-shadow: 0 6px 20px rgba(0,0,0,0.2);
   min-width: 120px;
   padding: 4px 0;

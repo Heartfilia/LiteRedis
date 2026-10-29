@@ -625,7 +625,7 @@ async function removeMember(m) {
   margin-left: 4px;
   padding: 0 8px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.84);
   color: #94a3b8;
   cursor: pointer;
@@ -633,7 +633,7 @@ async function removeMember(m) {
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
-  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color var(--motion-base) ease, background-color var(--motion-base) ease, color var(--motion-base) ease, box-shadow var(--motion-base) ease;
 }
 .fuzzy-check:hover {
   border-color: rgba(203, 213, 225, 0.96);
@@ -662,9 +662,9 @@ async function removeMember(m) {
 .fuzzy-indicator {
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #d4dbe5;
-  transition: background-color 0.18s ease, transform 0.18s ease;
+  transition: background-color var(--motion-base) ease, transform var(--motion-base) ease;
 }
 .fuzzy-check.active .fuzzy-indicator {
   background: #3b82f6;
@@ -684,7 +684,7 @@ async function removeMember(m) {
 .set-wrap { flex: 1; overflow-y: auto; }
 .set-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid rgba(241, 245, 249, 0.96); font-size: 12px; }
 .set-item:hover { background: rgba(248, 250, 252, 0.9); }
-.num-badge { background: rgba(245, 243, 255, 0.96); color: #7c3aed; padding: 1px 6px; border-radius: 4px; font-size: 10px; flex-shrink: 0; min-width: 28px; text-align: center; font-weight: 600; }
+.num-badge { background: rgba(245, 243, 255, 0.96); color: #7c3aed; padding: 1px 6px; border-radius: var(--radius-xs); font-size: 10px; flex-shrink: 0; min-width: 28px; text-align: center; font-weight: 600; }
 .set-header,
 .toolbar,
 .search-bar,

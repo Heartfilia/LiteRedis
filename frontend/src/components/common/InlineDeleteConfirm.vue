@@ -230,7 +230,7 @@ onBeforeUnmount(() => {
   background: #fff;
   background-color: #fff;
   border: 1px solid rgba(226, 232, 240, 0.84);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 18px 36px rgba(15, 23, 42, 0.16), 0 8px 18px rgba(148, 163, 184, 0.08);
   padding: 8px 10px;
   white-space: nowrap;
@@ -322,7 +322,7 @@ onBeforeUnmount(() => {
   min-height: 26px;
   padding: 0;
   border: 1px solid currentColor;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   background: #fff;
   color: #475569;
@@ -330,7 +330,7 @@ onBeforeUnmount(() => {
   line-height: 1;
   font-weight: 700;
   box-sizing: border-box;
-  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.14s ease;
+  transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease, transform var(--motion-fast) ease;
 }
 
 .delete-popover .btn-tiny:hover {

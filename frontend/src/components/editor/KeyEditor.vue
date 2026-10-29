@@ -450,7 +450,7 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, #ffffff, #f8fbff);
   color: #2563eb;
   box-shadow: 0 10px 20px rgba(191, 219, 254, 0.18);
-  transition: background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+  transition: background var(--motion-base) ease, transform var(--motion-base) ease, box-shadow var(--motion-base) ease;
 }
 .btn-retry:hover {
   background: linear-gradient(180deg, #f8fbff, #eff6ff);
@@ -502,11 +502,11 @@ onBeforeUnmount(() => {
   overflow-wrap: anywhere;
   line-height: 1.45;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 3px 9px;
   background: rgba(239, 246, 255, 0.75);
   box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.82);
-  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease, box-shadow var(--motion-fast) ease, transform var(--motion-fast) ease;
 }
 .key-editor.theme-dark .key-name {
   color: #93c5fd;
@@ -546,7 +546,7 @@ onBeforeUnmount(() => {
   height: 22px;
   font-size: 10px;
   padding: 0 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-weight: 600;
   flex-shrink: 0;
   letter-spacing: 0.04em;
@@ -560,7 +560,7 @@ onBeforeUnmount(() => {
   min-height: 22px;
   height: 22px;
   padding: 0 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(226, 232, 240, 0.96);
   background: rgba(255, 255, 255, 0.88);
   color: #94a3b8;
@@ -569,7 +569,7 @@ onBeforeUnmount(() => {
   letter-spacing: 0.04em;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+  transition: background var(--motion-base) ease, color var(--motion-base) ease, border-color var(--motion-base) ease, transform var(--motion-base) ease;
 }
 .ttl-chip:disabled {
   opacity: 0.5;
@@ -634,7 +634,7 @@ onBeforeUnmount(() => {
   gap: 8px;
   min-width: 164px;
   padding: 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(203, 213, 225, 0.96);
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 18px 36px rgba(148, 163, 184, 0.22);
@@ -664,7 +664,7 @@ onBeforeUnmount(() => {
   height: 28px;
   padding: 0 9px;
   border: 1px solid #60a5fa;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   outline: none;
   background: rgba(255, 255, 255, 0.95);
@@ -680,7 +680,7 @@ onBeforeUnmount(() => {
   height: 24px;
   min-height: 24px;
   padding: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -724,7 +724,7 @@ onBeforeUnmount(() => {
   min-width: 56px;
   padding: 0;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 12px;
   line-height: 1;
@@ -732,7 +732,7 @@ onBeforeUnmount(() => {
   color: #475569;
   font-weight: 600;
   box-sizing: border-box;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  transition: background var(--motion-base) ease, border-color var(--motion-base) ease, color var(--motion-base) ease, transform var(--motion-base) ease;
 }
 .key-editor.theme-dark .btn-tiny,
 .key-editor.theme-dark .btn-sm,
@@ -842,14 +842,14 @@ onBeforeUnmount(() => {
   height: 26px;
   padding: 0 9px;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 11px;
   line-height: 1;
   background: rgba(255, 255, 255, 0.96);
   color: #475569;
   box-sizing: border-box;
-  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+  transition: background var(--motion-base) ease, border-color var(--motion-base) ease, transform var(--motion-base) ease;
 }
 .btn-xs:hover {
   background: #f8fafc;
@@ -874,7 +874,7 @@ onBeforeUnmount(() => {
   max-width: 300px;
   padding: 6px 10px;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   outline: none;
@@ -935,7 +935,7 @@ onBeforeUnmount(() => {
   gap: 8px;
   min-height: 30px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid rgba(191, 219, 254, 0.92);
   background: rgba(255, 255, 255, 0.94);
   color: #2563eb;

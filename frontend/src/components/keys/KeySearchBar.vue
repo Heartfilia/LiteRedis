@@ -355,7 +355,7 @@ async function doSearch() {
   background: rgba(255, 255, 255, 0.96);
   overflow: hidden;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 8px 16px rgba(148, 163, 184, 0.07);
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  transition: border-color var(--motion-base) ease, box-shadow var(--motion-base) ease, transform var(--motion-base) ease;
 }
 .key-search-bar.theme-dark .search-input-shell {
   border-color: rgba(51, 65, 85, 0.96);
@@ -406,7 +406,7 @@ async function doSearch() {
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+  transition: color var(--motion-base) ease, background var(--motion-base) ease, border-color var(--motion-base) ease;
 }
 .btn-search:hover:not(:disabled) {
   color: #1d4ed8;
@@ -451,7 +451,7 @@ async function doSearch() {
   position: fixed;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(203, 213, 225, 0.95);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
   backdrop-filter: blur(14px);
   z-index: 10000;
@@ -488,7 +488,7 @@ async function doSearch() {
   white-space: nowrap;
   min-width: 0;
   border-radius: 10px;
-  transition: background 0.16s ease, color 0.16s ease;
+  transition: background var(--motion-base) ease, color var(--motion-base) ease;
 }
 .history-item-text {
   flex: 1;
@@ -501,7 +501,7 @@ async function doSearch() {
   height: 20px;
   min-width: 20px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: #cbd5e1;
   display: inline-flex;
@@ -509,7 +509,7 @@ async function doSearch() {
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: color 0.15s, background 0.15s;
+  transition: color var(--motion-base), background var(--motion-base);
 }
 .history-pin-btn:hover {
   color: #64748b;

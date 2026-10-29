@@ -146,11 +146,11 @@ function startResize(e) {
   width: 2px;
   cursor: col-resize;
   margin: 8px 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(180deg, rgba(203, 213, 225, 0.08), rgba(148, 163, 184, 0.34), rgba(203, 213, 225, 0.08));
   border: none;
   flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--motion-base), border-color var(--motion-base);
   z-index: 10;
   position: relative;
 }

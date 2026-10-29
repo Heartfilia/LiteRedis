@@ -585,7 +585,7 @@ async function addItem() {
 .list-wrap { flex: 1; overflow-y: auto; }
 .list-item { display: flex; align-items: center; gap: 6px; padding: 6px 6px; border-bottom: 1px solid rgba(241, 245, 249, 0.96); font-size: 12px; }
 .list-item:hover { background: rgba(248, 250, 252, 0.9); }
-.idx-badge { background: rgba(239, 246, 255, 0.96); color: #1d4ed8; padding: 1px 6px; border-radius: 4px; font-size: 10px; flex-shrink: 0; min-width: 28px; text-align: center; font-weight: 600; }
+.idx-badge { background: rgba(239, 246, 255, 0.96); color: #1d4ed8; padding: 1px 6px; border-radius: var(--radius-xs); font-size: 10px; flex-shrink: 0; min-width: 28px; text-align: center; font-weight: 600; }
 .list-header,
 .toolbar,
 .search-bar,
@@ -615,7 +615,7 @@ async function addItem() {
   color: #374151;
   font-size: 12px;
 }
-.list-item input { flex: 1; height: 28px; padding: 0 8px; border: 1px solid rgba(96, 165, 250, 0.92); border-radius: 6px; font-size: 12px; outline: none; color: #1e293b; background: rgba(255, 255, 255, 0.96); box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.3); }
+.list-item input { flex: 1; height: 28px; padding: 0 8px; border: 1px solid rgba(96, 165, 250, 0.92); border-radius: var(--radius-sm); font-size: 12px; outline: none; color: #1e293b; background: rgba(255, 255, 255, 0.96); box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.3); }
 .item-actions { display: flex; gap: 5px; flex-shrink: 0; }
 .sortable-col { cursor: pointer; user-select: none; }
 .sortable-col:hover { color: #374151; }

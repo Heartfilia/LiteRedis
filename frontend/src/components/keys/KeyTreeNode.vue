@@ -167,11 +167,11 @@ function onLeafClick(fullPath, event) {
   gap: 6px;
   padding: 0 10px;
   cursor: pointer;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 13px;
   min-height: 32px;
   color: #27364a;
-  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+  transition: background var(--motion-base) ease, color var(--motion-base) ease, transform var(--motion-base) ease, box-shadow var(--motion-base) ease;
 }
 .node-row:hover {
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(241, 245, 249, 0.92));
@@ -227,7 +227,7 @@ function onLeafClick(fullPath, event) {
 .type-badge {
   font-size: 10px;
   padding: 2px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   flex-shrink: 0;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -235,7 +235,7 @@ function onLeafClick(fullPath, event) {
 .ttl-badge {
   font-size: 10px;
   padding: 2px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(254, 243, 199, 0.95);
   color: #b45309;
   font-weight: 600;

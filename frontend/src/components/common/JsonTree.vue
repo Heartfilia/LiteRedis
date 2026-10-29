@@ -205,7 +205,7 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   cursor: default;
   padding: 0 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .json-row:hover {
   background: rgba(148, 163, 184, 0.12);
@@ -274,7 +274,7 @@ onBeforeUnmount(() => {
   text-align: left;
   padding: 7px 10px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: #334155;
   font-size: 11.5px;
@@ -282,7 +282,7 @@ onBeforeUnmount(() => {
   line-height: 1;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, color 0.12s;
+  transition: background var(--motion-fast), color var(--motion-fast);
 }
 .json-menu-item:hover {
   background: rgba(239, 246, 255, 0.94);
@@ -304,7 +304,7 @@ onBeforeUnmount(() => {
   position: fixed;
   z-index: 10061;
   padding: 5px 9px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 11px;
   line-height: 1;
   color: #15803d;

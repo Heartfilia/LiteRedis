@@ -122,7 +122,7 @@ function onNotesClick(event) {
   color: #2563eb;
   background: rgba(219, 234, 254, 0.9);
   border: 1px solid rgba(147, 197, 253, 0.7);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 8px;
   line-height: 1;
 }
@@ -133,12 +133,12 @@ function onNotesClick(event) {
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: #64748b;
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.14s, color 0.14s, border-color 0.14s;
+  transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
 }
 .wn-close:hover {
   background: #fff;
@@ -187,7 +187,7 @@ function onNotesClick(event) {
   font-family: ui-monospace, Menlo, monospace;
   font-size: 11.5px;
   padding: 1px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: rgba(241, 245, 249, 0.96);
   border: 1px solid rgba(226, 232, 240, 0.9);
 }
@@ -218,14 +218,14 @@ function onNotesClick(event) {
 .wn-btn {
   height: 30px;
   padding: 0 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid rgba(203, 213, 225, 0.96);
   background: #fff;
   color: #475569;
-  transition: background 0.14s, border-color 0.14s, color 0.14s;
+  transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast);
 }
 .wn-btn.ghost:hover {
   background: #f8fafc;

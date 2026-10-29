@@ -270,16 +270,16 @@ async function save() {
   color: #b45309;
   background: rgba(251, 191, 36, 0.12);
   border: 1px solid rgba(251, 191, 36, 0.35);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 5px 10px;
 }
 textarea {
   flex: 1; resize: none; padding: 10px 12px;
-  border: 1px solid rgba(203, 213, 225, 0.96); border-radius: 8px;
+  border: 1px solid rgba(203, 213, 225, 0.96); border-radius: var(--radius-md);
   font-family: monospace; font-size: 13px; outline: none;
   line-height: 1.6; color: #1f2937;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  transition: border-color var(--motion-base), box-shadow var(--motion-base), background var(--motion-base);
   min-height: 0;
 }
 .string-editor.theme-dark textarea {
@@ -316,11 +316,11 @@ textarea:focus { border-color: rgba(96, 165, 250, 0.92); box-shadow: 0 0 0 3px r
   background: rgba(255, 255, 255, 0.94);
   color: #475569;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 10.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.12s;
+  transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast), transform var(--motion-fast);
   white-space: nowrap;
 }
 .btn-action:hover { background: #f8fafc; border-color: #94a3b8; color: #1e293b; transform: translateY(-1px); }
@@ -376,11 +376,11 @@ textarea:focus { border-color: rgba(96, 165, 250, 0.92); box-shadow: 0 0 0 3px r
   background: linear-gradient(180deg, #ffffff, #f8fbff);
   color: #2563eb;
   border: 1px solid rgba(191, 219, 254, 0.96);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 10.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+  transition: background var(--motion-base), border-color var(--motion-base), color var(--motion-base), transform var(--motion-base);
   white-space: nowrap;
 }
 .btn-primary:hover { background: linear-gradient(180deg, #f8fbff, #eff6ff); border-color: #60a5fa; color: #1d4ed8; transform: translateY(-1px); }
@@ -460,5 +460,11 @@ textarea:focus { border-color: rgba(96, 165, 250, 0.92); box-shadow: 0 0 0 3px r
   0% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-1px) scale(1.012); }
   100% { transform: translateY(-1px) scale(1); }
+}
+
+/* 按下时回落到原位，避免只有抬起没有按下反馈 */
+.btn-action:active:not(:disabled),
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
 }
 </style>

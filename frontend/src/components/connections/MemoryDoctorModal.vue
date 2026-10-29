@@ -384,7 +384,7 @@ async function exportMarkdown() {
   font-size: 15px;
   cursor: pointer;
   padding: 4px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   line-height: 1;
 }
 
@@ -466,14 +466,14 @@ async function exportMarkdown() {
 
 .doctor-progress-track {
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(226, 232, 240, 0.9);
   overflow: hidden;
 }
 
 .doctor-progress-bar {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(90deg, #60a5fa, #2563eb);
   transition: width 0.25s ease;
 }
@@ -514,7 +514,7 @@ async function exportMarkdown() {
   flex-direction: column;
   gap: 6px;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(226, 232, 240, 0.96);
   background: rgba(248, 250, 252, 0.86);
 }
@@ -595,14 +595,14 @@ async function exportMarkdown() {
 
 .bar-track {
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(226, 232, 240, 0.86);
   overflow: hidden;
 }
 
 .bar-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(90deg, #93c5fd, #3b82f6);
   transition: width 0.3s ease;
 }
@@ -617,7 +617,7 @@ async function exportMarkdown() {
 .doctor-table-wrap {
   max-height: 320px;
   overflow: auto;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid rgba(226, 232, 240, 0.96);
 }
 
@@ -692,7 +692,7 @@ async function exportMarkdown() {
 .type-pill {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -746,7 +746,7 @@ async function exportMarkdown() {
   bottom: 64px;
   transform: translateX(-50%);
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   color: #065f46;
   background: rgba(209, 250, 229, 0.96);

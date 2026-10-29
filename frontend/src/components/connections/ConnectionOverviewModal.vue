@@ -539,7 +539,7 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.96);
   color: #64748b;
   cursor: pointer;
-  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, transform 0.14s ease;
+  transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease, transform var(--motion-fast) ease;
 }
 .overview-close:hover {
   background: rgba(248, 250, 252, 0.98);

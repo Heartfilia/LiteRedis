@@ -209,7 +209,7 @@ async function submit() {
   line-height: 1;
   box-sizing: border-box;
   box-shadow: 0 8px 16px rgba(191, 219, 254, 0.16);
-  transition: all 0.16s ease;
+  transition: all var(--motion-base) ease;
 }
 .create-key-btn:disabled {
   opacity: 0.45;
@@ -234,7 +234,7 @@ async function submit() {
   width: 300px;
   padding: 12px;
   border: 1px solid rgba(226, 232, 240, 0.84);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.16), 0 8px 18px rgba(148, 163, 184, 0.08);
   backdrop-filter: blur(8px);
@@ -260,7 +260,7 @@ async function submit() {
   cursor: pointer;
   font-size: 12px;
   line-height: 1;
-  transition: color 0.14s ease, transform 0.14s ease;
+  transition: color var(--motion-fast) ease, transform var(--motion-fast) ease;
 }
 .popover-close:hover {
   color: #475569;
@@ -288,7 +288,7 @@ async function submit() {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   outline: none;
   color: #1f2937;
@@ -315,7 +315,7 @@ async function submit() {
 .btn-create {
   min-height: 30px;
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   cursor: pointer;
   line-height: 1;
@@ -338,7 +338,7 @@ async function submit() {
 .create-msg {
   margin-top: 10px;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 12px;
 }
 .create-msg.ok {

@@ -45,7 +45,7 @@ const wrap = ref(false)
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.9);
   overflow: hidden;
   --json-key: #1d4ed8;
@@ -81,14 +81,14 @@ const wrap = ref(false)
   height: 22px;
   padding: 0 8px;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.94);
   color: #64748b;
   font-size: 10.5px;
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.14s, border-color 0.14s, color 0.14s;
+  transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast);
 }
 .json-wrap-btn svg {
   width: 12px;

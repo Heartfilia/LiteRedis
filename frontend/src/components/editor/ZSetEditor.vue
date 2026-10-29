@@ -716,7 +716,7 @@ async function copyMember(member) {
   background: #f3f4f6;
   border-left: 1px solid #e5e7eb;
   border-right: 1px solid #e5e7eb;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--motion-base), border-color var(--motion-base);
   z-index: 5;
 }
 .col-resizer:hover { background: #3b82f6; border-color: #3b82f6; }
@@ -726,7 +726,7 @@ async function copyMember(member) {
   min-width: 160px;
 }
 .score-text { cursor: pointer; }
-.score-cell input { width: 80px; height: 28px; padding: 0 8px; border: 1px solid rgba(96, 165, 250, 0.92); border-radius: 6px; font-size: 12px; outline: none; color: #1e293b; background: rgba(255, 255, 255, 0.96); box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.3); }
+.score-cell input { width: 80px; height: 28px; padding: 0 8px; border: 1px solid rgba(96, 165, 250, 0.92); border-radius: var(--radius-sm); font-size: 12px; outline: none; color: #1e293b; background: rgba(255, 255, 255, 0.96); box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.3); }
 .member-th,
 .member-cell {
   min-width: 0;

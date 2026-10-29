@@ -787,7 +787,7 @@ function openGitHub() {
 .btn-close {
   background: rgba(255,255,255,0.76);
   border: 1px solid rgba(226,232,240,0.9);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 14px;
   cursor: pointer;
   color: #9ca3af;
@@ -795,7 +795,7 @@ function openGitHub() {
   height: 30px;
   padding: 0;
   line-height: 1.4;
-  transition: color 0.12s, border-color 0.12s, background 0.12s, transform 0.12s;
+  transition: color var(--motion-fast), border-color var(--motion-fast), background var(--motion-fast), transform var(--motion-fast);
 }
 .btn-close:hover { color: #dc2626; border-color: #fca5a5; background: #fff1f2; transform: translateY(-1px); }
 
@@ -816,7 +816,7 @@ function openGitHub() {
   letter-spacing: 0.9px;
   margin-bottom: 12px;
   padding: 5px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255,255,255,0.72);
   border: 1px solid rgba(226,232,240,0.86);
   box-shadow: 0 4px 12px rgba(148, 163, 184, 0.06);
@@ -878,12 +878,12 @@ function openGitHub() {
   width: 80px;
   padding: 7px 10px;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 13px;
   text-align: right;
   outline: none;
   background: rgba(255,255,255,0.94);
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  transition: border-color var(--motion-base), box-shadow var(--motion-base), background var(--motion-base);
 }
 .text-input {
   width: 220px !important;
@@ -924,7 +924,7 @@ function openGitHub() {
   width: 96px;
   padding: 5px 8px;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   outline: none;
 }
@@ -936,14 +936,14 @@ function openGitHub() {
   font-size: 11px;
   padding: 3px 6px;
   background: rgba(226, 232, 240, 0.8);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   word-break: break-all;
 }
 .local-api-btn {
   font-size: 11px;
   padding: 3px 8px;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: #fff;
   cursor: pointer;
   color: #374151;
@@ -955,7 +955,7 @@ function openGitHub() {
   padding: 6px 8px;
   background: rgba(15, 23, 42, 0.9);
   color: #cbd5e1;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   word-break: break-all;
   line-height: 1.5;
 }
@@ -973,7 +973,7 @@ function openGitHub() {
 .lang-select {
   padding: 7px 10px;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 13px;
   outline: none;
   background: rgba(255,255,255,0.94);
@@ -1007,11 +1007,11 @@ function openGitHub() {
   height: 26px;
   padding: 0;
   border: 1px solid rgba(203, 213, 225, 0.92);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.9);
   color: #64748b;
   cursor: pointer;
-  transition: background 0.14s, border-color 0.14s, color 0.14s;
+  transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast);
 }
 .git-link svg {
   width: 14px;
@@ -1045,10 +1045,10 @@ function openGitHub() {
   white-space: nowrap;
   background: rgba(255,255,255,0.72);
   border: 1px solid rgba(226,232,240,0.92);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   padding: 6px 10px;
-  transition: color 0.12s, background 0.12s, border-color 0.12s, box-shadow 0.12s;
+  transition: color var(--motion-fast), background var(--motion-fast), border-color var(--motion-fast), box-shadow var(--motion-fast);
 }
 .save-msg {
   flex: 1;
@@ -1063,13 +1063,13 @@ function openGitHub() {
   background: #3b82f6;
   color: white;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   font-size: 13px;
   line-height: 1;
   font-weight: 500;
   box-sizing: border-box;
-  transition: background 0.15s;
+  transition: background var(--motion-base);
 }
 .btn-save:hover { background: #2563eb; }
 .btn-save:disabled { background: #93c5fd; cursor: not-allowed; }
@@ -1092,13 +1092,13 @@ function openGitHub() {
   background: #fff;
   color: #374151;
   border: 1px solid #d1d5db;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   font-size: 13px;
   line-height: 1;
   font-weight: 500;
   box-sizing: border-box;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 .btn-cancel:hover { background: #f3f4f6; border-color: #9ca3af; }
 .version-box:hover {
@@ -1118,13 +1118,13 @@ function openGitHub() {
   background: #fff;
   color: #374151;
   border: 1px solid #d1d5db;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   font-size: 13px;
   line-height: 1;
   font-weight: 500;
   box-sizing: border-box;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 .btn-close-modal:hover { background: #f3f4f6; border-color: #9ca3af; }
 .settings-toast {
@@ -1173,7 +1173,7 @@ function openGitHub() {
 }
 .toast-enter-active,
 .toast-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease, filter 0.22s ease;
+  transition: opacity var(--motion-slow) ease, transform var(--motion-slow) ease, filter var(--motion-slow) ease;
 }
 .toast-enter-from,
 .toast-leave-to {
@@ -1331,4 +1331,13 @@ function openGitHub() {
   border-color: #60a5fa;
 }
 
+
+/* 按下时回落到原位，避免只有抬起没有按下反馈 */
+.btn-close:active:not(:disabled),
+.btn-save:active:not(:disabled),
+.btn-cancel:active:not(:disabled),
+.git-link:active:not(:disabled),
+.local-api-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
 </style>

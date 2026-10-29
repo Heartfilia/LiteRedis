@@ -56,7 +56,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
   padding: 4px;
   background: #fff;
   border: 1px solid rgba(203, 213, 225, 0.9);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
 }
 .extract-menu-item {
@@ -64,7 +64,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
   width: 100%;
   padding: 6px 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   font-size: 13px;
   text-align: left;

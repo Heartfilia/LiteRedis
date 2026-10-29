@@ -1319,13 +1319,13 @@ async function addField() {
   margin-left: 6px;
   padding: 0;
   border: 1px solid #d1d5db;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   background: #fff;
   color: #475569;
   box-sizing: border-box;
   position: relative;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+  transition: background var(--motion-base) ease, border-color var(--motion-base) ease, color var(--motion-base) ease, transform var(--motion-base) ease, box-shadow var(--motion-base) ease;
 }
 .btn-calc::after {
   content: '';
@@ -1334,10 +1334,10 @@ async function addField() {
   right: 5px;
   bottom: -7px;
   height: 2px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   opacity: 0;
-  transition: opacity 0.16s ease, background 0.16s ease;
+  transition: opacity var(--motion-base) ease, background var(--motion-base) ease;
 }
 .btn-calc:hover,
 .btn-calc.active {
@@ -1360,7 +1360,7 @@ async function addField() {
   z-index: 30;
   width: min(520px, calc(100% - 4px));
   border: 1px solid rgba(226, 232, 240, 0.96);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.985), rgba(248, 250, 252, 0.97));
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
   backdrop-filter: blur(14px);
@@ -1397,7 +1397,7 @@ async function addField() {
   height: 24px;
   padding: 0;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: #fff;
   color: #64748b;
   cursor: pointer;
@@ -1479,7 +1479,7 @@ async function addField() {
 .calc-subrule-value,
 .calc-subrule-operator {
   border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   color: #334155;
   font-size: 12px;
@@ -1538,11 +1538,11 @@ async function addField() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  transition: background var(--motion-base) ease, border-color var(--motion-base) ease, color var(--motion-base) ease;
 }
 .calc-add-subrule,
 .calc-remove-subrule {
@@ -1631,13 +1631,13 @@ async function addField() {
   min-width: 76px;
   padding: 0 26px 0 10px;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background-color: #fff;
   color: #475569;
   font-size: 11px;
   font-weight: 600;
   outline: none;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  transition: background var(--motion-base) ease, border-color var(--motion-base) ease, color var(--motion-base) ease, box-shadow var(--motion-base) ease;
 }
 .calc-copy-log-btn {
   display: inline-flex;
@@ -1646,13 +1646,13 @@ async function addField() {
   height: 26px;
   padding: 0 10px;
   border: 1px solid rgba(203, 213, 225, 0.96);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff;
   color: #475569;
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  transition: background var(--motion-base) ease, border-color var(--motion-base) ease, color var(--motion-base) ease;
 }
 .calc-copy-log-btn:hover {
   background: #f8fafc;
@@ -1710,7 +1710,7 @@ async function addField() {
 }
 .calc-panel-enter-active,
 .calc-panel-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity var(--motion-base) ease, transform var(--motion-base) cubic-bezier(0.22, 1, 0.36, 1);
 }
 .calc-panel-enter-from,
 .calc-panel-leave-to {
@@ -1725,7 +1725,7 @@ async function addField() {
   margin-left: 4px;
   padding: 0 8px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.84);
   color: #94a3b8;
   cursor: pointer;
@@ -1733,7 +1733,7 @@ async function addField() {
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
-  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color var(--motion-base) ease, background-color var(--motion-base) ease, color var(--motion-base) ease, box-shadow var(--motion-base) ease;
 }
 .fuzzy-check:hover {
   border-color: rgba(203, 213, 225, 0.96);
@@ -1762,9 +1762,9 @@ async function addField() {
 .fuzzy-indicator {
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #d4dbe5;
-  transition: background-color 0.18s ease, transform 0.18s ease;
+  transition: background-color var(--motion-base) ease, transform var(--motion-base) ease;
 }
 .fuzzy-check.active .fuzzy-indicator {
   background: #3b82f6;
@@ -1851,7 +1851,7 @@ async function addField() {
   background: #f3f4f6;
   border-left: 1px solid #e5e7eb;
   border-right: 1px solid #e5e7eb;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--motion-base), border-color var(--motion-base);
   z-index: 5;
 }
 .col-resizer:hover { background: #3b82f6; border-color: #3b82f6; }
@@ -1887,7 +1887,7 @@ async function addField() {
   height: 28px;
   padding: 0 8px;
   border: 1px solid rgba(96, 165, 250, 0.92);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   outline: none;
   color: #1e293b;

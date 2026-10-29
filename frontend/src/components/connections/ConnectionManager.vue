@@ -464,11 +464,11 @@ onBeforeUnmount(() => {
   background: #3b82f6;
   color: white;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
-  transition: background 0.15s;
+  transition: background var(--motion-base);
 }
 .btn-new:hover { background: #2563eb; }
 .btn-close {
@@ -479,10 +479,10 @@ onBeforeUnmount(() => {
   background: rgba(255,255,255,0.74);
   color: #9ca3af;
   border: 1px solid rgba(226,232,240,0.92);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   font-size: 14px;
-  transition: color 0.12s, border-color 0.12s;
+  transition: color var(--motion-fast), border-color var(--motion-fast);
 }
 .btn-close:hover { color: #dc2626; border-color: #fca5a5; background: #fff1f2; }
 .cm-body {
@@ -509,9 +509,9 @@ onBeforeUnmount(() => {
 }
 .cm-group-zone {
   padding: 2px 0;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   position: relative;
-  transition: background 0.15s;
+  transition: background var(--motion-base);
 }
 .cm-group-zone.drag-over { background: #dbeafe; }
 .cm-group-zone.cross-group-preview.drag-over { background: rgba(16, 185, 129, 0.12); }
@@ -532,11 +532,11 @@ onBeforeUnmount(() => {
   gap: 8px;
   padding: 7px 14px;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin: 2px 8px;
   position: relative;
   border: 1px solid transparent;
-  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+  transition: background var(--motion-fast), border-color var(--motion-fast), box-shadow var(--motion-fast);
 }
 .cm-conn-item:hover {
   background: rgba(255, 255, 255, 0.72);
@@ -576,7 +576,7 @@ onBeforeUnmount(() => {
   right: 0;
   height: 2px;
   background: #3b82f6;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.22);
 }
 .cm-conn-item.cross-group-preview .cm-drop-indicator::before {
@@ -625,11 +625,11 @@ onBeforeUnmount(() => {
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.58px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin: 1px 8px;
   user-select: none;
   border: 1px solid transparent;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 .cm-group-header:hover {
   background: rgba(255, 255, 255, 0.64);
@@ -646,7 +646,7 @@ onBeforeUnmount(() => {
   color: #2563eb;
   background: rgba(59, 130, 246, 0.1);
   border: 1px solid rgba(59, 130, 246, 0.22);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 6px;
   line-height: 1.5;
 }
@@ -689,7 +689,7 @@ onBeforeUnmount(() => {
   z-index: 2000;
   background: white;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0,0,0,0.12);
   min-width: 160px;
   padding: 4px 0;
