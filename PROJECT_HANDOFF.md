@@ -157,6 +157,7 @@ GOCACHE=/tmp/literedis-go-cache wails build \
 约定：
 
 - 只有在明确要求时才更新 `changelog.js`，不要每轮改动都自动追加。
+- **开发者功能不写进更新日志**：本地调试 API（`/api/v1`、`/docs`、调试开关等）这类只有开发者自己用的能力，一律不写进 `changelog.js`。
 - 开发环境（`AppVersion=dev`）每次启动都会弹，并用 `RELEASE_NOTES` 里最新加的一条做预览，不写入"已读"标记。
 - 正式版本弹过一次会写入配置里的 `last_seen_version`，同一版本不再出现。
 
