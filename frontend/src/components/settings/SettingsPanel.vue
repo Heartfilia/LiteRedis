@@ -463,6 +463,8 @@ onMounted(async () => {
   }
   await refreshLocalAPIInfo()
   updateStore.ensureListener()
+  // 每次打开设置面板静默检查一次；失败不打扰用户，只有手动点版本按钮才提示异常
+  updateStore.check({ silent: true })
 })
 
 onBeforeUnmount(() => {

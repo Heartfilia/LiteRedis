@@ -83,28 +83,29 @@ export const useUpdateStore = defineStore('update', {
       await this.check()
     },
 
-    async check() {
+    // silent：打开设置面板时的自动检查，只更新状态不弹任何提示（失败也静默）
+    async check({ silent = false } = {}) {
       if (this.checking || this.updating) return
       this.checking = true
-      this.clearMessage()
+      if (!silent) this.clearMessage()
       try {
         const result = await checkLatestRelease()
         if (result.error) {
           this.hasUpdate = false
-          this.setMessage(result.error, false, 4000)
+          if (!silent) this.setMessage(result.error, false, 4000)
           return
         }
         if (result.need_update) {
           this.hasUpdate = true
           this.latest = result.latest || ''
-          this.setMessage(t('settings.updateAvailable').replace('{version}', `v${result.latest}`), true, 4000)
+          if (!silent) this.setMessage(t('settings.updateAvailable').replace('{version}', `v${result.latest}`), true, 4000)
           return
         }
         this.hasUpdate = false
-        this.setMessage(t('settings.latestVersion'), true, 3000)
+        if (!silent) this.setMessage(t('settings.latestVersion'), true, 3000)
       } catch (e) {
         this.hasUpdate = false
-        this.setMessage(e?.message || String(e) || t('settings.updateFailed'), false, 4000)
+        if (!silent) this.setMessage(e?.message || String(e) || t('settings.updateFailed'), false, 4000)
       } finally {
         this.checking = false
       }

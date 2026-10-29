@@ -260,3 +260,49 @@ test('restarting getter 边界：必须同时满足 updating 与 stage=restart',
   store.updating = false
   assert.equal(store.restarting, false, 'updating 复位后重启态必须结束')
 })
+test('静默检查（打开设置时自动触发）：失败不弹提示', async () => {
+  resetMocks({ release: { need_update: false, latest: '', error: 'GitHub 接口触发了 IP 访问限制' } })
+  const store = freshStore()
+  await store.check({ silent: true })
+  assert.equal(store.hasUpdate, false)
+  assert.equal(store.message, '', '自动检查失败必须静默')
+  assert.equal(store.messageOk, true, '提示状态不应被自动检查改写')
+  assert.equal(store.checking, false)
+})
+
+test('静默检查：发现新版本只更新状态，不弹提示', async () => {
+  resetMocks({ release: { need_update: true, latest: '1.4.0' } })
+  const store = freshStore()
+  await store.check({ silent: true })
+  assert.equal(store.hasUpdate, true)
+  assert.equal(store.latest, '1.4.0')
+  assert.equal(store.message, '', '自动检查不应弹出“发现新版本”提示')
+})
+
+test('静默检查：已是最新版本同样不弹提示', async () => {
+  resetMocks({ release: { need_update: false, latest: '1.4.0' } })
+  const store = freshStore()
+  await store.check({ silent: true })
+  assert.equal(store.hasUpdate, false)
+  assert.equal(store.message, '')
+})
+
+test('静默检查失败不会影响已有提示以外的行为：随后手动检查仍会提示异常', async () => {
+  resetMocks({ release: { need_update: false, latest: '', error: '代理连接失败' } })
+  const store = freshStore()
+  await store.check({ silent: true })
+  assert.equal(store.message, '')
+
+  await store.check()
+  assert.equal(store.messageOk, false)
+  assert.match(store.message, /代理连接失败/, '手动检查失败必须提示')
+})
+
+test('静默检查遇到进行中的更新不会打断：直接跳过', async () => {
+  resetMocks({ release: { need_update: true, latest: '1.4.0' } })
+  const store = freshStore()
+  store.updating = true
+  await store.check({ silent: true })
+  assert.equal(state.check, 0, '更新中不应发起检查')
+  assert.equal(store.checking, false)
+})
