@@ -166,3 +166,81 @@ func TestMarkVersionSeenIgnoresBlank(t *testing.T) {
 		t.Fatalf("blank version should not be stored, got %q", settings.LastSeenVersion)
 	}
 }
+
+func TestSaveConnectionRejectsDuplicateNameInSameGroup(t *testing.T) {
+	useTestConfigPath(t)
+
+	first, err := SaveConnection(ConnectionConfig{Name: "dev", Group: "A", Host: "127.0.0.1", Port: 6379})
+	if err != nil {
+		t.Fatalf("create first: %v", err)
+	}
+
+	// 同组同名（大小写、首尾空格不同）应被拒绝
+	if _, err := SaveConnection(ConnectionConfig{Name: "  DEV ", Group: " A ", Host: "127.0.0.1", Port: 6379}); err == nil {
+		t.Fatal("expected duplicate name in same group to be rejected")
+	} else if !strings.Contains(err.Error(), "已存在同名连接") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// 不同分组可以同名
+	if _, err := SaveConnection(ConnectionConfig{Name: "dev", Group: "B", Host: "127.0.0.1", Port: 6379}); err != nil {
+		t.Fatalf("same name in another group should be allowed: %v", err)
+	}
+
+	// 更新自己（名字不变）不应被自己挡住
+	first.Host = "10.0.0.1"
+	if _, err := SaveConnection(first); err != nil {
+		t.Fatalf("update self: %v", err)
+	}
+
+	// 挪到 B 组会和已有的 dev 撞名
+	first.Group = "B"
+	if _, err := SaveConnection(first); err == nil {
+		t.Fatal("expected moving into a group with the same name to be rejected")
+	}
+
+	// 空名称直接拒绝
+	if _, err := SaveConnection(ConnectionConfig{Name: "   ", Group: "C", Host: "127.0.0.1", Port: 6379}); err == nil {
+		t.Fatal("expected blank name to be rejected")
+	}
+}
+
+func TestReorderRejectsDuplicateNameInGroup(t *testing.T) {
+	useTestConfigPath(t)
+
+	a, err := SaveConnection(ConnectionConfig{Name: "dev", Group: "A", Host: "127.0.0.1", Port: 6379})
+	if err != nil {
+		t.Fatalf("create a: %v", err)
+	}
+	b, err := SaveConnection(ConnectionConfig{Name: "dev", Group: "B", Host: "127.0.0.1", Port: 6379})
+	if err != nil {
+		t.Fatalf("create b: %v", err)
+	}
+
+	err = ReorderConnections([]ConnectionOrderItem{
+		{ID: a.ID, Group: "A", SortOrder: 0},
+		{ID: b.ID, Group: "A", SortOrder: 1},
+	})
+	if err == nil {
+		t.Fatal("expected moving into a group with the same name to be rejected")
+	}
+
+	// 拒绝后不能落盘：b 仍应在 B 组
+	list, err := ListConnections()
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	for _, conn := range list {
+		if conn.ID == b.ID && conn.Group != "B" {
+			t.Fatalf("rejected reorder should not be persisted, group = %q", conn.Group)
+		}
+	}
+
+	// 同组内排序（不改分组）不应被挡
+	if err := ReorderConnections([]ConnectionOrderItem{
+		{ID: a.ID, Group: "A", SortOrder: 0},
+		{ID: b.ID, Group: "B", SortOrder: 1},
+	}); err != nil {
+		t.Fatalf("plain reorder should be allowed: %v", err)
+	}
+}

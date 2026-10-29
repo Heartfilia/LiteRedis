@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { listConnections, saveConnection, reorderConnections, deleteConnection, testConnection, connect, disconnect as disconnectAPI, isConnected, pingConnection } from '../api/wails.js'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../utils/connection.js'
+import { useI18n } from '../i18n/index.js'
+
+const { t } = useI18n()
 
 export const useConnectionsStore = defineStore('connections', {
   state: () => ({
@@ -75,6 +78,20 @@ export const useConnectionsStore = defineStore('connections', {
       const current = [...this.connections]
       const sourceIndex = current.findIndex(conn => conn.id === id)
       if (sourceIndex === -1) return { success: false, message: 'connection not found' }
+
+      const moving = current[sourceIndex]
+      // 目标分组里已有同名连接就先别动，避免出现两个重名连接
+      const conflictName = String(moving.name || '').trim().toLowerCase()
+      const conflict = current.some(conn =>
+        conn.id !== id &&
+        String(conn.group || '').trim() === String(targetGroup || '').trim() &&
+        String(conn.name || '').trim().toLowerCase() === conflictName
+      )
+      if (conflict) {
+        const message = t('connManager.moveDuplicateNameErr')
+        this.showGlobalToast(message, false)
+        return { success: false, message }
+      }
 
       const [moved] = current.splice(sourceIndex, 1)
       moved.group = targetGroup

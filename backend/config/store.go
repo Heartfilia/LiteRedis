@@ -154,6 +154,27 @@ func SaveConnection(cfg ConnectionConfig) (ConnectionConfig, error) {
 		return cfg, err
 	}
 
+	// 同一分组下名称唯一：忽略首尾空格与大小写，避免出现两个看起来一样的连接
+	cfg.Name = strings.TrimSpace(cfg.Name)
+	cfg.Group = strings.TrimSpace(cfg.Group)
+	if cfg.Name == "" {
+		return cfg, fmt.Errorf("连接名称不能为空")
+	}
+	for _, existing := range store.Connections {
+		if existing.ID == cfg.ID {
+			continue
+		}
+		if strings.TrimSpace(existing.Group) != cfg.Group {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(existing.Name), cfg.Name) {
+			if cfg.Group == "" {
+				return cfg, fmt.Errorf("默认分组下已存在同名连接「%s」", cfg.Name)
+			}
+			return cfg, fmt.Errorf("分组「%s」下已存在同名连接「%s」", cfg.Group, cfg.Name)
+		}
+	}
+
 	now := time.Now()
 	if cfg.ID == "" {
 		// 新建
@@ -212,6 +233,20 @@ func ReorderConnections(items []ConnectionOrderItem) error {
 			store.Connections[i].SortOrder = item.SortOrder
 			store.Connections[i].UpdatedAt = time.Now()
 		}
+	}
+
+	// 拖拽到别的分组后同样要保证同组名称唯一，否则直接拒绝这次排序
+	seen := make(map[string]struct{}, len(store.Connections))
+	for _, conn := range store.Connections {
+		key := strings.ToLower(strings.TrimSpace(conn.Group)) + "\x00" + strings.ToLower(strings.TrimSpace(conn.Name))
+		if _, exists := seen[key]; exists {
+			group := strings.TrimSpace(conn.Group)
+			if group == "" {
+				group = "默认分组"
+			}
+			return fmt.Errorf("分组「%s」下已存在同名连接「%s」，请先改名再移动", group, strings.TrimSpace(conn.Name))
+		}
+		seen[key] = struct{}{}
 	}
 
 	return saveStore(store)

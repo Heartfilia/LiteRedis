@@ -531,6 +531,19 @@ async function handleSave() {
   saveOkMsg.value = ''
   if (!form.name.trim()) { saveMsg.value = t('connManager.nameRequiredErr'); return }
   if (!form.isCluster && !form.host.trim()) { saveMsg.value = t('connManager.hostRequiredErr'); return }
+  // 同一分组下名称唯一（忽略大小写与首尾空格），先在前端拦一次，省得等后端报错
+  const nameKey = form.name.trim().toLowerCase()
+  const groupKey = (form.group || '').trim()
+  const duplicated = (connectionsStore.connections || []).some(item =>
+    item.id !== form.id &&
+    String(item.group || '').trim() === groupKey &&
+    String(item.name || '').trim().toLowerCase() === nameKey
+  )
+  if (duplicated) {
+    saveMsg.value = t('connManager.duplicateNameErr')
+    triggerSaveErrorFlash()
+    return
+  }
 
   saving.value = true
   try {
