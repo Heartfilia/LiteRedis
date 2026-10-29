@@ -63,9 +63,10 @@
             'drop-before': isItemDropPreview(conn.id, 'before'),
             'drop-after': isItemDropPreview(conn.id, 'after'),
             'cross-group-preview': isItemCrossGroupPreview(conn.id),
+            'drop-landed': landedId === conn.id,
           }]"
           draggable="true"
-          @dragstart="onDragStart(conn.id)"
+          @dragstart="onDragStart(conn.id, $event)"
           @dragend="onDragEnd"
           @dragover.prevent="onDragOverItem('', conn.id, $event)"
           @drop.prevent="onDropToGroup('', conn.id)"
@@ -168,9 +169,10 @@
                 'drop-before': isItemDropPreview(conn.id, 'before'),
                 'drop-after': isItemDropPreview(conn.id, 'after'),
                 'cross-group-preview': isItemCrossGroupPreview(conn.id),
+                'drop-landed': landedId === conn.id,
               }]"
               draggable="true"
-              @dragstart="onDragStart(conn.id)"
+              @dragstart="onDragStart(conn.id, $event)"
               @dragend="onDragEnd"
               @dragover.prevent="onDragOverItem(group, conn.id, $event)"
               @drop.prevent="onDropToGroup(group, conn.id)"
@@ -570,11 +572,20 @@ function toggleGroup(group) {
 
 // 拖拽
 const dragId = ref(null)
+const landedId = ref('')
+let landedTimer = null
+let clickSuppressedUntil = 0
 const dragOverGroup = ref(null)
 const dragPreview = ref({ group: null, targetId: '', placement: 'before', mode: null })
-function onDragStart(connId) {
+function onDragStart(connId, event) {
   dragId.value = connId
   dragPreview.value = { group: null, targetId: '', placement: 'before', mode: null }
+  // effectAllowed=move 让浏览器显示"移动"光标，拖拽意图更明确
+  if (event && event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    try { event.dataTransfer.setData('text/plain', connId) } catch (e) {}
+  }
+  document.body.classList.add('is-conn-dragging')
 }
 function onDragOverItem(group, targetId, event) {
   if (!dragId.value || dragId.value === targetId) return
@@ -614,9 +625,23 @@ function onDragEnd() {
     clearTimeout(dragExpandTimer)
     dragExpandTimer = null
   }
+  document.body.classList.remove('is-conn-dragging')
+  // 拖拽结束后短暂屏蔽点击，避免松手那一下误触「打开连接」
+  clickSuppressedUntil = Date.now() + 280
   dragOverGroup.value = null
   dragId.value = null
   dragPreview.value = { group: null, targetId: '', placement: 'before', mode: null }
+}
+
+// 落位后给被移动的连接一个短暂的落位高亮
+function markLanded(connId) {
+  if (!connId) return
+  landedId.value = connId
+  if (landedTimer) clearTimeout(landedTimer)
+  landedTimer = setTimeout(() => {
+    landedId.value = ''
+    landedTimer = null
+  }, 360)
 }
 function isItemDropPreview(targetId, placement) {
   return dragPreview.value.mode === 'item' &&
@@ -643,14 +668,18 @@ function groupDropHint(group) {
 async function onDropToGroup(targetGroup, targetId = '') {
   const placement = dragPreview.value.targetId === targetId ? dragPreview.value.placement : 'before'
   dragOverGroup.value = null
-  if (!dragId.value) return
-  if (dragId.value !== targetId) {
-    await connectionsStore.moveConnection(dragId.value, targetId, targetGroup, placement)
+  const movingId = dragId.value
+  if (!movingId) return
+  if (movingId !== targetId) {
+    const result = await connectionsStore.moveConnection(movingId, targetId, targetGroup, placement)
+    if (!result || result.success !== false) markLanded(movingId)
   }
   onDragEnd()
 }
 
 async function handleConnect(conn) {
+  // 刚拖拽完的 280ms 内忽略点击，避免松手误触打开连接
+  if (Date.now() < clickSuppressedUntil) return
   if (connectionsStore.isConnecting(conn.id)) return
   if (connectionsStore.isConnected(conn.id)) {
     // 已连接：重新激活，恢复该连接的历史状态（如有）
@@ -1114,6 +1143,20 @@ async function disconnectConn(id) {
   background: rgba(78, 154, 241, 0.12);
   box-shadow: inset 0 0 0 1px rgba(120, 185, 255, 0.18);
 }
+/* 落位高亮：松开鼠标后被移动的连接会闪一下，确认"落在这里了" */
+.conn-item.drop-landed {
+  animation: connLanded 320ms var(--ease-out);
+}
+@keyframes connLanded {
+  0% {
+    background: rgba(96, 165, 250, 0.26);
+    box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.45);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
+}
 .conn-lock {
   width: 11px;
   height: 11px;
@@ -1139,6 +1182,8 @@ async function disconnectConn(id) {
   left: 0;
   right: 0;
   height: 2px;
+  transform-origin: left center;
+  animation: dropLineIn var(--motion-fast) var(--ease-out);
   background: #69b1ff;
   border-radius: var(--radius-pill);
   box-shadow: 0 0 0 1px rgba(30, 42, 58, 0.45), 0 0 10px rgba(105, 177, 255, 0.35);
@@ -1161,6 +1206,16 @@ async function disconnectConn(id) {
 .conn-item.cross-group-preview .drop-indicator::after {
   background: #34d399;
   box-shadow: 0 0 0 2px #1e2a3a, 0 0 10px rgba(52, 211, 153, 0.45);
+}
+@keyframes dropLineIn {
+  from {
+    transform: scaleX(0.2);
+    opacity: 0.4;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
 }
 .drop-indicator.before { top: -1px; }
 .drop-indicator.after { bottom: -1px; }

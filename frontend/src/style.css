@@ -86,6 +86,18 @@ button:not(:disabled):active,
   transform: translateY(0) scale(0.985);
 }
 
+/* 拖拽连接、拖拽调宽时统一光标，避免指针在子元素上闪成默认箭头 */
+body.is-conn-dragging,
+body.is-conn-dragging * {
+  cursor: grabbing !important;
+}
+body.is-panel-resizing,
+body.is-panel-resizing * {
+  cursor: col-resize !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
 /* 系统开启"减少动态效果"时，把过渡与动画压到最短 */
 @media (prefers-reduced-motion: reduce) {
   *,

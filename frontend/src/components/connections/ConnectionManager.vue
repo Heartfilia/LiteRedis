@@ -45,7 +45,7 @@
                   'cross-group-preview': isItemCrossGroupPreview(conn.id),
                 }]"
                 draggable="true"
-                @dragstart="onDragStart(conn.id)"
+                @dragstart="onDragStart(conn.id, $event)"
                 @dragend="onDragEnd"
                 @dragover.prevent="onDragOverItem('', conn.id, $event)"
                 @drop.prevent="onDropToGroup('', conn.id)"
@@ -96,7 +96,7 @@
                     'cross-group-preview': isItemCrossGroupPreview(conn.id),
                   }]"
                   draggable="true"
-                  @dragstart="onDragStart(conn.id)"
+                  @dragstart="onDragStart(conn.id, $event)"
                   @dragend="onDragEnd"
                   @dragover.prevent="onDragOverItem(group, conn.id, $event)"
                   @drop.prevent="onDropToGroup(group, conn.id)"
@@ -179,6 +179,7 @@ const { t } = useI18n()
 const selectedConn = ref(null)
 const collapsed = ref({})
 const dragId = ref(null)
+let clickSuppressedUntil = 0
 const dragOverGroup = ref(null)
 const dragPreview = ref({ group: null, targetId: '', placement: 'before', mode: null })
 const suppressHover = ref(false)
@@ -200,6 +201,7 @@ function newConnection() {
 }
 
 function selectConn(conn) {
+  if (Date.now() < clickSuppressedUntil) return
   selectedConn.value = {
     ...conn,
     isCluster: conn.is_cluster,
@@ -223,9 +225,14 @@ function toggleGroup(group) {
   collapsed.value[group] = !collapsed.value[group]
 }
 
-function onDragStart(connId) {
+function onDragStart(connId, event) {
   dragId.value = connId
   dragPreview.value = { group: null, targetId: '', placement: 'before', mode: null }
+  if (event && event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    try { event.dataTransfer.setData('text/plain', connId) } catch (e) {}
+  }
+  document.body.classList.add('is-conn-dragging')
 }
 
 function onDragOverItem(group, targetId, event) {
@@ -269,6 +276,9 @@ function onDragEnd() {
     clearTimeout(dragExpandTimer)
     dragExpandTimer = null
   }
+  document.body.classList.remove('is-conn-dragging')
+  // 拖拽结束后短暂屏蔽点击，避免松手那一下误选中别的连接
+  clickSuppressedUntil = Date.now() + 280
   releaseHoverState()
   dragOverGroup.value = null
   dragId.value = null
