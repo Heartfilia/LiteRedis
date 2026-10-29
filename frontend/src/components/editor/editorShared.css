@@ -448,3 +448,25 @@
   color: #bfdbfe;
   border-color: rgba(59, 130, 246, 0.7);
 }
+
+/* 值内容区域允许鼠标选中 / 拖选多行复制；
+   行内按钮和表头保持不可选，避免拖选时把按钮文字也带上 */
+.list-wrap,
+.set-wrap,
+.zset-wrap,
+.hash-table-wrap,
+.stream-wrap {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.list-wrap button,
+.set-wrap button,
+.zset-wrap button,
+.hash-table-wrap button,
+.stream-wrap button,
+.list-wrap thead,
+.zset-wrap thead,
+.hash-table-wrap thead {
+  -webkit-user-select: none;
+  user-select: none;
+}
