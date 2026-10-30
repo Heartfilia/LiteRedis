@@ -294,10 +294,10 @@
             </span>
           </button>
           <button
-            class="btn-icon btn-collapse"
+            v-if="hasConnectedConnections"
+            class="btn-icon btn-collapse pop-in"
             :title="t('sidebar.collapse')"
-            :disabled="!hasConnections"
-            @click="hasConnections && (sidebarCollapsed = true)"
+            @click="sidebarCollapsed = true"
           >
             <span class="btn-icon-glyph" aria-hidden="true">
               <svg viewBox="0 0 16 16" fill="none">
@@ -484,7 +484,9 @@ const namedGroups = computed(() => {
 const connectedConnections = computed(() =>
   connectionsStore.connections.filter(c => connectionsStore.isConnected(c.id))
 )
+const hasConnectedConnections = computed(() => connectedConnections.value.length > 0)
 const hasConnections = computed(() => connectionsStore.connections.length > 0)
+// 是否有「已连接」的 Redis：折叠按钮只在此时出现
 // —— 主题切换菜单（浅色 / 暗色 / 跟随系统，后续主题效果继续往这里加）——
 const THEME_OPTIONS = [
   { value: 'light', labelKey: 'sidebar.themeLight' },
@@ -567,6 +569,13 @@ watch(hasConnections, (value) => {
     sidebarCollapsed.value = false
   }
 }, { immediate: true })
+
+// 折叠状态下所有 Redis 都断开（断网、服务挂了）时，自动展开回到等待连接的初始状态
+watch(hasConnectedConnections, (value) => {
+  if (!value && sidebarCollapsed.value) {
+    sidebarCollapsed.value = false
+  }
+})
 
 // 右键菜单
 const ctxMenu = ref({ visible: false, x: 0, y: 0, conn: null })

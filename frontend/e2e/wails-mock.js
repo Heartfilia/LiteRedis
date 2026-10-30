@@ -39,6 +39,14 @@ export async function installWailsMock(page, options = {}) {
         command_history: [],
       }
 
+      // 测试可以随时模拟断网：命中的数据接口会抛出连接类错误
+      const net = { up: true }
+      const refused = 'dial tcp 127.0.0.1:6379: connect: connection refused'
+      const guard = (value) => {
+        if (!net.up) throw new Error(refused)
+        return value
+      }
+
       const keys = Array.from({ length: keyCount }, (_, index) => ({
         name: 'user:' + (index % 60) + ':field:' + index,
         type: ['string', 'hash', 'list', 'set', 'zset'][index % 5],
@@ -62,33 +70,38 @@ export async function installWailsMock(page, options = {}) {
         Connect: () => ({ success: true, init_db: 0 }),
         Disconnect: () => ({ success: true }),
         IsConnected: () => true,
-        PingConnection: () => ({ success: true }),
-        SelectDB: () => ({ success: true }),
-        DbSize: () => 5000,
-        ScanKeys: (connId, pattern, count) => ({
-          keys: keys.slice(0, Math.min(count || 200, keys.length)),
-          next_cursor: 0,
-          has_more: false,
-        }),
-        GetValue: () => ({
-          key: '',
-          type: 'string',
-          string_val: JSON.stringify(
-            Object.fromEntries(
-              Array.from({ length: 3000 }, (_, i) => ['field_' + String(i).padStart(4, '0'), 'value-' + i + '-' + 'x'.repeat(20)])
-            )
-          ),
-        }),
-        GetConnectionOverview: () => ({
-          host: '127.0.0.1',
-          port: 6379,
-          used_memory: '1.2 MB',
-          current_db: 0,
-          total_keys: 5000,
-          uptime_human: '2 天',
-        }),
-        ExecuteRedisCommand: () => ({ success: true, output: 'PONG' }),
-        ExecuteRedisCommandForce: () => ({ success: true, output: 'PONG' }),
+        PingConnection: () => guard({ success: true }),
+        SelectDB: () => guard({ success: true }),
+        ScanKeys: (connId, pattern, count) =>
+          guard({
+            keys: keys.slice(0, Math.min(count || 200, keys.length)),
+            next_cursor: 0,
+            has_more: false,
+          }),
+        GetValue: () =>
+          guard({
+            key: '',
+            type: 'string',
+            string_val: JSON.stringify(
+              Object.fromEntries(
+                Array.from({ length: 3000 }, (_, i) => [
+                  'field_' + String(i).padStart(4, '0'),
+                  'value-' + i + '-' + 'x'.repeat(20),
+                ])
+              )
+            ),
+          }),
+        GetConnectionOverview: () =>
+          guard({
+            host: '127.0.0.1',
+            port: 6379,
+            used_memory: '1.2 MB',
+            current_db: 0,
+            total_keys: 5000,
+            uptime_human: '2 天',
+          }),
+        ExecuteRedisCommand: () => guard({ success: true, output: 'PONG' }),
+        ExecuteRedisCommandForce: () => guard({ success: true, output: 'PONG' }),
         GetLocalAPIInfo: () => ({ running: false, port: 0, token: '', error: '' }),
         GetDiagnostics: () => ({ connections: [] }),
         GetUpdateInfo: () => ({ need_update: false, latest: '1.0.0' }),
@@ -104,6 +117,12 @@ export async function installWailsMock(page, options = {}) {
                 Promise.resolve(typeof impl[method] === 'function' ? impl[method](...args) : { success: true }),
             }
           ),
+        },
+      }
+      // 测试开关：window.__wailsMock.setNetworkUp(false) 模拟断网
+      window.__wailsMock = {
+        setNetworkUp: (up) => {
+          net.up = up
         },
       }
       // runtime 里的方法一律当空实现，避免未绑定就抛错

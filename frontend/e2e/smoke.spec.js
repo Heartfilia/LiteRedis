@@ -221,3 +221,30 @@ test.describe('follow system theme', () => {
     await expect(page.locator('.btn-theme')).toHaveAttribute('data-theme-pref', 'auto')
   })
 })
+test('collapse button follows connection state and restores on network loss', async ({ page }) => {
+  await installWailsMock(page, { keyCount: 60 })
+  await page.goto('/')
+
+  // 没有已连接的 Redis：折叠按钮不存在
+  await expect(page.locator('.btn-collapse')).toHaveCount(0)
+
+  await page.locator('.conn-item .conn-main').first().click()
+  await expandAll(page)
+  const collapseBtn = page.locator('.btn-collapse')
+  await expect(collapseBtn).toBeVisible()
+
+  // 打开一个 key，让刷新有目标
+  await page.locator('.tree-scroll .node-row.leaf-row').first().click()
+  await page.waitForTimeout(600)
+
+  await collapseBtn.click()
+  await expect(page.locator('.sidebar-collapsed-layer.visible')).toBeVisible()
+
+  // 模拟断网后刷新当前 key，触发连接失败
+  await page.evaluate(() => window.__wailsMock.setNetworkUp(false))
+  await page.keyboard.press('Meta+r')
+
+  // 自动展开回到等待连接的初始状态，折叠按钮随之消失
+  await expect(page.locator('.sidebar-collapsed-layer.visible')).toHaveCount(0)
+  await expect(page.locator('.btn-collapse')).toHaveCount(0)
+})
