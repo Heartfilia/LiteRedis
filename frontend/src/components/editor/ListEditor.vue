@@ -42,8 +42,10 @@
       </span>
     </div>
 
-    <div class="list-wrap">
-      <div v-for="(item, idx) in displayItems" :key="idx" class="list-item">
+    <div ref="listWrapRef" class="list-wrap">
+      <div v-if="vTopPad" :style="{ height: vTopPad + 'px' }" aria-hidden="true"></div>
+      <template v-for="(item, idx) in displayItems" :key="idx">
+      <div v-if="idx >= vStart && idx < vEnd" class="list-item" data-vrow>
         <span
           class="idx-badge"
           @click="openExtractMenu($event, displayOriginalIndices[idx] >= 0 ? displayOriginalIndices[idx] : rawItems.indexOf(item))"
@@ -82,6 +84,8 @@
           </template>
         </div>
       </div>
+      </template>
+      <div v-if="vBottomPad" :style="{ height: vBottomPad + 'px' }" aria-hidden="true"></div>
     </div>
 
     <!-- 加载更多 -->
@@ -129,6 +133,7 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
+import { useRowVirtualizer } from '../../utils/virtualList.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
 import { lPush, rPush, lSet, lRem, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
@@ -150,6 +155,13 @@ const requestGuard = createRequestGuard(() => ({
   db: workspaceStore.currentDB,
   key: props.keyValue?.key || null,
 }))
+
+// 长列表窗口化：超过 120 行时只渲染可视区附近的行
+const listWrapRef = ref(null)
+const { start: vStart, end: vEnd, topPad: vTopPad, bottomPad: vBottomPad } = useRowVirtualizer({
+  containerRef: listWrapRef,
+  count: computed(() => displayItems.value?.length || 0),
+})
 
 const rawItems = ref([])      // 原始加载的 items（保留原始索引）
 const showAdd = ref(false)

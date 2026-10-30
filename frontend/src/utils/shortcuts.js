@@ -29,6 +29,11 @@ export function installGlobalShortcuts() {
   installed = true
   window.addEventListener('keydown', (event) => {
     const cmdOrCtrl = event.metaKey || event.ctrlKey
+    if (cmdOrCtrl && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'k') {
+      event.preventDefault()
+      window.dispatchEvent(new CustomEvent('literedis:command-palette'))
+      return
+    }
     if (cmdOrCtrl && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'r') {
       // 不拦截的话 WebView 会尝试刷新页面
       event.preventDefault()

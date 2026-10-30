@@ -34,7 +34,7 @@
       <button class="add-row-btn add-row-btn-primary" @click="addMember">{{ t('keyEditor.add') }}</button>
       <button class="add-row-btn" @click="showAdd = false">{{ t('keyEditor.cancel') }}</button>
     </div>
-    <div class="zset-wrap">
+    <div ref="zsetWrapRef" class="zset-wrap">
       <table class="zset-table">
         <thead>
           <tr>
@@ -50,7 +50,9 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(m, idx) in displayMembers" :key="m.member">
+          <tr v-if="vTopPad" aria-hidden="true"><td :colspan="4" :style="{ height: vTopPad + 'px', padding: 0, border: 0 }"></td></tr>
+          <template v-for="(m, idx) in displayMembers" :key="m.member">
+          <tr v-if="idx >= vStart && idx < vEnd" data-vrow>
             <td class="num-cell" @click="openExtractMenu($event, rawMembers.findIndex(x => x.member === m.member))" @contextmenu.prevent="openExtractMenu($event, rawMembers.findIndex(x => x.member === m.member))">{{ idx + 1 }}</td>
             <td class="score-cell" :style="{ width: scoreWidth + 'px' }">
               <span v-if="editingMember !== m.member" class="score-text" @click="startEdit(m)">{{ m.score }}</span>
@@ -81,6 +83,8 @@
               </div>
             </td>
           </tr>
+          </template>
+          <tr v-if="vBottomPad" aria-hidden="true"><td :colspan="4" :style="{ height: vBottomPad + 'px', padding: 0, border: 0 }"></td></tr>
         </tbody>
       </table>
     </div>
@@ -130,6 +134,7 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
+import { useRowVirtualizer } from '../../utils/virtualList.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
 import { zAdd, zRem, renameZSetMember, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
@@ -268,6 +273,13 @@ const sortedMembers = computed(() => {
 
 // 直接显示所有已加载的数据
 const displayMembers = computed(() => sortedMembers.value)
+
+// 长列表窗口化：超过 120 行时只渲染可视区附近的行
+const zsetWrapRef = ref(null)
+const { start: vStart, end: vEnd, topPad: vTopPad, bottomPad: vBottomPad } = useRowVirtualizer({
+  containerRef: zsetWrapRef,
+  count: computed(() => displayMembers.value?.length || 0),
+})
 
 const lastKey = ref('')
 function persistSearchState(key = props.keyValue?.key || lastKey.value) {

@@ -232,7 +232,7 @@
     </div>
 
     <!-- hash 表格 -->
-    <div class="hash-table-wrap">
+    <div ref="hashWrapRef" class="hash-table-wrap">
       <table class="hash-table">
         <colgroup>
           <col class="num-colgroup" />
@@ -252,7 +252,9 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="([field, val], idx) in displayEntries" :key="field">
+          <tr v-if="vTopPad" aria-hidden="true"><td :colspan="4" :style="{ height: vTopPad + 'px', padding: 0, border: 0 }"></td></tr>
+          <template v-for="([field, val], idx) in displayEntries" :key="field">
+          <tr v-if="idx >= vStart && idx < vEnd" data-vrow>
             <td class="num-cell" @click="openExtractMenu($event, field)" @contextmenu.prevent="openExtractMenu($event, field)">{{ idx + 1 }}</td>
             <td class="field-cell" :style="fieldColumnStyle">{{ field }}</td>
             <td class="value-cell" :style="valueColumnStyle">
@@ -280,6 +282,8 @@
               </div>
             </td>
           </tr>
+          </template>
+          <tr v-if="vBottomPad" aria-hidden="true"><td :colspan="4" :style="{ height: vBottomPad + 'px', padding: 0, border: 0 }"></td></tr>
         </tbody>
       </table>
     </div>
@@ -329,6 +333,7 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
+import { useRowVirtualizer } from '../../utils/virtualList.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
 import { hSet, hDel, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
@@ -517,6 +522,13 @@ const sortedEntries = computed(() => {
 
 // 直接显示所有已加载的数据（不再客户端分页）
 const displayEntries = computed(() => sortedEntries.value)
+
+// 长列表窗口化：超过 120 行时只渲染可视区附近的行
+const hashWrapRef = ref(null)
+const { start: vStart, end: vEnd, topPad: vTopPad, bottomPad: vBottomPad } = useRowVirtualizer({
+  containerRef: hashWrapRef,
+  count: computed(() => displayEntries.value?.length || 0),
+})
 
 const lastKey = ref('')
 function persistSearchState(key = props.keyValue?.key || lastKey.value) {

@@ -57,8 +57,10 @@
       </span>
     </div>
 
-    <div class="set-wrap">
-      <div v-for="(m, idx) in displayMembers" :key="m" class="set-item">
+    <div ref="setWrapRef" class="set-wrap">
+      <div v-if="vTopPad" :style="{ height: vTopPad + 'px' }" aria-hidden="true"></div>
+      <template v-for="(m, idx) in displayMembers" :key="m">
+      <div v-if="idx >= vStart && idx < vEnd" class="set-item" data-vrow>
         <span class="num-badge" @click="openExtractMenu($event, rawMembers.indexOf(m))" @contextmenu.prevent="openExtractMenu($event, rawMembers.indexOf(m))">{{ idx + 1 }}</span>
         <span class="member-val">
           <span class="val-preview">{{ m }}</span>
@@ -74,6 +76,8 @@
           />
         </div>
       </div>
+      </template>
+      <div v-if="vBottomPad" :style="{ height: vBottomPad + 'px' }" aria-hidden="true"></div>
     </div>
 
     <!-- 加载更多 -->
@@ -121,6 +125,7 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
+import { useRowVirtualizer } from '../../utils/virtualList.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
 import { sAdd, sRem, renameSetMember, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
@@ -231,6 +236,13 @@ const sortedMembers = computed(() => {
 
 // 直接显示所有已加载的数据
 const displayMembers = computed(() => sortedMembers.value)
+
+// 长列表窗口化：超过 120 行时只渲染可视区附近的行
+const setWrapRef = ref(null)
+const { start: vStart, end: vEnd, topPad: vTopPad, bottomPad: vBottomPad } = useRowVirtualizer({
+  containerRef: setWrapRef,
+  count: computed(() => displayMembers.value?.length || 0),
+})
 
 const lastKey = ref('')
 function persistSearchState(key = props.keyValue?.key || lastKey.value) {

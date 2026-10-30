@@ -8,6 +8,7 @@
       @close="showConnManager = false"
     />
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
+    <CommandPalette v-if="showPalette" @close="showPalette = false" />
     <WelcomeWizard
       v-if="showWelcome"
       @skip="dismissWelcome(false)"
@@ -42,6 +43,7 @@ import MainContent from './components/layout/MainContent.vue'
 import ConnectionManager from './components/connections/ConnectionManager.vue'
 import WhatsNewModal from './components/common/WhatsNewModal.vue'
 import WelcomeWizard from './components/common/WelcomeWizard.vue'
+import CommandPalette from './components/common/CommandPalette.vue'
 import SettingsModal from './components/settings/SettingsModal.vue'
 import { useConnectionsStore } from './stores/connections.js'
 import { useSettingsStore } from './stores/settings.js'
@@ -129,6 +131,12 @@ async function closeWhatsNew() {
   }
 }
 
+// ---- Cmd/Ctrl+K 命令面板 ----
+const showPalette = ref(false)
+function togglePalette() {
+  showPalette.value = !showPalette.value
+}
+
 // ---- 首次使用向导（只在完全没有连接时出现，看过/跳过都不再弹） ----
 const showWelcome = ref(false)
 
@@ -159,6 +167,7 @@ onMounted(async () => {
   await Promise.all([connectionsStore.loadConnections(), settingsStore.load()])
   // 屏蔽原生右键菜单（输入框/可编辑区域保留，编辑器行首的自定义菜单另行处理）
   document.addEventListener('contextmenu', suppressContextMenu)
+  window.addEventListener('literedis:command-palette', togglePalette)
   // 新用户先看引导；已经弹过引导就不再叠加「更新内容」弹窗
   const welcomed = await maybeShowWelcome()
   if (!welcomed) maybeShowWhatsNew()
@@ -174,6 +183,7 @@ function suppressContextMenu(e) {
 
 onBeforeUnmount(() => {
   document.removeEventListener('contextmenu', suppressContextMenu)
+  window.removeEventListener('literedis:command-palette', togglePalette)
 })
 
 let toastTimer = null
