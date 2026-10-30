@@ -24,6 +24,7 @@ test('normalizeThemePreference: 只认三个合法值，其它回落到浅色', 
   assert.equal(normalizeThemePreference('light'), 'light')
   assert.equal(normalizeThemePreference('dark'), 'dark')
   assert.equal(normalizeThemePreference('auto'), 'auto')
+  assert.equal(normalizeThemePreference('green'), 'green')
   assert.equal(normalizeThemePreference('AUTO'), 'light')
   assert.equal(normalizeThemePreference(undefined), 'light')
 })
@@ -46,6 +47,10 @@ test('setTheme: 明暗直接生效，auto 跟随系统当前偏好', () => {
 
   store.setTheme('light')
   assert.equal(store.themeMode, 'light')
+
+  store.setTheme('green')
+  assert.equal(store.themePreference, 'green')
+  assert.equal(store.themeMode, 'green')
 
   store.setTheme('auto')
   assert.equal(store.themePreference, 'auto')

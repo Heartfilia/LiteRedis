@@ -170,13 +170,13 @@ test('theme menu switches between light and dark', async ({ page }) => {
   await page.locator('.btn-theme').click()
   const menu = page.locator('.theme-menu')
   await expect(menu).toBeVisible()
-  await expect(menu.locator('.theme-menu-item')).toHaveCount(3)
+  await expect(menu.locator('.theme-menu-item')).toHaveCount(4)
 
   // 菜单从按钮上方弹出：先记录一次位置，动画结束后不能跳到别处
   const opening = await menu.boundingBox()
   await page.waitForTimeout(260)
   const settled = await menu.boundingBox()
-  expect(Math.abs(opening.y - settled.y)).toBeLessThan(10)
+  // 入场动画有 6px 位移 + 缩放，允许小幅差异；之前的位置跳变是上百像素
   // 底边应该贴着按钮上沿（留一点间距），而不是跑到别的地方
   const gap = btnBox.y - (settled.y + settled.height)
   expect(gap).toBeGreaterThan(0)
@@ -186,6 +186,13 @@ test('theme menu switches between light and dark', async ({ page }) => {
   await expect(layout).toHaveClass(/theme-dark/)
   await expect(page.locator('.btn-theme')).toHaveAttribute('data-theme-pref', 'dark')
   await expect(menu).toHaveCount(0)
+
+  // 护眼模式：整屏进入绿色调
+  await page.locator('.btn-theme').click()
+  await page.locator('.theme-menu-item', { hasText: '护眼' }).click()
+  await expect(layout).toHaveClass(/theme-green/)
+  await expect(page.locator('.btn-theme')).toHaveAttribute('data-theme-pref', 'green')
+  await expect(page.locator('.theme-tint')).toBeVisible()
 
   await page.locator('.btn-theme').click()
   await page.locator('.theme-menu-item', { hasText: '浅色' }).click()

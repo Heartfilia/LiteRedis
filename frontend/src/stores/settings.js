@@ -12,9 +12,9 @@ export function normalizeLoadCount(value, fallback = DEFAULT_LOAD_COUNT) {
 }
 
 const THEME_STORAGE_KEY = 'liteRedis_themeMode'
-const THEME_PREFERENCES = ['light', 'dark', 'auto']
+const THEME_PREFERENCES = ['light', 'green', 'dark', 'auto']
 
-// 主题选择：light / dark / auto（跟随系统）
+// 主题选择：light / green（护眼）/ dark / auto（跟随系统）
 export function normalizeThemePreference(value) {
   return THEME_PREFERENCES.includes(value) ? value : 'light'
 }
@@ -44,7 +44,7 @@ export const useSettingsStore = defineStore('settings', {
     debugMode: false,
     // 实际生效的主题（light | dark），组件都用它拼 theme-xxx 类名
     themeMode: 'light',
-    // 用户选择（light | dark | auto），auto 跟随系统
+    // 用户选择（light | green | dark | auto），auto 跟随系统
     themePreference: 'light',
     keyScanCount: 200,
     hashLoadCount: 20,

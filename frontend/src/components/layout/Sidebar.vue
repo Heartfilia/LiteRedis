@@ -479,6 +479,7 @@ const hasConnections = computed(() => connectionsStore.connections.length > 0)
 // —— 主题切换菜单（浅色 / 暗色 / 跟随系统，后续主题效果继续往这里加）——
 const THEME_OPTIONS = [
   { value: 'light', labelKey: 'sidebar.themeLight' },
+  { value: 'green', labelKey: 'sidebar.themeGreen' },
   { value: 'dark', labelKey: 'sidebar.themeDark' },
   { value: 'auto', labelKey: 'sidebar.themeAuto' },
 ]

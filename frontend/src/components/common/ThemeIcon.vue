@@ -4,6 +4,10 @@
       <rect x="3" y="4.5" width="18" height="12.5" rx="2.2" stroke="currentColor" stroke-width="1.8" />
       <path d="M8.5 20.6h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
     </template>
+    <template v-else-if="name === 'green'">
+      <path d="M2.8 12S6 6.4 12 6.4 21.2 12 21.2 12 18 17.6 12 17.6 2.8 12 2.8 12z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+      <circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.7" />
+    </template>
     <template v-else-if="name === 'dark'">
       <path d="M18 14.5A7.5 7.5 0 119.5 6 6 6 0 0018 14.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
     </template>
@@ -20,7 +24,7 @@
 </template>
 
 <script setup>
-// 主题图标：light 太阳 / dark 月亮 / auto 显示器
+// 主题图标：light 太阳 / green 眼睛 / dark 月亮 / auto 显示器
 defineProps({
   name: { type: String, default: 'light' },
 })

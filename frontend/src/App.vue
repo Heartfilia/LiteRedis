@@ -23,6 +23,11 @@
       @close="closeWhatsNew"
     />
     <Teleport to="body">
+      <!-- 护眼模式：整屏叠一层淡绿，把所有白底面板统一压成柔和的绿调 -->
+      <div v-if="settingsStore.themeMode === 'green'" class="theme-tint" aria-hidden="true" />
+    </Teleport>
+
+    <Teleport to="body">
       <Transition name="app-toast">
         <div
           v-if="connectionsStore.globalToast"
@@ -260,6 +265,27 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
     radial-gradient(circle at right 18%, rgba(20, 184, 166, 0.12), transparent 24%),
     linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
 }
+.app-layout.theme-green {
+  --app-text: #223528;
+  --app-muted: #57705d;
+  --app-panel-border: rgba(186, 210, 172, 0.94);
+  --app-panel-bg: rgba(252, 255, 249, 0.96);
+  --app-sidebar-bg: linear-gradient(180deg, rgba(238, 248, 229, 0.98), rgba(226, 240, 214, 0.98));
+  /* 底色比面板更深一档，乘上叠层之后才能看出层次 */
+  background:
+    radial-gradient(circle at top left, rgba(198, 226, 178, 0.72), transparent 36%),
+    radial-gradient(circle at right 18%, rgba(210, 234, 189, 0.6), transparent 30%),
+    linear-gradient(180deg, #e2f0d6 0%, #d2e6c4 100%);
+}
+/* 护眼模式的淡绿叠层：只影响颜色，不吃事件 */
+.theme-tint {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background: rgba(217, 236, 200, 0.46);
+}
 .app-layout.font-medium {
   --ui-font-title: 14px;
   --ui-font-body: 13px;
@@ -399,5 +425,9 @@ body {
 body[data-theme='dark'] {
   background: #0b1220;
   color: #e2e8f0;
+}
+body[data-theme='green'] {
+  background: #e9f3e1;
+  color: #24382a;
 }
 </style>
