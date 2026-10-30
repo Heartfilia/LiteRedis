@@ -14,7 +14,7 @@
         :class="{ 'is-collapsed': shortcutsCollapsed }"
       >
         <div class="shortcut-head">
-          <span v-if="shortcutsCollapsed" class="shortcut-collapsed-title">{{ collapsedShortcutTitle }}</span>
+          <span class="shortcut-summary">{{ shortcutSummary }}</span>
           <button
             type="button"
             class="shortcut-toggle"
@@ -32,7 +32,6 @@
         <div class="shortcut-collapse-inner">
         <div class="shortcut-body">
         <div v-if="favoriteKeys.length" class="shortcut-group">
-          <div class="shortcut-title">★ {{ t('keyTree.favorites') }} · {{ favoriteKeys.length }}</div>
           <div
             v-for="item in favoriteKeys"
             :key="'fav-' + item"
@@ -46,7 +45,6 @@
           </div>
         </div>
         <div v-if="recentKeyList.length" class="shortcut-group">
-          <div class="shortcut-title">{{ t('keyTree.recent') }} · {{ recentKeyList.length }}</div>
           <div
             v-for="item in recentKeyList"
             :key="'recent-' + item"
@@ -403,7 +401,8 @@ const dbBarRef = ref(null)
 const barNarrow = ref(false)
 // 「收藏 / 最近访问」板块的折叠状态：不做持久化，切连接或切 DB 时恢复展开
 const shortcutsCollapsed = ref(false)
-const collapsedShortcutTitle = computed(() => {
+// 顶栏摘要：收藏、最近访问各有多少条，谁有显示谁（展开和收起状态一致）
+const shortcutSummary = computed(() => {
   const parts = []
   if (favoriteKeys.value.length) parts.push(t('keyTree.favorites') + ' · ' + favoriteKeys.value.length)
   if (recentKeyList.value.length) parts.push(t('keyTree.recent') + ' · ' + recentKeyList.value.length)
@@ -1135,7 +1134,8 @@ function collapseVisibleTree() {
   height: 16px;
   flex-shrink: 0;
 }
-.shortcut-collapsed-title {
+/* 顶栏摘要：展开/收起都显示「收藏 · N   最近访问 · M」 */
+.shortcut-summary {
   flex: 1;
   min-width: 0;
   font-size: 11px;
@@ -1145,8 +1145,17 @@ function collapseVisibleTree() {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.key-tree.theme-dark .shortcut-collapsed-title {
+.key-tree.theme-dark .shortcut-summary {
   color: #94a3b8;
+}
+/* 收藏与最近访问之间用一条细虚线分开（标题已经合并到顶栏） */
+.shortcut-group + .shortcut-group {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px dashed rgba(203, 213, 225, 0.85);
+}
+.key-tree.theme-dark .shortcut-group + .shortcut-group {
+  border-top-color: rgba(51, 65, 85, 0.9);
 }
 .shortcut-toggle {
   margin-left: auto;
