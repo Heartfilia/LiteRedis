@@ -1,6 +1,6 @@
 <template>
   <div ref="mainContentRef" class="main-content" :class="`theme-${settingsStore.themeMode || 'light'}`">
-    <ConnectionTabs />
+    <ConnectionTabs v-if="settingsStore.connectionTabsEnabled" />
     <div class="main-body">
     <div class="key-tree-panel" :style="{ width: panelWidth + 'px' }">
       <KeyTree />

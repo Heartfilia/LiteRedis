@@ -152,6 +152,14 @@
 
       <div class="setting-item">
         <label>
+          <span class="label-text">{{ t('settings.connectionTabs') }}</span>
+          <span class="label-hint">{{ t('settings.connectionTabsHint') }}</span>
+        </label>
+        <input v-model="form.connectionTabsEnabled" type="checkbox" class="check-input" />
+      </div>
+
+      <div class="setting-item">
+        <label>
           <span class="label-text">{{ t('settings.searchHistoryLimit') }}</span>
           <span class="label-hint">{{ t('settings.searchHistoryHint') }}</span>
         </label>
@@ -484,6 +492,7 @@ const form = reactive({
   searchHistoryLimit: 10,
   keyDisplayMode: 'tree',
   fontSizeLevel: 'small',
+  connectionTabsEnabled: false,
   watermarkEnabled: false,
   watermarkText: '',
   watermarkSize: 16,
@@ -566,6 +575,7 @@ function syncFromStore() {
   form.searchHistoryLimit = settingsStore.searchHistoryLimit
   form.keyDisplayMode = settingsStore.keyDisplayMode
   form.fontSizeLevel = settingsStore.fontSizeLevel
+  form.connectionTabsEnabled = settingsStore.connectionTabsEnabled
   form.watermarkEnabled = settingsStore.watermarkEnabled
   form.watermarkText = settingsStore.watermarkText
   form.watermarkSize = settingsStore.watermarkSize
@@ -591,6 +601,7 @@ function reset() {
   form.searchHistoryLimit = 10
   form.keyDisplayMode = 'tree'
   form.fontSizeLevel = 'small'
+  form.connectionTabsEnabled = false
   form.watermarkEnabled = false
   form.watermarkText = ''
   form.watermarkSize = 16

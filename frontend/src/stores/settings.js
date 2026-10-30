@@ -44,6 +44,8 @@ export const useSettingsStore = defineStore('settings', {
     lastSeenVersion: '',
     // 是否已看过首次使用向导
     onboardingDone: false,
+    // 顶部连接标签栏，默认关闭（和没有标签栏之前一样从左侧切换）
+    connectionTabsEnabled: false,
   }),
 
   actions: {
@@ -98,6 +100,7 @@ export const useSettingsStore = defineStore('settings', {
         this.proxyUrl = s.proxy_url || ''
         this.lastSeenVersion = s.last_seen_version || ''
         this.onboardingDone = s.onboarding_done === true
+        this.connectionTabsEnabled = s.connection_tabs_enabled === true
         setLanguage(this.language)
         this.loaded = true
         this.applyTheme()
@@ -117,6 +120,7 @@ export const useSettingsStore = defineStore('settings', {
         stream_load_count: values.streamLoadCount,
         search_history_limit: values.searchHistoryLimit,
         key_display_mode: values.keyDisplayMode,
+        connection_tabs_enabled: values.connectionTabsEnabled === true,
         font_size_level: values.fontSizeLevel,
         watermark_enabled: values.watermarkEnabled,
         watermark_text: values.watermarkText,
