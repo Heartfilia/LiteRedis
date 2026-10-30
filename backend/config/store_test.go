@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -387,5 +388,61 @@ func TestExportConnectionsSortedAndComplete(t *testing.T) {
 	}
 	if payload.Connections[0].Name != "b" || payload.Connections[1].Name != "a" {
 		t.Fatalf("export should follow sort order, got %q then %q", payload.Connections[0].Name, payload.Connections[1].Name)
+	}
+}
+
+func TestCommandHistoryPersistsAndDeduplicates(t *testing.T) {
+	useTestConfigPath(t)
+
+	if err := AppendCommandHistory("  GET foo  "); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	if err := AppendCommandHistory("HGETALL bar"); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	if err := AppendCommandHistory("GET foo"); err != nil {
+		t.Fatalf("append duplicate: %v", err)
+	}
+
+	history := GetCommandHistory()
+	if len(history) != 2 {
+		t.Fatalf("expected dedup to 2 entries, got %v", history)
+	}
+	if history[0] != "GET foo" || history[1] != "HGETALL bar" {
+		t.Fatalf("unexpected order: %v", history)
+	}
+
+	// 保存设置不应清掉历史
+	settings, _ := GetSettings()
+	settings.ProxyURL = "http://127.0.0.1:7890"
+	settings.CommandHistory = nil
+	if err := SaveSettings(settings); err != nil {
+		t.Fatalf("SaveSettings: %v", err)
+	}
+	if got := GetCommandHistory(); len(got) != 2 {
+		t.Fatalf("history cleared by SaveSettings: %v", got)
+	}
+
+	if err := ClearCommandHistory(); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	if got := GetCommandHistory(); len(got) != 0 {
+		t.Fatalf("expected empty history, got %v", got)
+	}
+}
+
+func TestCommandHistoryCapsAtLimit(t *testing.T) {
+	useTestConfigPath(t)
+	for i := 0; i < 130; i++ {
+		if err := AppendCommandHistory("CMD" + strconv.Itoa(i)); err != nil {
+			t.Fatalf("append: %v", err)
+		}
+	}
+	history := GetCommandHistory()
+	if len(history) != 100 {
+		t.Fatalf("expected 100 entries, got %d", len(history))
+	}
+	if history[0] != "CMD129" {
+		t.Fatalf("newest should be first, got %q", history[0])
 	}
 }

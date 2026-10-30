@@ -22,6 +22,10 @@ export function CheckLatestRelease() {
   return window['go']['main']['App']['CheckLatestRelease']();
 }
 
+export function ClearCommandHistory() {
+  return window['go']['main']['App']['ClearCommandHistory']();
+}
+
 export function CompleteOnboarding() {
   return window['go']['main']['App']['CompleteOnboarding']();
 }
@@ -84,6 +88,10 @@ export function ForgetSSHHostFingerprint(arg1, arg2) {
 
 export function GetAppVersion() {
   return window['go']['main']['App']['GetAppVersion']();
+}
+
+export function GetCommandHistory() {
+  return window['go']['main']['App']['GetCommandHistory']();
 }
 
 export function GetConnectionDB(arg1) {
@@ -180,6 +188,10 @@ export function PublishKeyValue(arg1, arg2, arg3, arg4) {
 
 export function PublishMessage(arg1, arg2, arg3) {
   return window['go']['main']['App']['PublishMessage'](arg1, arg2, arg3);
+}
+
+export function PushCommandHistory(arg1) {
+  return window['go']['main']['App']['PushCommandHistory'](arg1);
 }
 
 export function RPush(arg1, arg2, arg3) {

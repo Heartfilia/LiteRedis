@@ -13,6 +13,8 @@ export function CancelMemoryScan():Promise<config.OperationResult>;
 
 export function CheckLatestRelease():Promise<main.VersionInfo>;
 
+export function ClearCommandHistory():Promise<config.OperationResult>;
+
 export function CompleteOnboarding():Promise<config.OperationResult>;
 
 export function Connect(arg1:string):Promise<main.ConnectResult>;
@@ -44,6 +46,8 @@ export function ExportKeysToFile(arg1:string,arg2:Array<string>,arg3:string):Pro
 export function ForgetSSHHostFingerprint(arg1:string,arg2:number):Promise<config.OperationResult>;
 
 export function GetAppVersion():Promise<string>;
+
+export function GetCommandHistory():Promise<Array<string>>;
 
 export function GetConnectionDB(arg1:string):Promise<number>;
 
@@ -92,6 +96,8 @@ export function PingConnection(arg1:string):Promise<config.OperationResult>;
 export function PublishKeyValue(arg1:string,arg2:config.KeyValue,arg3:number,arg4:string):Promise<config.OperationResult>;
 
 export function PublishMessage(arg1:string,arg2:string,arg3:string):Promise<number>;
+
+export function PushCommandHistory(arg1:string):Promise<config.OperationResult>;
 
 export function RPush(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 

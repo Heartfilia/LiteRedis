@@ -109,7 +109,7 @@
 <script setup>
 import { Teleport, computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
-import { executeRedisCommand, executeRedisCommandForce, getConnectionOverview } from '../../api/wails.js'
+import { executeRedisCommand, executeRedisCommandForce, getConnectionOverview, getCommandHistory, pushCommandHistory } from '../../api/wails.js'
 import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
@@ -313,12 +313,23 @@ async function scrollConsoleToBottom() {
   }
 }
 
+async function loadCommandHistory() {
+  try {
+    const list = await getCommandHistory()
+    if (Array.isArray(list)) commandHistory.value = list
+  } catch (e) {
+    // 读不到就退化成内存历史
+  }
+}
+
 function rememberCommand(text) {
   const normalized = text.trim()
   if (!normalized) return
   commandHistory.value = [normalized, ...commandHistory.value.filter(item => item !== normalized)].slice(0, 100)
   historyIndex.value = -1
   draftCommand.value = ''
+  // 落盘（跨会话保留），失败不影响本次执行
+  pushCommandHistory(normalized).catch(() => {})
 }
 
 function resetHistoryNavigation() {
@@ -456,8 +467,8 @@ watch(
   () => props.connId,
   async () => {
     consoleHistory.value = []
-    commandHistory.value = []
     historyIndex.value = -1
+    loadCommandHistory()
     draftCommand.value = ''
     command.value = ''
     await refreshOverview()
@@ -468,6 +479,7 @@ watch(
 
 onMounted(async () => {
   await refreshOverview()
+  await loadCommandHistory()
   await scrollConsoleToBottom()
   focusConsoleInput()
   refreshTimer = setInterval(refreshOverview, 5000)

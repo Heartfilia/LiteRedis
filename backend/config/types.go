@@ -78,6 +78,8 @@ type AppSettings struct {
 	LocalAPIAuthDisabled bool `json:"local_api_auth_disabled"`
 	// OnboardingDone 是否已经看过首次使用向导，看完/跳过都不再弹
 	OnboardingDone bool `json:"onboarding_done"`
+	// CommandHistory 命令台执行过的命令（最近在前，最多 100 条）
+	CommandHistory []string `json:"command_history,omitempty"`
 }
 
 const (

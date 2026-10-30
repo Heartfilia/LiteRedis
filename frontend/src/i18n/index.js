@@ -537,6 +537,13 @@ const messages = {
       logs: '最近日志（200 行）',
       emptyLog: '（暂无日志）',
     },
+    tabs: {
+      close: '关闭标签',
+      new: '新建或打开连接',
+      empty: '还没有打开连接',
+      connected: '已连接',
+      disconnected: '未连接',
+    },
     cmdk: {
       placeholder: '搜索动作、连接、数据库或最近访问的 key…',
       empty: '没有匹配的结果',
@@ -1125,6 +1132,13 @@ const messages = {
       subtitle: 'Version, latency and recent logs',
       logs: 'Recent log (200 lines)',
       emptyLog: '(no log yet)',
+    },
+    tabs: {
+      close: 'Close tab',
+      new: 'New or open connection',
+      empty: 'No connection opened yet',
+      connected: 'connected',
+      disconnected: 'disconnected',
     },
     cmdk: {
       placeholder: 'Search actions, connections, databases or recent keys…',

@@ -1026,6 +1026,27 @@ func (a *App) GetSettings() (config.AppSettings, error) {
 }
 
 // SaveSettings 保存全局设置
+// GetCommandHistory 命令台历史（持久化，最多 100 条）
+func (a *App) GetCommandHistory() []string {
+	return config.GetCommandHistory()
+}
+
+// PushCommandHistory 记录一条执行过的命令
+func (a *App) PushCommandHistory(command string) config.OperationResult {
+	if err := config.AppendCommandHistory(command); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
+// ClearCommandHistory 清空命令历史
+func (a *App) ClearCommandHistory() config.OperationResult {
+	if err := config.ClearCommandHistory(); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
 // CompleteOnboarding 记录首次使用向导已看过
 func (a *App) CompleteOnboarding() config.OperationResult {
 	if err := config.MarkOnboardingDone(); err != nil {

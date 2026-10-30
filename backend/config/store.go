@@ -443,6 +443,10 @@ func SaveSettings(s AppSettings) error {
 	if !s.OnboardingDone {
 		s.OnboardingDone = store.Settings.OnboardingDone
 	}
+	// 命令历史同理：前端保存设置不会带这个字段，清空要显式调用 ClearCommandHistory
+	if s.CommandHistory == nil {
+		s.CommandHistory = store.Settings.CommandHistory
+	}
 	store.Settings = s
 	return saveStore(store)
 }

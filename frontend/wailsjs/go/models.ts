@@ -26,6 +26,7 @@ export namespace config {
 	    local_api_redis_enabled: boolean;
 	    local_api_auth_disabled: boolean;
 	    onboarding_done: boolean;
+	    command_history?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
@@ -58,6 +59,7 @@ export namespace config {
 	        this.local_api_redis_enabled = source["local_api_redis_enabled"];
 	        this.local_api_auth_disabled = source["local_api_auth_disabled"];
 	        this.onboarding_done = source["onboarding_done"];
+	        this.command_history = source["command_history"];
 	    }
 	}
 	export class BatchKeyResult {

@@ -1,5 +1,7 @@
 <template>
   <div ref="mainContentRef" class="main-content" :class="`theme-${settingsStore.themeMode || 'light'}`">
+    <ConnectionTabs />
+    <div class="main-body">
     <div class="key-tree-panel" :style="{ width: panelWidth + 'px' }">
       <KeyTree />
     </div>
@@ -17,6 +19,7 @@
       </div>
       <KeyEditor />
     </div>
+    </div>
   </div>
 </template>
 
@@ -24,6 +27,7 @@
 import { computed, ref } from 'vue'
 import KeyTree from '../keys/KeyTree.vue'
 import KeyEditor from '../editor/KeyEditor.vue'
+import ConnectionTabs from './ConnectionTabs.vue'
 import { useSettingsStore } from '../../stores/settings.js'
 
 const MIN_WIDTH = 250
@@ -104,12 +108,19 @@ function startResize(e) {
 <style scoped>
 .main-content {
   display: flex;
+  flex-direction: column;
   flex: 1;
   overflow: hidden;
   height: 100vh;
   min-width: 0;
   padding: var(--app-shell-gap) var(--app-shell-gap) var(--app-shell-gap) var(--app-shell-inner-gap);
   gap: 0;
+}
+.main-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 .main-content.is-resizing,
 .main-content.is-resizing * {

@@ -86,6 +86,11 @@ export const getReleaseNotes = (version) => callGo('GetReleaseNotes', version)
 export const markVersionSeen = (version) => callGo('MarkVersionSeen', version)
 export const completeOnboarding = () => callGo('CompleteOnboarding')
 
+// ===== 命令历史 =====
+export const getCommandHistory = () => callGo('GetCommandHistory')
+export const pushCommandHistory = (command) => callGo('PushCommandHistory', command)
+export const clearCommandHistory = () => callGo('ClearCommandHistory')
+
 // ===== 配置导出 / 导入 =====
 export const exportConnectionsToFile = () => callGo('ExportConnectionsToFile')
 export const importConnectionsFromFile = () => callGo('ImportConnectionsFromFile')

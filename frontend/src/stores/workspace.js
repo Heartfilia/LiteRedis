@@ -89,6 +89,8 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     return {
       activeConnID: null,
+      // 打开过的连接（标签栏），关闭标签不会断开连接
+      openTabs: [],
       activeConnName: '',
       currentDB: 0,
       totalKeys: 0,
@@ -408,6 +410,9 @@ export const useWorkspaceStore = defineStore('workspace', {
       this.activeConnID = id
       this.activeConnName = name
       this._loadingKey = null
+      if (id && !this.openTabs.includes(id)) {
+        this.openTabs = [...this.openTabs, id]
+      }
 
       // 若该连接有历史快照，恢复之
       if (id && this.connStates[id]) {
