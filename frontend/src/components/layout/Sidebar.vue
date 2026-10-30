@@ -379,7 +379,8 @@
       v-if="overviewConn"
       :conn-id="overviewConn.id"
       :connection-name="overviewConn.name || t('sidebar.unnamed')"
-      @close="overviewConn = null"
+      :initial-command="overviewCommand"
+      @close="closeOverview"
     />
 
     <MemoryDoctorModal
@@ -454,6 +455,8 @@ const connectedConnections = computed(() =>
 )
 const hasConnections = computed(() => connectionsStore.connections.length > 0)
 const overviewConn = ref(null)
+// 命令面板点了「最近命令」时，带一条命令进命令台直接执行
+const overviewCommand = ref('')
 const memoryConn = ref(null)
 const diagMenu = ref({ visible: false, x: 0, y: 0, conn: null })
 const monitorConn = ref(null)
@@ -567,12 +570,27 @@ function handlePanelEvent(event) {
   if (kind) openPanelForActiveConn(kind)
 }
 
+function closeOverview() {
+  overviewConn.value = null
+  overviewCommand.value = ''
+}
+
+function handleRunCommand(event) {
+  const conn = activeConn.value
+  const command = event && event.detail ? String(event.detail.command || '').trim() : ''
+  if (!conn || !command) return
+  if (!connectionsStore.isConnected(conn.id) || conn.is_cluster) return
+  overviewCommand.value = command
+  overviewConn.value = conn
+}
+
 onMounted(() => {
   document.addEventListener('click', closeCtxMenu)
   document.addEventListener('click', closeDiagMenu)
   for (const name of Object.keys(CONN_PANEL_EVENTS)) {
     window.addEventListener(name, handlePanelEvent)
   }
+  window.addEventListener('literedis:run-command', handleRunCommand)
 })
 onBeforeUnmount(() => {
   if (disposeMenuEscape) disposeMenuEscape()
@@ -581,6 +599,7 @@ onBeforeUnmount(() => {
   for (const name of Object.keys(CONN_PANEL_EVENTS)) {
     window.removeEventListener(name, handlePanelEvent)
   }
+  window.removeEventListener('literedis:run-command', handleRunCommand)
   if (toastTimer) clearTimeout(toastTimer)
   if (dragExpandTimer) clearTimeout(dragExpandTimer)
 })

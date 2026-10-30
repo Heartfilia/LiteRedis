@@ -119,6 +119,8 @@ import { isConnectionErrorMessage } from '../../utils/connection.js'
 const props = defineProps({
   connId: { type: String, required: true },
   connectionName: { type: String, default: '' },
+  // 从命令面板「最近命令」进来时，带一条命令直接执行
+  initialCommand: { type: String, default: '' },
 })
 
 const emit = defineEmits(['close'])
@@ -482,6 +484,10 @@ onMounted(async () => {
   await loadCommandHistory()
   await scrollConsoleToBottom()
   focusConsoleInput()
+  if (props.initialCommand) {
+    command.value = props.initialCommand
+    await runCommand()
+  }
   refreshTimer = setInterval(refreshOverview, 5000)
 })
 

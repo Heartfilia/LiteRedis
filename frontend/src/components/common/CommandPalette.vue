@@ -59,7 +59,7 @@ import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
-import { getDatabases } from '../../api/wails.js'
+import { getDatabases, getCommandHistory, scanKeys } from '../../api/wails.js'
 
 const emit = defineEmits(['close'])
 
@@ -75,6 +75,58 @@ const query = ref('')
 const activeIndex = ref(0)
 const inputRef = ref(null)
 const listRef = ref(null)
+
+// 最近在命令台执行过的命令
+const commandHistory = ref([])
+// 输入时按 pattern 去库里扫出来的 key
+const keyMatches = ref([])
+let keySearchTimer = null
+let keySearchSeq = 0
+
+// Redis glob 里 * ? [ ] \ 都是特殊字符，搜索词里出现时要转义
+function escapeGlob(text) {
+  let out = ''
+  for (const ch of text) {
+    if (ch === '*' || ch === '?' || ch === '[' || ch === ']' || ch === '\\') out += '\\'
+    out += ch
+  }
+  return out
+}
+
+async function searchKeys(text) {
+  const seq = ++keySearchSeq
+  try {
+    const result = await scanKeys(workspaceStore.activeConnID, '*' + escapeGlob(text) + '*', 20, 0)
+    if (seq !== keySearchSeq) return
+    keyMatches.value = (result?.keys || []).map((key) => key.name)
+  } catch (e) {
+    if (seq === keySearchSeq) keyMatches.value = []
+  }
+}
+
+watch(query, (value) => {
+  activeIndex.value = 0
+  const text = value.trim()
+  if (keySearchTimer) {
+    clearTimeout(keySearchTimer)
+    keySearchTimer = null
+  }
+  // 连线上库扫 key 是全量 SCAN，只在够长且已连接时才触发，并做防抖
+  if (!connReady.value || text.length < 2) {
+    keySearchSeq++
+    keyMatches.value = []
+    return
+  }
+  keySearchTimer = setTimeout(() => {
+    keySearchTimer = null
+    searchKeys(text)
+  }, 260)
+})
+
+watch(() => workspaceStore.activeConnID, () => {
+  keySearchSeq++
+  keyMatches.value = []
+})
 
 function close() {
   emit('close')
@@ -211,6 +263,33 @@ const recentKeyItems = computed(() =>
   }))
 )
 
+// 输入时从当前连接扫出来的 key
+const keyMatchItems = computed(() =>
+  (keyMatches.value || []).map((key) => ({
+    id: 'match:' + key,
+    label: key,
+    hint: t('cmdk.openKey'),
+    run: () => workspaceStore.selectKey(key),
+  }))
+)
+
+// 最近在命令台执行过的命令，点一下直接打开命令台执行
+const commandItems = computed(() => {
+  const cluster = !!activeConn.value?.is_cluster
+  const hint = !connReady.value
+    ? t('cmdk.needConnection')
+    : cluster
+      ? t('cmdk.clusterUnsupported')
+      : t('cmdk.runInConsole')
+  return (commandHistory.value || []).map((command) => ({
+    id: 'cmd:' + command,
+    label: command,
+    hint,
+    disabled: !connReady.value || cluster,
+    run: () => window.dispatchEvent(new CustomEvent('literedis:run-command', { detail: { command } })),
+  }))
+})
+
 function matches(label, hint, q) {
   if (!q) return true
   const text = (label + ' ' + (hint || '')).toLowerCase()
@@ -221,6 +300,9 @@ const results = computed(() => {
   const q = query.value.trim().toLowerCase()
   const sections = [
     { title: t('cmdk.groupActions'), items: actions.value.filter((item) => matches(item.label, item.hint, q)) },
+    // 命令只在搜索时出现，避免一打开面板就混进一堆历史命令
+    { title: t('cmdk.groupCommands'), items: q ? commandItems.value.filter((item) => matches(item.label, '', q)) : [] },
+    { title: t('cmdk.groupKeyMatch'), items: keyMatchItems.value.filter((item) => matches(item.label, '', q)) },
     { title: t('cmdk.groupConnections'), items: connectionItems.value.filter((item) => matches(item.label, item.hint, q)) },
     { title: t('cmdk.groupDatabases'), items: q ? [] : databaseItems.value.slice(0, 16) },
     { title: t('cmdk.groupRecent'), items: recentKeyItems.value.filter((item) => matches(item.label, '', q)) },
@@ -287,14 +369,16 @@ function run(index) {
   }
 }
 
-watch(query, () => {
-  activeIndex.value = 0
-})
-
 let disposeEscape = null
 onMounted(async () => {
   disposeEscape = registerEscapeHandler(close)
   nextTick(() => inputRef.value && inputRef.value.focus())
+  try {
+    const list = await getCommandHistory()
+    if (Array.isArray(list)) commandHistory.value = list
+  } catch (e) {
+    // 读不到历史不影响面板其他功能
+  }
   if (workspaceStore.activeConnID) {
     try {
       const count = await getDatabases(workspaceStore.activeConnID)
@@ -306,6 +390,11 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
   if (disposeEscape) disposeEscape()
+  if (keySearchTimer) {
+    clearTimeout(keySearchTimer)
+    keySearchTimer = null
+  }
+  keySearchSeq++
 })
 </script>
 
