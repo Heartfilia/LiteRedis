@@ -13,6 +13,8 @@ export function CancelMemoryScan():Promise<config.OperationResult>;
 
 export function CheckLatestRelease():Promise<main.VersionInfo>;
 
+export function CompleteOnboarding():Promise<config.OperationResult>;
+
 export function Connect(arg1:string):Promise<main.ConnectResult>;
 
 export function CopyKeysToConnection(arg1:string,arg2:string,arg3:Array<string>,arg4:boolean):Promise<config.BatchKeyResult>;
@@ -33,6 +35,8 @@ export function ExecuteRedisCommand(arg1:string,arg2:string):Promise<config.Redi
 
 export function ExecuteRedisCommandForce(arg1:string,arg2:string):Promise<config.RedisConsoleResult>;
 
+export function ExportDebugLog():Promise<string>;
+
 export function ExportKeysToFile(arg1:string,arg2:Array<string>,arg3:string):Promise<string>;
 
 export function ForgetSSHHostFingerprint(arg1:string,arg2:number):Promise<config.OperationResult>;
@@ -44,6 +48,8 @@ export function GetConnectionDB(arg1:string):Promise<number>;
 export function GetConnectionOverview(arg1:string):Promise<config.RedisConnectionOverview>;
 
 export function GetDatabases(arg1:string):Promise<number>;
+
+export function GetDiagnostics():Promise<main.Diagnostics>;
 
 export function GetKeyInfo(arg1:string,arg2:string):Promise<config.RedisKey>;
 

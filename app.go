@@ -1021,6 +1021,14 @@ func (a *App) GetSettings() (config.AppSettings, error) {
 }
 
 // SaveSettings 保存全局设置
+// CompleteOnboarding 记录首次使用向导已看过
+func (a *App) CompleteOnboarding() config.OperationResult {
+	if err := config.MarkOnboardingDone(); err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
 // MarkVersionSeen 记录已经看过某个版本的更新说明，保证每个版本只提示一次
 func (a *App) MarkVersionSeen(version string) config.OperationResult {
 	if err := config.MarkVersionSeen(version); err != nil {

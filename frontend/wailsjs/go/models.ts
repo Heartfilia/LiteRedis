@@ -25,6 +25,7 @@ export namespace config {
 	    last_seen_version: string;
 	    local_api_redis_enabled: boolean;
 	    local_api_auth_disabled: boolean;
+	    onboarding_done: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
@@ -56,6 +57,7 @@ export namespace config {
 	        this.last_seen_version = source["last_seen_version"];
 	        this.local_api_redis_enabled = source["local_api_redis_enabled"];
 	        this.local_api_auth_disabled = source["local_api_auth_disabled"];
+	        this.onboarding_done = source["onboarding_done"];
 	    }
 	}
 	export class BatchKeyResult {
@@ -603,6 +605,78 @@ export namespace main {
 	        this.message = source["message"];
 	        this.init_db = source["init_db"];
 	    }
+	}
+	export class DiagnosticConnection {
+	    id: string;
+	    name: string;
+	    host: string;
+	    port: number;
+	    connected: boolean;
+	    latency_ms: number;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DiagnosticConnection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.connected = source["connected"];
+	        this.latency_ms = source["latency_ms"];
+	        this.error = source["error"];
+	    }
+	}
+	export class Diagnostics {
+	    app_version: string;
+	    platform: string;
+	    config_path: string;
+	    debug_log_path: string;
+	    debug_log_size: number;
+	    local_api_enabled: boolean;
+	    local_api_running: boolean;
+	    local_api_port: number;
+	    connections: DiagnosticConnection[];
+	    log_tail: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Diagnostics(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.app_version = source["app_version"];
+	        this.platform = source["platform"];
+	        this.config_path = source["config_path"];
+	        this.debug_log_path = source["debug_log_path"];
+	        this.debug_log_size = source["debug_log_size"];
+	        this.local_api_enabled = source["local_api_enabled"];
+	        this.local_api_running = source["local_api_running"];
+	        this.local_api_port = source["local_api_port"];
+	        this.connections = this.convertValues(source["connections"], DiagnosticConnection);
+	        this.log_tail = source["log_tail"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class LocalAPIInfo {
 	    running: boolean;

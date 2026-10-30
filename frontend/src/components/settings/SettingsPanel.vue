@@ -358,7 +358,22 @@
           </div>
         </div>
       </div>
+
+      <div class="section-title mt">{{ t('diagnostics.title') }}</div>
+      <div class="setting-item">
+        <label>
+          <span class="label-text">{{ t('diagnostics.title') }}</span>
+          <span class="label-hint">{{ t('diagnostics.subtitle') }}</span>
+        </label>
+        <div class="input-unit">
+          <button type="button" class="local-api-btn" @click="showDiagnostics = true">
+            {{ t('diagnostics.open') }}
+          </button>
+        </div>
+      </div>
     </div>
+
+    <DiagnosticsModal v-if="showDiagnostics" @close="showDiagnostics = false" />
 
     <!-- floating toast -->
     <Teleport to="body">
@@ -404,6 +419,7 @@
 import { ref, reactive, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useUpdateStore } from '../../stores/update.js'
+import DiagnosticsModal from './DiagnosticsModal.vue'
 import { useI18n } from '../../i18n/index.js'
 import { getAppVersion, getLocalAPIInfo, regenerateLocalAPIToken } from '../../api/wails.js'
 import { refreshLocalAPIRuntime } from '../../services/browserExtract.js'
@@ -442,6 +458,7 @@ const form = reactive({
 })
 
 const saving = ref(false)
+const showDiagnostics = ref(false)
 const appVersion = ref('dev')
 const updateStore = useUpdateStore()
 const msg = ref('')

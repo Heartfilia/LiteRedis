@@ -42,6 +42,8 @@ export const useSettingsStore = defineStore('settings', {
     proxyUrl: '',
     // 已看过更新说明的版本号，用于每个版本只弹一次「更新内容」
     lastSeenVersion: '',
+    // 是否已看过首次使用向导
+    onboardingDone: false,
   }),
 
   actions: {
@@ -95,6 +97,7 @@ export const useSettingsStore = defineStore('settings', {
         this.proxyEnabled = !!s.proxy_enabled
         this.proxyUrl = s.proxy_url || ''
         this.lastSeenVersion = s.last_seen_version || ''
+        this.onboardingDone = s.onboarding_done === true
         setLanguage(this.language)
         this.loaded = true
         this.applyTheme()

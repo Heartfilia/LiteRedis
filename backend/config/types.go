@@ -76,6 +76,8 @@ type AppSettings struct {
 	LocalAPIRedisEnabled bool `json:"local_api_redis_enabled"`
 	// LocalAPIAuthDisabled 关闭本地 API 的 token 校验（纯本机自用场景），默认开启校验
 	LocalAPIAuthDisabled bool `json:"local_api_auth_disabled"`
+	// OnboardingDone 是否已经看过首次使用向导，看完/跳过都不再弹
+	OnboardingDone bool `json:"onboarding_done"`
 }
 
 const (

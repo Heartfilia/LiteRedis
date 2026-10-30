@@ -78,3 +78,8 @@ export const checkLatestRelease = () => callGo('CheckLatestRelease')
 export const startUpdate = () => callGo('StartUpdate')
 export const getReleaseNotes = (version) => callGo('GetReleaseNotes', version)
 export const markVersionSeen = (version) => callGo('MarkVersionSeen', version)
+export const completeOnboarding = () => callGo('CompleteOnboarding')
+
+// ===== 诊断 =====
+export const getDiagnostics = () => callGo('GetDiagnostics')
+export const exportDebugLog = () => callGo('ExportDebugLog')

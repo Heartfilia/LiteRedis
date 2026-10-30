@@ -8,6 +8,11 @@
       @close="showConnManager = false"
     />
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
+    <WelcomeWizard
+      v-if="showWelcome"
+      @skip="dismissWelcome(false)"
+      @create="dismissWelcome(true)"
+    />
     <WhatsNewModal
       v-if="showWhatsNew"
       :version="whatsNew.version"
@@ -36,10 +41,11 @@ import Sidebar from './components/layout/Sidebar.vue'
 import MainContent from './components/layout/MainContent.vue'
 import ConnectionManager from './components/connections/ConnectionManager.vue'
 import WhatsNewModal from './components/common/WhatsNewModal.vue'
+import WelcomeWizard from './components/common/WelcomeWizard.vue'
 import SettingsModal from './components/settings/SettingsModal.vue'
 import { useConnectionsStore } from './stores/connections.js'
 import { useSettingsStore } from './stores/settings.js'
-import { getAppVersion, getReleaseNotes, markVersionSeen } from './api/wails.js'
+import { getAppVersion, getReleaseNotes, markVersionSeen, completeOnboarding } from './api/wails.js'
 import { RELEASE_NOTES } from './changelog.js'
 
 const connectionsStore = useConnectionsStore()
@@ -123,14 +129,39 @@ async function closeWhatsNew() {
   }
 }
 
+// ---- 首次使用向导（只在完全没有连接时出现，看过/跳过都不再弹） ----
+const showWelcome = ref(false)
+
+async function maybeShowWelcome() {
+  if (settingsStore.onboardingDone) return false
+  if ((connectionsStore.connections || []).length > 0) {
+    // 已有连接说明是老用户，直接标记已看过，避免以后删空连接又弹出来
+    try { await completeOnboarding() } catch (e) {}
+    settingsStore.onboardingDone = true
+    return false
+  }
+  showWelcome.value = true
+  return true
+}
+
+async function dismissWelcome(openCreate) {
+  showWelcome.value = false
+  try {
+    await completeOnboarding()
+    settingsStore.onboardingDone = true
+  } catch (e) {}
+  if (openCreate) showConnManager.value = true
+}
+
 onMounted(async () => {
   // Cmd/Ctrl+R 刷新当前 key，Esc 关闭最上层浮层
   installGlobalShortcuts()
-  connectionsStore.loadConnections()
-  await settingsStore.load()
+  await Promise.all([connectionsStore.loadConnections(), settingsStore.load()])
   // 屏蔽原生右键菜单（输入框/可编辑区域保留，编辑器行首的自定义菜单另行处理）
   document.addEventListener('contextmenu', suppressContextMenu)
-  maybeShowWhatsNew()
+  // 新用户先看引导；已经弹过引导就不再叠加「更新内容」弹窗
+  const welcomed = await maybeShowWelcome()
+  if (!welcomed) maybeShowWhatsNew()
 })
 
 function suppressContextMenu(e) {

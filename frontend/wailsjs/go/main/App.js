@@ -22,6 +22,10 @@ export function CheckLatestRelease() {
   return window['go']['main']['App']['CheckLatestRelease']();
 }
 
+export function CompleteOnboarding() {
+  return window['go']['main']['App']['CompleteOnboarding']();
+}
+
 export function Connect(arg1) {
   return window['go']['main']['App']['Connect'](arg1);
 }
@@ -62,6 +66,10 @@ export function ExecuteRedisCommandForce(arg1, arg2) {
   return window['go']['main']['App']['ExecuteRedisCommandForce'](arg1, arg2);
 }
 
+export function ExportDebugLog() {
+  return window['go']['main']['App']['ExportDebugLog']();
+}
+
 export function ExportKeysToFile(arg1, arg2, arg3) {
   return window['go']['main']['App']['ExportKeysToFile'](arg1, arg2, arg3);
 }
@@ -84,6 +92,10 @@ export function GetConnectionOverview(arg1) {
 
 export function GetDatabases(arg1) {
   return window['go']['main']['App']['GetDatabases'](arg1);
+}
+
+export function GetDiagnostics() {
+  return window['go']['main']['App']['GetDiagnostics']();
 }
 
 export function GetKeyInfo(arg1, arg2) {

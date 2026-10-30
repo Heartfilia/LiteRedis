@@ -33,6 +33,11 @@ func init() {
 	configPath = filepath.Join(appDir, "connections.json")
 }
 
+// ConfigPath 配置文件路径（诊断页展示、排查问题时用）
+func ConfigPath() string {
+	return configPath
+}
+
 // loadStore 从磁盘读取配置（不加锁，调用方负责）
 func loadStore() (*ConfigStore, error) {
 	data, err := os.ReadFile(configPath)
@@ -431,11 +436,29 @@ func SaveSettings(s AppSettings) error {
 	if s.LocalAPIPort < 1024 || s.LocalAPIPort > 65535 {
 		s.LocalAPIPort = defaults.LocalAPIPort
 	}
-	// 保存设置时保留「已看过更新说明的版本」，避免每次应用设置把弹窗重新触发
+	// 保存设置时保留「已看过更新说明的版本」与「已看过引导」，避免设置一保存又弹一次
 	if s.LastSeenVersion == "" {
 		s.LastSeenVersion = store.Settings.LastSeenVersion
 	}
+	if !s.OnboardingDone {
+		s.OnboardingDone = store.Settings.OnboardingDone
+	}
 	store.Settings = s
+	return saveStore(store)
+}
+
+// MarkOnboardingDone 记录首次使用向导已看过（之后不再弹）
+func MarkOnboardingDone() error {
+	storeMu.Lock()
+	defer storeMu.Unlock()
+	store, err := loadStore()
+	if err != nil {
+		return err
+	}
+	if store.Settings.OnboardingDone {
+		return nil
+	}
+	store.Settings.OnboardingDone = true
 	return saveStore(store)
 }
 

@@ -290,3 +290,34 @@ func TestLegacyDuplicateNamesAreNormalized(t *testing.T) {
 		t.Fatalf("expected renamed connection to be persisted, file: %s", data)
 	}
 }
+
+func TestMarkOnboardingDoneAndPreserveOnSave(t *testing.T) {
+	useTestConfigPath(t)
+
+	settings, err := GetSettings()
+	if err != nil {
+		t.Fatalf("GetSettings: %v", err)
+	}
+	if settings.OnboardingDone {
+		t.Fatal("onboarding should default to false")
+	}
+
+	if err := MarkOnboardingDone(); err != nil {
+		t.Fatalf("MarkOnboardingDone: %v", err)
+	}
+	settings, _ = GetSettings()
+	if !settings.OnboardingDone {
+		t.Fatal("onboarding flag was not persisted")
+	}
+
+	// 前端保存设置时不会带这个字段，保存后必须保留
+	settings.OnboardingDone = false
+	settings.ProxyURL = "http://127.0.0.1:7890"
+	if err := SaveSettings(settings); err != nil {
+		t.Fatalf("SaveSettings: %v", err)
+	}
+	after, _ := GetSettings()
+	if !after.OnboardingDone {
+		t.Fatal("onboarding flag was cleared by SaveSettings")
+	}
+}
