@@ -151,8 +151,9 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     recentKeyList(state) {
-      const list = this.shortcuts.recent[this.shortcutScope] || []
-      return list.filter(key => key !== state.selectedKey)
+      // 直接打开（含搜索直达）的 key 也要立刻出现在最近访问里，
+      // 所以这里不再过滤当前选中的 key，只在列表里给它加高亮
+      return this.shortcuts.recent[this.shortcutScope] || []
     },
 
     displaySessions: (state) => {

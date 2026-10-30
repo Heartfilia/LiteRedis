@@ -8,14 +8,45 @@
       <!-- SearchTabs 只在单session模式显示 -->
       <SearchTabs v-if="!workspaceStore.keepPrevSearch && !showClusterEmptyHint" />
 
-      <div v-if="favoriteKeys.length || recentKeyList.length" class="shortcut-block">
+      <div
+        v-if="favoriteKeys.length || recentKeyList.length"
+        class="shortcut-block"
+        :class="{ 'is-collapsed': shortcutsCollapsed }"
+      >
+        <button
+          v-if="shortcutsCollapsed"
+          type="button"
+          class="shortcut-collapsed-bar"
+          @click="shortcutsCollapsed = false"
+        >
+          <span class="shortcut-collapsed-title">{{ collapsedShortcutTitle }}</span>
+          <span class="shortcut-expand">
+            {{ t('keyTree.expandShortcut') }}
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M4 6.2 8 10.2l4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+        </button>
+        <button
+          v-else
+          type="button"
+          class="shortcut-toggle"
+          :title="t('keyTree.collapseShortcut')"
+          @click="shortcutsCollapsed = true"
+        >
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M4 9.8 8 5.8l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <template v-if="!shortcutsCollapsed">
+        <div class="shortcut-body">
         <div v-if="favoriteKeys.length" class="shortcut-group">
           <div class="shortcut-title">★ {{ t('keyTree.favorites') }} · {{ favoriteKeys.length }}</div>
           <div
             v-for="item in favoriteKeys"
             :key="'fav-' + item"
             v-kbd-row="{ tabindex: 0 }"
-            class="shortcut-row"
+            :class="['shortcut-row', { active: workspaceStore.selectedKey === item }]"
             :title="item"
             @click="workspaceStore.selectKey(item)"
           >
@@ -29,7 +60,7 @@
             v-for="item in recentKeyList"
             :key="'recent-' + item"
             v-kbd-row="{ tabindex: 0 }"
-            class="shortcut-row"
+            :class="['shortcut-row', { active: workspaceStore.selectedKey === item }]"
             :title="item"
             @click="workspaceStore.selectKey(item)"
           >
@@ -42,6 +73,8 @@
             <span class="shortcut-name">{{ item }}</span>
           </div>
         </div>
+        </div>
+        </template>
       </div>
 
       <div class="tree-content">
@@ -376,6 +409,15 @@ watch(activeConnID, () => {
 // 面板太窄、左侧按钮组会越过中线时，改为并入左侧图标组（间距 2px）
 const dbBarRef = ref(null)
 const barNarrow = ref(false)
+// 「收藏 / 最近访问」板块的折叠状态：不做持久化，切连接或切 DB 时恢复展开
+const shortcutsCollapsed = ref(false)
+const collapsedShortcutTitle = computed(() => {
+  if (recentKeyList.value.length) return t('keyTree.recent') + ' · ' + recentKeyList.value.length
+  return t('keyTree.favorites') + ' · ' + favoriteKeys.value.length
+})
+watch([activeConnID, () => workspaceStore.currentDB], () => {
+  shortcutsCollapsed.value = false
+})
 let dbBarObserver = null
 
 function syncDbBarNarrow() {
@@ -1074,14 +1116,121 @@ function collapseVisibleTree() {
   color: #1e40af;
 }
 .shortcut-block {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 4px 8px 6px;
   border-bottom: 1px dashed rgba(203, 213, 225, 0.9);
   margin-bottom: 4px;
-  max-height: 168px;
+}
+/* 只让内容区滚动，右上角的收起按钮始终留在原位 */
+.shortcut-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 148px;
   overflow-y: auto;
+}
+.shortcut-block.is-collapsed {
+  padding: 2px 6px;
+  max-height: none;
+  overflow: visible;
+}
+/* 板块右上角的收起按钮 */
+.shortcut-toggle {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
+}
+.shortcut-toggle svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+.shortcut-toggle:hover {
+  color: #475569;
+  background: rgba(241, 245, 249, 0.95);
+  border-color: rgba(203, 213, 225, 0.9);
+}
+.key-tree.theme-dark .shortcut-toggle:hover {
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(71, 85, 105, 0.95);
+}
+/* 收起后的一行：左侧标题，右侧「展开 + 箭头」，整行可点 */
+.shortcut-collapsed-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.shortcut-collapsed-bar:hover {
+  background: rgba(241, 245, 249, 0.95);
+  color: #334155;
+}
+.key-tree.theme-dark .shortcut-collapsed-bar {
+  color: #94a3b8;
+}
+.key-tree.theme-dark .shortcut-collapsed-bar:hover {
+  background: rgba(30, 41, 59, 0.95);
+  color: #e2e8f0;
+}
+.shortcut-collapsed-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shortcut-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  color: #2563eb;
+}
+.shortcut-expand svg {
+  width: 11px;
+  height: 11px;
+  display: block;
+}
+.key-tree.theme-dark .shortcut-expand {
+  color: #93c5fd;
+}
+/* 当前正在查看的 key 在列表里高亮 */
+.shortcut-row.active {
+  background: rgba(219, 234, 254, 0.78);
+  color: #1d4ed8;
+}
+.key-tree.theme-dark .shortcut-row.active {
+  background: rgba(30, 64, 175, 0.34);
+  color: #dbeafe;
 }
 .shortcut-title {
   font-size: 10px;
