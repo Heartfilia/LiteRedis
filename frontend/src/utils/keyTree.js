@@ -72,3 +72,23 @@ export function flattenVisibleRows(nodes = [], isExpanded = () => true, depth = 
   }
   return output
 }
+/**
+ * 找到某个 key 在树里的祖先目录链（用于展开并定位）。
+ * 返回 [] 表示它在根层级，返回 null 表示当前树里没有这个 key。
+ */
+export function findKeyAncestors(nodes = [], fullPath = '') {
+  if (!fullPath) return null
+  function walk(list, chain) {
+    for (const node of list) {
+      if (!node) continue
+      if (node.isLeaf) {
+        if (node.fullPath === fullPath) return chain
+        continue
+      }
+      const found = walk(node.children || [], [...chain, node.fullPath])
+      if (found) return found
+    }
+    return null
+  }
+  return walk(nodes, [])
+}

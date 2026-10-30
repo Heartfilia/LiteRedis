@@ -339,7 +339,7 @@ import { useI18n } from '../../i18n/index.js'
 import KeySearchBar from './KeySearchBar.vue'
 import SearchTabs from './SearchTabs.vue'
 import KeyTreeRow from './KeyTreeRow.vue'
-import { buildKeyTree, flattenVisibleRows } from '../../utils/keyTree.js'
+import { buildKeyTree, findKeyAncestors, flattenVisibleRows } from '../../utils/keyTree.js'
 import { useRowVirtualizer } from '../../utils/virtualList.js'
 import { exportKeysToFile, copyKeysToConnection, copyKeysToDatabase, getDatabases, getConnectionDB, importKeysFromFile } from '../../api/wails.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
@@ -543,6 +543,46 @@ function measureTreeRowHeight(container) {
   const height = row ? row.getBoundingClientRect().height : 0
   return height > 4 ? height : 32
 }
+
+// 从命令面板 / 收藏 / 最近访问选中 key 时，展开父级目录并把它滚到可视区
+async function revealSelectedKey(key) {
+  if (!key) return
+  if (workspaceStore.keepPrevSearch) return
+  const ancestors = findKeyAncestors(session.value?.treeData || [], key)
+  if (!ancestors) return
+  for (const path of ancestors) {
+    workspaceStore.setNodeExpanded(path, true)
+  }
+  await nextTick()
+  const index = treeVisibleRows.value.findIndex((row) => row.node.isLeaf && row.node.fullPath === key)
+  if (index < 0) return
+  scrollTreeToIndex(index)
+}
+
+function scrollTreeToIndex(index) {
+  const container = treeScrollRef.value
+  if (!container) return
+  // 已经在可视区里就不用动，避免点自己的行时轻微跳一下
+  const rendered = container.querySelector(`.tree-row[data-row-index="${index}"]`)
+  if (rendered) {
+    const box = container.getBoundingClientRect()
+    const rect = rendered.getBoundingClientRect()
+    if (rect.top >= box.top && rect.bottom <= box.bottom) return
+  }
+  const rowHeight = measureTreeRowHeight(container)
+  const top = index * rowHeight
+  const bottom = top + rowHeight
+  if (top < container.scrollTop) {
+    container.scrollTop = top
+  } else if (bottom > container.scrollTop + container.clientHeight) {
+    container.scrollTop = bottom - container.clientHeight
+  }
+  treeVirtualizer.syncScroll()
+}
+
+watch(() => workspaceStore.selectedKey, (key) => {
+  revealSelectedKey(key)
+})
 
 function openMoreMenu(event) {
   if (readOnly.value || !workspaceStore.selectedKeys.length) return
