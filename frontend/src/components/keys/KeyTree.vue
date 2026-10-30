@@ -14,7 +14,13 @@
         :class="{ 'is-collapsed': shortcutsCollapsed }"
       >
         <div class="shortcut-head">
-          <span class="shortcut-summary">{{ shortcutSummary }}</span>
+          <span class="shortcut-summary">
+            <span
+              v-for="part in shortcutSummaryParts"
+              :key="part.key"
+              class="shortcut-summary-part"
+            >{{ part.label }}</span>
+          </span>
           <button
             type="button"
             class="shortcut-toggle"
@@ -402,11 +408,16 @@ const barNarrow = ref(false)
 // 「收藏 / 最近访问」板块的折叠状态：不做持久化，切连接或切 DB 时恢复展开
 const shortcutsCollapsed = ref(false)
 // 顶栏摘要：收藏、最近访问各有多少条，谁有显示谁（展开和收起状态一致）
-const shortcutSummary = computed(() => {
+// 分成独立元素渲染，两段之间的间距由 CSS 控制，不依赖会被折叠的空格
+const shortcutSummaryParts = computed(() => {
   const parts = []
-  if (favoriteKeys.value.length) parts.push(t('keyTree.favorites') + ' · ' + favoriteKeys.value.length)
-  if (recentKeyList.value.length) parts.push(t('keyTree.recent') + ' · ' + recentKeyList.value.length)
-  return parts.join('    ')
+  if (favoriteKeys.value.length) {
+    parts.push({ key: 'favorites', label: t('keyTree.favorites') + ' · ' + favoriteKeys.value.length })
+  }
+  if (recentKeyList.value.length) {
+    parts.push({ key: 'recent', label: t('keyTree.recent') + ' · ' + recentKeyList.value.length })
+  }
+  return parts
 })
 watch([activeConnID, () => workspaceStore.currentDB], () => {
   shortcutsCollapsed.value = false
@@ -1147,6 +1158,10 @@ function collapseVisibleTree() {
 }
 .key-tree.theme-dark .shortcut-summary {
   color: #94a3b8;
+}
+/* 收藏与最近访问两段之间的间隔 */
+.shortcut-summary-part + .shortcut-summary-part {
+  margin-left: 6px;
 }
 /* 收藏与最近访问之间用一条细虚线分开（标题已经合并到顶栏） */
 .shortcut-group + .shortcut-group {

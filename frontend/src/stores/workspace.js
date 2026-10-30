@@ -859,16 +859,30 @@ export const useWorkspaceStore = defineStore('workspace', {
       if (!key || !this.activeConnID) return
       const scope = this.shortcutScope
       const current = this.shortcuts.favorites[scope] || []
-      const next = current.includes(key) ? current.filter(item => item !== key) : [...current, key]
+      const isFavorited = current.includes(key)
+      const next = isFavorited ? current.filter(item => item !== key) : [...current, key]
       this.shortcuts = {
         ...this.shortcuts,
         favorites: { ...this.shortcuts.favorites, [scope]: next },
       }
+      // 收藏之后就不该再出现在最近访问里，避免同一个 key 两处重复
+      if (!isFavorited) this._dropRecentKey(key, scope)
       this._persistShortcuts()
+    },
+
+    _dropRecentKey(key, scope) {
+      const recent = this.shortcuts.recent[scope] || []
+      if (!recent.includes(key)) return
+      this.shortcuts = {
+        ...this.shortcuts,
+        recent: { ...this.shortcuts.recent, [scope]: recent.filter(item => item !== key) },
+      }
     },
 
     recordRecentKey(key) {
       if (!key || !this.activeConnID) return
+      // 已收藏的 key 只留在收藏里，不再进最近访问
+      if (this.favoriteKeys.includes(key)) return
       const scope = this.shortcutScope
       const current = this.shortcuts.recent[scope] || []
       if (current[0] === key) return
