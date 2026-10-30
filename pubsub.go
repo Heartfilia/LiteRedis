@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -171,6 +172,21 @@ func (a *App) flushPubSub(sess *pubSubSession) {
 		return
 	}
 	wailsruntime.EventsEmit(a.ctx, pubSubBatchEvent, batch)
+}
+
+// PublishMessage 向频道发布一条消息，返回收到该消息的订阅者数量
+func (a *App) PublishMessage(connID, channel, payload string) (int64, error) {
+	channel = strings.TrimSpace(channel)
+	if channel == "" {
+		return 0, errors.New("请填写要发布的频道")
+	}
+	client, err := a.manager.GetClient(connID)
+	if err != nil {
+		return 0, err
+	}
+	ctx, cancel := context.WithTimeout(a.pubSubContext(), 5*time.Second)
+	defer cancel()
+	return client.Publish(ctx, channel, payload).Result()
 }
 
 // StopPubSub 停止订阅

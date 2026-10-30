@@ -178,6 +178,10 @@ export function PublishKeyValue(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['PublishKeyValue'](arg1, arg2, arg3, arg4);
 }
 
+export function PublishMessage(arg1, arg2, arg3) {
+  return window['go']['main']['App']['PublishMessage'](arg1, arg2, arg3);
+}
+
 export function RPush(arg1, arg2, arg3) {
   return window['go']['main']['App']['RPush'](arg1, arg2, arg3);
 }

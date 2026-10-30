@@ -91,6 +91,8 @@ export function PingConnection(arg1:string):Promise<config.OperationResult>;
 
 export function PublishKeyValue(arg1:string,arg2:config.KeyValue,arg3:number,arg4:string):Promise<config.OperationResult>;
 
+export function PublishMessage(arg1:string,arg2:string,arg3:string):Promise<number>;
+
 export function RPush(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
 export function RegenerateLocalAPIToken():Promise<config.OperationResult>;

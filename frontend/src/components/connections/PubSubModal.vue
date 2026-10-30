@@ -31,6 +31,27 @@
           </button>
         </div>
 
+        <div class="ps-publish">
+          <span class="ps-publish-label">{{ t('pubsub.publish') }}</span>
+          <input
+            v-model="publishChannel"
+            class="ps-publish-channel"
+            :placeholder="t('pubsub.publishChannelHint')"
+            spellcheck="false"
+          />
+          <input
+            v-model="publishPayload"
+            class="ps-publish-payload"
+            :placeholder="t('pubsub.publishPayloadHint')"
+            spellcheck="false"
+            @keydown.enter="doPublish"
+          />
+          <button class="ps-btn" :disabled="publishing || !publishChannel.trim()" @click="doPublish">
+            {{ publishing ? t('pubsub.publishing') : t('pubsub.publishAction') }}
+          </button>
+          <span class="ps-publish-status" :class="{ err: publishFailed }">{{ publishStatus }}</span>
+        </div>
+
         <div v-if="error" class="ps-error">{{ error }}</div>
 
         <div class="ps-list">
@@ -59,7 +80,7 @@ import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
-import { startPubSub, stopPubSub, getPubSubStatus } from '../../api/wails.js'
+import { startPubSub, stopPubSub, getPubSubStatus, publishMessage } from '../../api/wails.js'
 
 const props = defineProps({
   connId: { type: String, required: true },
@@ -78,6 +99,12 @@ const busy = ref(false)
 const count = ref(0)
 const error = ref('')
 const messages = ref([])
+const publishChannel = ref('')
+const publishPayload = ref('')
+const publishing = ref(false)
+const publishStatus = ref('')
+const publishFailed = ref(false)
+let publishTimer = null
 let seq = 0
 
 const MAX_MESSAGES = 300
@@ -137,11 +164,34 @@ async function toggle() {
         return
       }
       running.value = true
+      // 发布频道默认跟第一个订阅频道对齐，方便自己发一条测试
+      if (!publishChannel.value.trim() && channels.length) {
+        publishChannel.value = channels[0]
+      }
     }
   } catch (e) {
     error.value = e?.message || String(e)
   } finally {
     busy.value = false
+  }
+}
+
+async function doPublish() {
+  const channel = publishChannel.value.trim()
+  if (!channel || publishing.value) return
+  publishing.value = true
+  publishFailed.value = false
+  try {
+    const receivers = await publishMessage(props.connId, channel, publishPayload.value)
+    publishStatus.value = t('pubsub.published').replace('{n}', receivers ?? 0)
+    publishPayload.value = ''
+  } catch (e) {
+    publishFailed.value = true
+    publishStatus.value = e?.message || String(e)
+  } finally {
+    publishing.value = false
+    if (publishTimer) clearTimeout(publishTimer)
+    publishTimer = setTimeout(() => { publishStatus.value = '' }, 3000)
   }
 }
 
@@ -344,6 +394,53 @@ onBeforeUnmount(async () => {
   background: #f8fafc;
   color: #94a3b8;
 }
+.ps-publish {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.ps-publish-label {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: #64748b;
+}
+.ps-publish-channel,
+.ps-publish-payload {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(203, 213, 225, 0.96);
+  border-radius: var(--radius-sm);
+  font: 12px ui-monospace, Menlo, monospace;
+  color: #1e293b;
+  background: #fff;
+  outline: none;
+}
+.ps-publish-channel {
+  width: 180px;
+  flex: 0 0 auto;
+}
+.ps-publish-payload {
+  flex: 1;
+  min-width: 160px;
+}
+.ps-publish-channel:focus,
+.ps-publish-payload:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.32);
+}
+.ps-publish-status {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: #15803d;
+  min-width: 56px;
+}
+.ps-publish-status.err {
+  color: #b91c1c;
+}
 .ps-error {
   margin: 10px 16px 0;
   padding: 7px 10px;
@@ -458,6 +555,18 @@ onBeforeUnmount(async () => {
 .ps-overlay.theme-dark .ps-pattern { color: #c4b5fd; }
 .ps-overlay.theme-dark .ps-payload { color: #cbd5e1; }
 .ps-overlay.theme-dark .ps-footer { border-top-color: rgba(51, 65, 85, 0.94); }
+.ps-overlay.theme-dark .ps-publish {
+  border-bottom-color: rgba(51, 65, 85, 0.94);
+}
+.ps-overlay.theme-dark .ps-publish-label { color: #94a3b8; }
+.ps-overlay.theme-dark .ps-publish-channel,
+.ps-overlay.theme-dark .ps-publish-payload {
+  background: rgba(11, 18, 32, 0.96);
+  border-color: rgba(71, 85, 105, 0.96);
+  color: #e2e8f0;
+}
+.ps-overlay.theme-dark .ps-publish-status { color: #6ee7b7; }
+.ps-overlay.theme-dark .ps-publish-status.err { color: #fda4af; }
 .ps-overlay.theme-dark .ps-error {
   color: #fda4af;
   background: rgba(76, 5, 25, 0.9);
