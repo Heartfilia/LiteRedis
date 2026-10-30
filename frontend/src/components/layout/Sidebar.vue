@@ -294,10 +294,12 @@
             </span>
           </button>
           <button
-            v-if="hasConnectedConnections"
-            class="btn-icon btn-collapse pop-in"
-            :title="t('sidebar.collapse')"
-            @click="sidebarCollapsed = true"
+            class="btn-icon btn-collapse"
+            :class="{ 'is-hidden': !hasConnectedConnections }"
+            :title="hasConnectedConnections ? t('sidebar.collapse') : ''"
+            :tabindex="hasConnectedConnections ? 0 : -1"
+            :aria-hidden="hasConnectedConnections ? null : 'true'"
+            @click="hasConnectedConnections && (sidebarCollapsed = true)"
           >
             <span class="btn-icon-glyph" aria-hidden="true">
               <svg viewBox="0 0 16 16" fill="none">
@@ -1220,6 +1222,25 @@ async function disconnectConn(id) {
 }
 .btn-collapse {
   color: #64748b;
+  /* 出现 / 消失都是宽度收放 + 淡入缩放，不再瞬间弹出 */
+  transition:
+    width var(--motion-base) var(--ease-out),
+    min-width var(--motion-base) var(--ease-out),
+    padding var(--motion-base) var(--ease-out),
+    opacity var(--motion-base) var(--ease-out),
+    transform var(--motion-base) var(--ease-out);
+}
+.btn-collapse.is-hidden {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border-width: 0;
+  /* 抵消相邻的 4px 间距，收起后完全不占位 */
+  margin-left: -4px;
+  opacity: 0;
+  transform: scale(0.5);
+  pointer-events: none;
+  overflow: hidden;
 }
 .btn-collapse .btn-icon-glyph { font-size: 10px; }
 .btn-collapse:hover {

@@ -225,8 +225,8 @@ test('collapse button follows connection state and restores on network loss', as
   await installWailsMock(page, { keyCount: 60 })
   await page.goto('/')
 
-  // 没有已连接的 Redis：折叠按钮不存在
-  await expect(page.locator('.btn-collapse')).toHaveCount(0)
+  // 没有已连接的 Redis：折叠按钮收起不可见
+  await expect(page.locator('.btn-collapse')).toBeHidden()
 
   await page.locator('.conn-item .conn-main').first().click()
   await expandAll(page)
@@ -246,5 +246,5 @@ test('collapse button follows connection state and restores on network loss', as
 
   // 自动展开回到等待连接的初始状态，折叠按钮随之消失
   await expect(page.locator('.sidebar-collapsed-layer.visible')).toHaveCount(0)
-  await expect(page.locator('.btn-collapse')).toHaveCount(0)
+  await expect(page.locator('.btn-collapse')).toBeHidden()
 })
