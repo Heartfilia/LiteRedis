@@ -117,16 +117,16 @@
                     :style="{ left: suggestPos.left + 'px', top: suggestPos.top + 'px', width: suggestPos.width + 'px' }"
                   >
                     <button
-                      v-for="(name, index) in suggestions"
-                      :key="name"
+                      v-for="(item, index) in suggestions"
+                      :key="item.value"
                       type="button"
                       class="console-suggest-item"
                       :class="{ active: index === suggestIndex }"
-                      @mousedown.prevent="useSuggestion(name)"
+                      @mousedown.prevent="useSuggestion(item)"
                       @mouseenter="suggestIndex = index"
                     >
-                      <span class="suggest-name">{{ name.toUpperCase() }}</span>
-                      <span class="suggest-args">{{ signatureText(name) }}</span>
+                      <span class="suggest-name">{{ item.value }}</span>
+                      <span v-if="item.hint" class="suggest-args">{{ item.hint }}</span>
                     </button>
                   </div>
                 </Teleport>
@@ -142,7 +142,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
-import { REDIS_COMMAND_HINTS, filterCommandNames, tokenizeCommandLine } from '../../utils/redisCommands.js'
+import { REDIS_COMMAND_HINTS, filterCommandNames, suggestArguments, tokenizeCommandLine } from '../../utils/redisCommands.js'
 import { executeRedisCommand, executeRedisCommandForce, getConnectionOverview, getCommandHistory, pushCommandHistory } from '../../api/wails.js'
 import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -226,11 +226,15 @@ const suggestIndex = ref(0)
 const suggestDismissed = ref(false)
 const suggestPos = ref(null)
 
-// 只在输入第一个词（还没敲空格）时补全命令名；敲了空格就进入参数阶段
+// 命令名阶段补命令；进入参数阶段后补子命令 / 关键字
 const suggestions = computed(() => {
   const raw = command.value || ''
-  if (!raw || /\s$/.test(raw)) return []
-  return filterCommandNames(raw)
+  if (!raw.trim()) return []
+  const commands = filterCommandNames(raw)
+  if (commands.length) {
+    return commands.map((name) => ({ value: name.toUpperCase(), hint: signatureText(name) }))
+  }
+  return suggestArguments(raw).map((item) => ({ value: item.value, hint: item.hint }))
 })
 const suggestVisible = computed(() => !running.value && !suggestDismissed.value && suggestions.value.length > 0)
 
@@ -255,8 +259,17 @@ function updateSuggestPosition() {
   }
 }
 
-function useSuggestion(name) {
-  command.value = name.toUpperCase() + ' '
+// 补全只替换正在输入的那一段：命令名阶段整行，参数阶段只替换最后一个词
+function useSuggestion(item) {
+  const value = String(item.value || '').toUpperCase()
+  const raw = command.value || ''
+  if (!/\s/.test(raw.trim())) {
+    command.value = value + ' '
+  } else {
+    const endsWithSpace = /\s$/.test(raw)
+    const head = endsWithSpace ? raw : raw.replace(/\S+$/, '')
+    command.value = head + value + ' '
+  }
   suggestDismissed.value = true
   suggestIndex.value = 0
   nextTick(() => {
@@ -266,14 +279,16 @@ function useSuggestion(name) {
 }
 
 function acceptSuggestion() {
-  const name = suggestions.value[suggestIndex.value]
-  if (name) useSuggestion(name)
+  const item = suggestions.value[suggestIndex.value]
+  if (item) useSuggestion(item)
 }
 
 function onEnterKey() {
   const highlighted = suggestions.value[suggestIndex.value]
-  // 输入还不完整时回车先补全，输全了才执行
-  if (suggestVisible.value && highlighted && command.value.trim().toLowerCase() !== highlighted) {
+  // 正在输入的这段已经和候选完全一致时，回车直接执行；否则先补全
+  const tokens = (command.value || '').trim().split(/\s+/)
+  const typing = (tokens[tokens.length - 1] || '').toUpperCase()
+  if (suggestVisible.value && highlighted && typing !== highlighted.value.toUpperCase()) {
     useSuggestion(highlighted)
     return
   }
@@ -775,6 +790,9 @@ onBeforeUnmount(() => {
 /* 命令名补全下拉 */
 .console-suggest {
   position: fixed;
+  /* 和命令行一样的等宽字体，Teleport 到 body 后不会继承 */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
   /* 要盖在连接概览的浮层（12000）之上，但仍低于全局 toast（12100） */
   z-index: 12050;
   max-height: 240px;

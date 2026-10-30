@@ -111,3 +111,77 @@ export function tokenizeCommandLine(text) {
     .split(/(\s+)/)
     .filter((part) => part !== '')
 }
+// 子命令：命令后面的第一个参数（CONFIG GET / CLIENT LIST …）
+export const REDIS_SUBCOMMANDS = {
+  acl: ['CAT', 'DELUSER', 'GENPASS', 'GETUSER', 'LIST', 'SETUSER', 'USERS', 'WHOAMI'],
+  client: ['GETNAME', 'ID', 'INFO', 'KILL', 'LIST', 'NO-EVICT', 'PAUSE', 'REPLY', 'SETNAME', 'UNPAUSE'],
+  cluster: ['COUNTKEYSINSLOT', 'GETKEYSINSLOT', 'INFO', 'KEYSLOT', 'NODES', 'REPLICAS', 'SLOTS', 'MYID'],
+  command: ['COUNT', 'DOCS', 'GETKEYS', 'INFO', 'LIST'],
+  config: ['GET', 'HELP', 'RESETSTAT', 'REWRITE', 'SET'],
+  latency: ['DOCTOR', 'GRAPH', 'HISTORY', 'LATEST', 'RESET'],
+  memory: ['DOCTOR', 'MALLOC-STATS', 'PURGE', 'STATS', 'USAGE'],
+  object: ['ENCODING', 'FREQ', 'IDLETIME', 'REFCOUNT'],
+  pubsub: ['CHANNELS', 'NUMPAT', 'NUMSUB', 'SHARDCHANNELS', 'SHARDNUMSUB'],
+  script: ['EXISTS', 'FLUSH', 'LOAD'],
+  slowlog: ['GET', 'HELP', 'LEN', 'RESET'],
+  xgroup: ['CREATE', 'CREATECONSUMER', 'DELCONSUMER', 'DESTROY', 'SETID'],
+  xinfo: ['CONSUMERS', 'GROUPS', 'STREAM'],
+}
+
+// 关键字：跟在参数后面的选项（SET … NX EX 30 / SCAN 0 MATCH …）
+export const REDIS_COMMAND_KEYWORDS = {
+  copy: ['DB', 'REPLACE'],
+  expire: ['GT', 'LT', 'NX', 'XX'],
+  getex: ['EX', 'EXAT', 'PERSIST', 'PX', 'PXAT'],
+  lpos: ['COUNT', 'MAXLEN', 'RANK'],
+  pexpire: ['GT', 'LT', 'NX', 'XX'],
+  scan: ['COUNT', 'MATCH', 'TYPE'],
+  hscan: ['COUNT', 'MATCH', 'NOVALUES'],
+  set: ['EX', 'EXAT', 'GET', 'KEEPTTL', 'NX', 'PX', 'PXAT', 'XX'],
+  sscan: ['COUNT', 'MATCH'],
+  xadd: ['LIMIT', 'MAXLEN', 'MINID', 'NOMKSTREAM'],
+  xrange: ['COUNT'],
+  xrevrange: ['COUNT'],
+  xtrim: ['LIMIT', 'MAXLEN', 'MINID'],
+  zadd: ['CH', 'GT', 'INCR', 'LT', 'NX', 'XX'],
+  zrange: ['BYLEX', 'BYSCORE', 'LIMIT', 'REV', 'WITHSCORES'],
+  zrangebylex: ['LIMIT'],
+  zrangebyscore: ['LIMIT', 'WITHSCORES'],
+  zrevrange: ['WITHSCORES'],
+  zrevrangebyscore: ['LIMIT', 'WITHSCORES'],
+  zscan: ['COUNT', 'MATCH'],
+}
+
+/**
+ * 参数补全：命令名之后，第一个参数优先补子命令，其余补关键字。
+ * 返回 [{ value, hint }]，已输入过的关键字不再重复推荐。
+ */
+export function suggestArguments(input, limit = 8) {
+  const raw = String(input || '')
+  if (!raw.trim()) return []
+  const endsWithSpace = /\s$/.test(raw)
+  const tokens = raw.trim().split(/\s+/)
+  // 还在敲命令名，交给 filterCommandNames
+  if (tokens.length === 1 && !endsWithSpace) return []
+
+  const command = tokens[0].toLowerCase()
+  const partial = (endsWithSpace ? '' : tokens[tokens.length - 1]).toUpperCase()
+  const argIndex = (endsWithSpace ? tokens.length : tokens.length - 1) - 1
+  const used = new Set(tokens.slice(1).map((token) => token.toUpperCase()))
+
+  if (argIndex === 0) {
+    const subcommands = REDIS_SUBCOMMANDS[command]
+    if (subcommands) {
+      return subcommands
+        .filter((value) => value.startsWith(partial))
+        .slice(0, limit)
+        .map((value) => ({ value, hint: '' }))
+    }
+  }
+
+  const keywords = REDIS_COMMAND_KEYWORDS[command] || []
+  return keywords
+    .filter((value) => value.startsWith(partial) && !used.has(value))
+    .slice(0, limit)
+    .map((value) => ({ value, hint: '' }))
+}
