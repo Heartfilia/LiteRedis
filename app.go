@@ -20,10 +20,13 @@ import (
 
 // App struct
 type App struct {
-	ctx             context.Context
-	manager         *redisbackend.ClientManager
-	registry        *localapi.KeyRegistry
-	apiServer       *localapi.Server
+	ctx       context.Context
+	manager   *redisbackend.ClientManager
+	registry  *localapi.KeyRegistry
+	apiServer *localapi.Server
+
+	pubsubMu        sync.Mutex
+	pubsub          map[string]*pubSubSession
 	initWindowState config.WindowState
 
 	memoryScanMu     sync.Mutex
@@ -84,6 +87,7 @@ func (a *App) shutdown(ctx context.Context) {
 	x, y := wailsruntime.WindowGetPosition(ctx)
 	_ = config.SaveWindowState(config.WindowState{X: x, Y: y, Width: w, Height: h})
 
+	a.stopAllPubSub()
 	a.manager.DisconnectAll()
 	a.apiServer.Stop()
 }
@@ -178,6 +182,7 @@ func (a *App) Connect(id string) ConnectResult {
 
 // Disconnect 断开连接
 func (a *App) Disconnect(id string) config.OperationResult {
+	a.stopPubSub(id)
 	a.manager.Disconnect(id)
 	a.registry.UnpublishConn(id)
 	return config.OperationResult{Success: true}

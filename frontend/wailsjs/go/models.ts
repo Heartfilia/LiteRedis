@@ -220,6 +220,28 @@ export namespace config {
 	        this.score = source["score"];
 	    }
 	}
+	export class ImportSummary {
+	    added: number;
+	    updated: number;
+	    skipped: number;
+	    renamed: number;
+	    updated_ids?: string[];
+	    messages?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.added = source["added"];
+	        this.updated = source["updated"];
+	        this.skipped = source["skipped"];
+	        this.renamed = source["renamed"];
+	        this.updated_ids = source["updated_ids"];
+	        this.messages = source["messages"];
+	    }
+	}
 	export class StreamEntry {
 	    id: string;
 	    fields: Record<string, string>;
@@ -693,6 +715,26 @@ export namespace main {
 	        this.running = source["running"];
 	        this.port = source["port"];
 	        this.token = source["token"];
+	        this.error = source["error"];
+	    }
+	}
+	export class PubSubStatus {
+	    running: boolean;
+	    channels: string[];
+	    patterns: string[];
+	    count: number;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PubSubStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.running = source["running"];
+	        this.channels = source["channels"];
+	        this.patterns = source["patterns"];
+	        this.count = source["count"];
 	        this.error = source["error"];
 	    }
 	}

@@ -351,6 +351,14 @@
           </svg>
           <span>{{ t('sidebar.memoryDoctor') }}</span>
         </div>
+        <div class="ctx-item diag-item" @click="pickDiag('pubsub')">
+          <svg class="diag-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 10.5a11 11 0 0116 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M7 13.5a7 7 0 0110 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <circle cx="12" cy="17.5" r="1.6" fill="currentColor"/>
+          </svg>
+          <span>{{ t('sidebar.pubsub') }}</span>
+        </div>
         <div class="ctx-item diag-item" @click="pickDiag('monitor')">
           <svg class="diag-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M4 19V5M4 19h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
@@ -381,6 +389,13 @@
       @close="memoryConn = null"
     />
 
+    <PubSubModal
+      v-if="pubsubConn"
+      :conn-id="pubsubConn.id"
+      :connection-name="pubsubConn.name || t('sidebar.unnamed')"
+      @close="pubsubConn = null"
+    />
+
     <RealtimeMonitorModal
       v-if="monitorConn"
       :conn-id="monitorConn.id"
@@ -402,6 +417,7 @@ import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import ConnectionOverviewModal from '../connections/ConnectionOverviewModal.vue'
 import MemoryDoctorModal from '../connections/MemoryDoctorModal.vue'
 import RealtimeMonitorModal from '../connections/RealtimeMonitorModal.vue'
+import PubSubModal from '../connections/PubSubModal.vue'
 import { formatDebugMessage } from '../../utils/debug.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
 
@@ -441,6 +457,7 @@ const overviewConn = ref(null)
 const memoryConn = ref(null)
 const diagMenu = ref({ visible: false, x: 0, y: 0, conn: null })
 const monitorConn = ref(null)
+const pubsubConn = ref(null)
 
 function connectionStateClass(id) {
   if (connectionsStore.isConnecting(id)) return 'connecting'
@@ -503,6 +520,8 @@ function pickDiag(kind) {
     openOverview(conn)
   } else if (kind === 'monitor') {
     monitorConn.value = conn
+  } else if (kind === 'pubsub') {
+    pubsubConn.value = conn
   } else {
     openMemory(conn)
   }

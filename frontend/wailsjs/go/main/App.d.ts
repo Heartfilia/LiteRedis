@@ -35,6 +35,8 @@ export function ExecuteRedisCommand(arg1:string,arg2:string):Promise<config.Redi
 
 export function ExecuteRedisCommandForce(arg1:string,arg2:string):Promise<config.RedisConsoleResult>;
 
+export function ExportConnectionsToFile():Promise<string>;
+
 export function ExportDebugLog():Promise<string>;
 
 export function ExportKeysToFile(arg1:string,arg2:Array<string>,arg3:string):Promise<string>;
@@ -55,6 +57,8 @@ export function GetKeyInfo(arg1:string,arg2:string):Promise<config.RedisKey>;
 
 export function GetLocalAPIInfo():Promise<main.LocalAPIInfo>;
 
+export function GetPubSubStatus(arg1:string):Promise<main.PubSubStatus>;
+
 export function GetReleaseNotes(arg1:string):Promise<main.ReleaseNotes>;
 
 export function GetSettings():Promise<config.AppSettings>;
@@ -66,6 +70,8 @@ export function GetValue(arg1:string,arg2:string,arg3:number,arg4:number,arg5:st
 export function HDel(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
 export function HSet(arg1:string,arg2:string,arg3:string,arg4:string):Promise<config.OperationResult>;
+
+export function ImportConnectionsFromFile():Promise<config.ImportSummary>;
 
 export function ImportKeysFromFile(arg1:string,arg2:boolean):Promise<config.BatchKeyResult>;
 
@@ -117,7 +123,11 @@ export function SetString(arg1:string,arg2:string,arg3:string):Promise<config.Op
 
 export function SetTTL(arg1:string,arg2:string,arg3:number):Promise<config.OperationResult>;
 
+export function StartPubSub(arg1:string,arg2:Array<string>,arg3:Array<string>):Promise<config.OperationResult>;
+
 export function StartUpdate():Promise<main.UpdateResult>;
+
+export function StopPubSub(arg1:string):Promise<config.OperationResult>;
 
 export function TestConnection(arg1:config.ConnectionConfig):Promise<config.OperationResult>;
 

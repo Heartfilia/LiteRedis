@@ -66,6 +66,10 @@ export function ExecuteRedisCommandForce(arg1, arg2) {
   return window['go']['main']['App']['ExecuteRedisCommandForce'](arg1, arg2);
 }
 
+export function ExportConnectionsToFile() {
+  return window['go']['main']['App']['ExportConnectionsToFile']();
+}
+
 export function ExportDebugLog() {
   return window['go']['main']['App']['ExportDebugLog']();
 }
@@ -106,6 +110,10 @@ export function GetLocalAPIInfo() {
   return window['go']['main']['App']['GetLocalAPIInfo']();
 }
 
+export function GetPubSubStatus(arg1) {
+  return window['go']['main']['App']['GetPubSubStatus'](arg1);
+}
+
 export function GetReleaseNotes(arg1) {
   return window['go']['main']['App']['GetReleaseNotes'](arg1);
 }
@@ -128,6 +136,10 @@ export function HDel(arg1, arg2, arg3) {
 
 export function HSet(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['HSet'](arg1, arg2, arg3, arg4);
+}
+
+export function ImportConnectionsFromFile() {
+  return window['go']['main']['App']['ImportConnectionsFromFile']();
 }
 
 export function ImportKeysFromFile(arg1, arg2) {
@@ -230,8 +242,16 @@ export function SetTTL(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetTTL'](arg1, arg2, arg3);
 }
 
+export function StartPubSub(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartPubSub'](arg1, arg2, arg3);
+}
+
 export function StartUpdate() {
   return window['go']['main']['App']['StartUpdate']();
+}
+
+export function StopPubSub(arg1) {
+  return window['go']['main']['App']['StopPubSub'](arg1);
 }
 
 export function TestConnection(arg1) {

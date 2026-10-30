@@ -24,6 +24,11 @@ export const getConnectionDB = (connID) => callGo('GetConnectionDB', connID)
 export const scanMemoryReport = (connID, pattern, maxKeys) => callGo('ScanMemoryReport', connID, pattern, maxKeys)
 export const cancelMemoryScan = () => callGo('CancelMemoryScan')
 export const getSlowLog = (connID, count) => callGo('GetSlowLog', connID, count)
+
+// ===== 发布订阅 =====
+export const startPubSub = (connID, channels, patterns) => callGo('StartPubSub', connID, channels, patterns)
+export const stopPubSub = (connID) => callGo('StopPubSub', connID)
+export const getPubSubStatus = (connID) => callGo('GetPubSubStatus', connID)
 export const exportKeysToFile = (connID, keys, format) => callGo('ExportKeysToFile', connID, keys, format)
 export const copyKeysToConnection = (srcConnID, dstConnID, keys, overwrite) => callGo('CopyKeysToConnection', srcConnID, dstConnID, keys, overwrite)
 export const copyKeysToDatabase = (connID, keys, dstDB, overwrite) => callGo('CopyKeysToDatabase', connID, keys, dstDB, overwrite)
