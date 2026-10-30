@@ -1029,6 +1029,76 @@ func (a *App) CompleteOnboarding() config.OperationResult {
 	return config.OperationResult{Success: true}
 }
 
+// ExportConnectionsToFile 导出全部连接配置（含明文密码，前端会二次确认）
+func (a *App) ExportConnectionsToFile() (string, error) {
+	payload, err := config.ExportConnections()
+	if err != nil {
+		return "", err
+	}
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	stamp := time.Now().Format("20060102-150405")
+	path, err := wailsruntime.SaveFileDialog(a.ctx, wailsruntime.SaveDialogOptions{
+		Title:           "导出连接配置",
+		DefaultFilename: "literedis-connections-" + stamp + ".json",
+		Filters:         []wailsruntime.FileFilter{{DisplayName: "JSON", Pattern: "*.json"}},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil
+	}
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// ImportConnectionsFromFile 导入连接配置：同 ID 覆盖、同组重名自动加后缀
+func (a *App) ImportConnectionsFromFile() (config.ImportSummary, error) {
+	path, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "导入连接配置",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "JSON", Pattern: "*.json"},
+		},
+	})
+	if err != nil {
+		return config.ImportSummary{}, err
+	}
+	if path == "" {
+		return config.ImportSummary{}, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return config.ImportSummary{}, err
+	}
+	var payload config.ConfigExport
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return config.ImportSummary{}, fmt.Errorf("不是有效的导出文件: %w", err)
+	}
+	if payload.App != "" && payload.App != "LiteRedis" {
+		return config.ImportSummary{}, fmt.Errorf("不是 LiteRedis 的配置文件")
+	}
+	summary, err := config.ImportConnections(payload.Connections)
+	if err != nil {
+		return summary, err
+	}
+	// 被覆盖的连接如果传输参数变了，让运行中的实例按新配置重连
+	for _, id := range summary.UpdatedIDs {
+		cfg, cfgErr := config.GetConnection(id)
+		if cfgErr != nil || cfg == nil {
+			continue
+		}
+		if a.manager.ApplyConnectionConfig(*cfg) {
+			a.registry.UnpublishConn(id)
+		}
+	}
+	return summary, nil
+}
+
 // MarkVersionSeen 记录已经看过某个版本的更新说明，保证每个版本只提示一次
 func (a *App) MarkVersionSeen(version string) config.OperationResult {
 	if err := config.MarkVersionSeen(version); err != nil {

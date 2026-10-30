@@ -359,6 +359,48 @@
         </div>
       </div>
 
+      <div class="section-title mt">{{ t('settings.configTransfer') }}</div>
+      <div class="setting-item">
+        <label>
+          <span class="label-text">{{ t('settings.exportConfig') }}</span>
+          <span class="label-hint">{{ t('settings.exportConfigHint') }}</span>
+        </label>
+        <div class="input-unit">
+          <button
+            type="button"
+            class="local-api-btn"
+            :class="{ danger: exportConfirming }"
+            @click="handleExportConfig"
+          >
+            {{ exportConfirming ? t('settings.exportConfigConfirm') : t('settings.exportConfigAction') }}
+          </button>
+        </div>
+      </div>
+      <div class="setting-item">
+        <label>
+          <span class="label-text">{{ t('settings.importConfig') }}</span>
+          <span class="label-hint">{{ t('settings.importConfigHint') }}</span>
+        </label>
+        <div class="input-unit">
+          <button type="button" class="local-api-btn" :disabled="importing" @click="handleImportConfig">
+            {{ importing ? t('settings.importing') : t('settings.importConfigAction') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="section-title mt">{{ t('settings.installGuide') }}</div>
+      <div class="setting-item">
+        <label>
+          <span class="label-text">{{ t('settings.installGuide') }}</span>
+          <span class="label-hint">{{ t('settings.installGuideEntry') }}</span>
+        </label>
+        <div class="input-unit">
+          <button type="button" class="local-api-btn" @click="showGuide = true">
+            {{ t('settings.installGuideOpen') }}
+          </button>
+        </div>
+      </div>
+
       <div class="section-title mt">{{ t('diagnostics.title') }}</div>
       <div class="setting-item">
         <label>
@@ -374,6 +416,7 @@
     </div>
 
     <DiagnosticsModal v-if="showDiagnostics" @close="showDiagnostics = false" />
+    <InstallGuideModal v-if="showGuide" @close="showGuide = false" />
 
     <!-- floating toast -->
     <Teleport to="body">
@@ -420,8 +463,10 @@ import { ref, reactive, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useUpdateStore } from '../../stores/update.js'
 import DiagnosticsModal from './DiagnosticsModal.vue'
+import InstallGuideModal from '../common/InstallGuideModal.vue'
 import { useI18n } from '../../i18n/index.js'
-import { getAppVersion, getLocalAPIInfo, regenerateLocalAPIToken } from '../../api/wails.js'
+import { getAppVersion, getLocalAPIInfo, regenerateLocalAPIToken, exportConnectionsToFile, importConnectionsFromFile } from '../../api/wails.js'
+import { useConnectionsStore } from '../../stores/connections.js'
 import { refreshLocalAPIRuntime } from '../../services/browserExtract.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
@@ -459,6 +504,10 @@ const form = reactive({
 
 const saving = ref(false)
 const showDiagnostics = ref(false)
+const showGuide = ref(false)
+const exportConfirming = ref(false)
+const importing = ref(false)
+let exportConfirmTimer = null
 const appVersion = ref('dev')
 const updateStore = useUpdateStore()
 const msg = ref('')
@@ -753,6 +802,61 @@ async function regenerateToken() {
 
 async function handleVersionClick() {
   await updateStore.runPrimaryAction()
+}
+
+// 导出前二次确认：文件里是明文密码
+async function handleExportConfig() {
+  if (!exportConfirming.value) {
+    exportConfirming.value = true
+    if (exportConfirmTimer) clearTimeout(exportConfirmTimer)
+    exportConfirmTimer = setTimeout(() => {
+      exportConfirming.value = false
+      exportConfirmTimer = null
+    }, 4000)
+    return
+  }
+  exportConfirming.value = false
+  if (exportConfirmTimer) {
+    clearTimeout(exportConfirmTimer)
+    exportConfirmTimer = null
+  }
+  try {
+    const path = await exportConnectionsToFile()
+    if (!path) return
+    ok.value = true
+    msg.value = t('settings.exportConfigDone').replace('{path}', path)
+  } catch (e) {
+    ok.value = false
+    msg.value = e?.message || String(e)
+  }
+}
+
+async function handleImportConfig() {
+  if (importing.value) return
+  importing.value = true
+  try {
+    const summary = await importConnectionsFromFile()
+    if (!summary) return
+    if (summary.added || summary.updated) {
+      await useConnectionsStore().loadConnections()
+      ok.value = true
+      let text = t('settings.importConfigDone')
+        .replace('{added}', summary.added || 0)
+        .replace('{updated}', summary.updated || 0)
+      if (summary.skipped) {
+        text += ' · ' + t('settings.importSkipped').replace('{n}', summary.skipped)
+      }
+      msg.value = text
+    } else if (summary.messages && summary.messages.length) {
+      ok.value = false
+      msg.value = summary.messages.join('；')
+    }
+  } catch (e) {
+    ok.value = false
+    msg.value = e?.message || String(e)
+  } finally {
+    importing.value = false
+  }
 }
 
 function openApiDocs() {

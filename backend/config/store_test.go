@@ -321,3 +321,71 @@ func TestMarkOnboardingDoneAndPreserveOnSave(t *testing.T) {
 		t.Fatal("onboarding flag was cleared by SaveSettings")
 	}
 }
+
+func TestImportConnectionsMergesRenamesAndSkips(t *testing.T) {
+	useTestConfigPath(t)
+
+	existing, err := SaveConnection(ConnectionConfig{Name: "dev", Group: "A", Host: "h1", Port: 6379})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	summary, err := ImportConnections([]ConnectionConfig{
+		{ID: existing.ID, Name: "dev", Group: "A", Host: "h2", Port: 6379},
+		{Name: "dev", Group: "A", Host: "h3", Port: 6379},
+		{Name: "  ", Group: "A", Host: "h4", Port: 6379},
+		{Name: "other", Group: "B", Host: "h5", Port: 6379},
+	})
+	if err != nil {
+		t.Fatalf("ImportConnections: %v", err)
+	}
+	if summary.Updated != 1 || summary.Added != 2 || summary.Skipped != 1 || summary.Renamed != 1 {
+		t.Fatalf("unexpected summary: %+v", summary)
+	}
+	if len(summary.UpdatedIDs) != 1 || summary.UpdatedIDs[0] != existing.ID {
+		t.Fatalf("updated ids not reported: %+v", summary.UpdatedIDs)
+	}
+
+	list, err := ListConnections()
+	if err != nil {
+		t.Fatalf("ListConnections: %v", err)
+	}
+	if len(list) != 3 {
+		t.Fatalf("expected 3 connections, got %d", len(list))
+	}
+	byName := map[string]ConnectionConfig{}
+	for _, c := range list {
+		byName[c.Name] = c
+	}
+	if byName["dev"].Host != "h2" {
+		t.Fatalf("same id should be overwritten, got host %q", byName["dev"].Host)
+	}
+	if _, ok := byName["dev (2)"]; !ok {
+		t.Fatalf("duplicate name should be renamed, got %+v", byName)
+	}
+	if _, ok := byName["other"]; !ok {
+		t.Fatalf("new connection missing: %+v", byName)
+	}
+}
+
+func TestExportConnectionsSortedAndComplete(t *testing.T) {
+	useTestConfigPath(t)
+
+	if _, err := SaveConnection(ConnectionConfig{Name: "b", Group: "A", Host: "h", Port: 6379}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SaveConnection(ConnectionConfig{Name: "a", Group: "A", Host: "h", Port: 6379}); err != nil {
+		t.Fatal(err)
+	}
+
+	payload, err := ExportConnections()
+	if err != nil {
+		t.Fatalf("ExportConnections: %v", err)
+	}
+	if payload.App != "LiteRedis" || len(payload.Connections) != 2 {
+		t.Fatalf("unexpected payload: %+v", payload)
+	}
+	if payload.Connections[0].Name != "b" || payload.Connections[1].Name != "a" {
+		t.Fatalf("export should follow sort order, got %q then %q", payload.Connections[0].Name, payload.Connections[1].Name)
+	}
+}

@@ -80,6 +80,10 @@ export const getReleaseNotes = (version) => callGo('GetReleaseNotes', version)
 export const markVersionSeen = (version) => callGo('MarkVersionSeen', version)
 export const completeOnboarding = () => callGo('CompleteOnboarding')
 
+// ===== 配置导出 / 导入 =====
+export const exportConnectionsToFile = () => callGo('ExportConnectionsToFile')
+export const importConnectionsFromFile = () => callGo('ImportConnectionsFromFile')
+
 // ===== 诊断 =====
 export const getDiagnostics = () => callGo('GetDiagnostics')
 export const exportDebugLog = () => callGo('ExportDebugLog')
