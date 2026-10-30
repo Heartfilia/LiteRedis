@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { computeWindow } from './virtualList.js'
+import { buildOffsets, computeWindow, findWindowForOffsets } from './virtualList.js'
 
 test('computeWindow: 顶部时从 0 开始，上下留白正确', () => {
   const w = computeWindow(10000, 0, 600, 32, 8)
@@ -45,4 +45,45 @@ test('computeWindow: 异常入参不会产生负索引', () => {
   assert.equal(w.start, 0)
   assert.equal(w.end, 0)
   assert.equal(w.topPad, 0)
+})
+// —— 变高行 ——
+const varHeights = [40, 80, 56, 120, 40]
+const varOffsets = buildOffsets(varHeights.length, (i) => varHeights[i], () => 60)
+
+test('buildOffsets: 累加实测高度，缺测量时用估算值', () => {
+  assert.equal(varOffsets.length, 6)
+  assert.equal(varOffsets[0], 0)
+  assert.equal(varOffsets[1], 40)
+  assert.equal(varOffsets[2], 120)
+  assert.equal(varOffsets[5], 336)
+
+  const estimated = buildOffsets(3, () => 0, () => 50)
+  assert.equal(estimated[3], 150)
+})
+
+test('findWindowForOffsets: 顶部窗口带 overscan，顶部留白为 0', () => {
+  const w = findWindowForOffsets(varOffsets, 0, 100, 1)
+  assert.equal(w.start, 0)
+  assert.equal(w.topPad, 0)
+  assert.ok(w.end >= 2)
+})
+
+test('findWindowForOffsets: 滚动到中间时窗口落在对应位置', () => {
+  // 130 落在第 2 行（40+80）之后的第 3 行区间
+  const w = findWindowForOffsets(varOffsets, 130, 100, 0)
+  assert.equal(w.start, 2)
+  assert.equal(w.topPad, varOffsets[2])
+  assert.equal(w.topPad + (varOffsets[w.end] - varOffsets[w.start]) + w.bottomPad, varOffsets[5])
+})
+
+test('findWindowForOffsets: 底部不越界、空列表返回空窗口', () => {
+  const w = findWindowForOffsets(varOffsets, 10000, 100, 3)
+  assert.equal(w.end, 5)
+  assert.equal(w.bottomPad, 0)
+  assert.deepEqual(findWindowForOffsets(buildOffsets(0, () => 0, () => 0), 0, 100), {
+    start: 0,
+    end: 0,
+    topPad: 0,
+    bottomPad: 0,
+  })
 })

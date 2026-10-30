@@ -18,10 +18,18 @@
         </svg>
       </button>
     </div>
-    <div class="stream-wrap">
-      <div v-for="(entry, idx) in displayEntries" :key="entry.id" class="stream-entry">
+    <div ref="streamWrapRef" class="stream-wrap">
+      <div v-if="vTopPad" class="v-pad" :style="{ height: vTopPad + 'px' }" aria-hidden="true" />
+      <div
+        v-for="entry in windowEntries"
+        :key="entry.id"
+        class="stream-entry"
+        data-vrow
+        :data-vkey="entry.id"
+        :data-vindex="entry.index"
+      >
         <div class="entry-header">
-          <span class="entry-num" @click="openExtractMenu($event, entry.id)" @contextmenu.prevent="openExtractMenu($event, entry.id)">{{ idx + 1 }}</span>
+          <span class="entry-num" @click="openExtractMenu($event, entry.id)" @contextmenu.prevent="openExtractMenu($event, entry.id)">{{ entry.index + 1 }}</span>
           <span class="entry-id">{{ entry.id }}</span>
           <button class="btn-entry-copy" :class="{ copied: copiedEntry === entry.id }" @click="copyEntry(entry)">
             {{ copiedEntry === entry.id ? '✓ ' + t('keyEditor.copied') : t('keyEditor.copy') }}
@@ -35,6 +43,7 @@
           </span>
         </div>
       </div>
+      <div v-if="vBottomPad" class="v-pad" :style="{ height: vBottomPad + 'px' }" aria-hidden="true" />
     </div>
     <ExtractMenu
       :visible="extractMenu.visible"
@@ -58,6 +67,7 @@ import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
 import { mergeStreamEntries } from '../../utils/streamPagination.js'
+import { useVariableVirtualizer } from '../../utils/virtualList.js'
 import { isConnectionErrorMessage } from '../../utils/connection.js'
 import { openBrowserExtract, copyExtractLink } from '../../services/browserExtract.js'
 import { getValue } from '../../api/wails.js'
@@ -88,6 +98,38 @@ let copyTimer = null
 
 const displayEntries = computed(() => entries.value)
 const totalEntries = computed(() => totalCount.value >= 0 ? totalCount.value : entries.value.length)
+
+// stream entry 的字段会换行，行高不固定：实测 + 估算来窗口化
+const streamWrapRef = ref(null)
+const streamVirtualizer = useVariableVirtualizer({
+  containerRef: streamWrapRef,
+  items: displayEntries,
+  keyOf: (entry) => entry.id,
+  estimate: (entry) => {
+    let chars = 0
+    const fields = entry.fields || {}
+    for (const key of Object.keys(fields)) {
+      chars += key.length + String(fields[key]).length + 2
+    }
+    // 头部一行、字段按每行约 56 个字符估算
+    return 42 + Math.max(1, Math.ceil(chars / 56)) * 17
+  },
+})
+const vTopPad = computed(() => streamVirtualizer.topPad.value)
+const vBottomPad = computed(() => streamVirtualizer.bottomPad.value)
+const windowEntries = computed(() => {
+  const list = displayEntries.value
+  if (!streamVirtualizer.active.value) {
+    return list.map((entry, index) => ({ ...entry, index }))
+  }
+  const start = streamVirtualizer.start.value
+  const end = streamVirtualizer.end.value
+  const out = []
+  for (let i = start; i < end; i++) {
+    out.push({ ...list[i], index: i })
+  }
+  return out
+})
 
 watch(() => props.keyValue, kv => {
   requestGuard.invalidateAll()
@@ -181,7 +223,8 @@ async function copyEntry(entry) {
 
 <style scoped>
 .stream-editor { display: flex; flex-direction: column; height: 100%; gap: 7px; }
-.stream-wrap { flex: 1; overflow-y: auto; }
+.stream-wrap { flex: 1; overflow-y: auto; position: relative; }
+.v-pad { pointer-events: none; }
 .stream-entry { border-bottom: 1px solid rgba(241, 245, 249, 0.96); padding: 8px 10px; font-size: 12px; }
 .stream-entry:hover { background: rgba(248, 250, 252, 0.9); }
 .entry-header { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
