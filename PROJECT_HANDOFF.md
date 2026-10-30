@@ -98,6 +98,7 @@ Vue 组件
 
 - ESLint（`frontend/eslint.config.js`，flat config + eslint-plugin-vue essential）与 Prettier（`frontend/.prettierrc.json`）已接入，CI 在构建前跑 `npm run lint`，有报错就失败。
 - 格式化暂不设门禁：`npm run format` / `npm run format:check` 手动使用，避免一次性重排几十个文件盖掉业务 diff；新文件建议先格式化再提交。
+- 交互冒烟用 Playwright（`frontend/e2e`，`npm run e2e`）：跑 Vite dev + 注入假的 `window.go`，覆盖树窗口化滚动、键盘导航、标签拖拽/中键关闭、命令台补全、命令面板搜 key。默认用系统 Chrome，CI 里装 Playwright 自带 chromium 后设 `PW_CHANNEL=bundled`。
 
 ## 已通过验证
 
@@ -108,6 +109,7 @@ GOCACHE=/tmp/literedis-go-cache go vet ./...
 npm --prefix frontend run lint
 npm --prefix frontend run build
 node --test frontend/src/utils/*.test.js frontend/src/stores/*.test.js
+npm --prefix frontend run e2e
 GOCACHE=/tmp/literedis-go-cache wails build -platform darwin/arm64 -clean -v 2 -nocolour
 codesign --verify --deep --strict --verbose=2 build/bin/LiteRedis.app
 git diff --check
