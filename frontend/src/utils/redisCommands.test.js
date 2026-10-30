@@ -67,6 +67,18 @@ test('suggestArguments: 命令名阶段、无子命令无关键字的命令返�
   assert.deepEqual(suggestArguments(''), [])
 })
 
+test('suggestArguments: 第一个参数位置不推关键字', () => {
+  assert.deepEqual(suggestArguments('zrange '), [])
+  assert.deepEqual(suggestArguments('zrange ke'), [])
+  assert.deepEqual(suggestArguments('zrange key 0 -1 ').map((item) => item.value), [
+    'BYLEX',
+    'BYSCORE',
+    'LIMIT',
+    'REV',
+    'WITHSCORES',
+  ])
+})
+
 test('suggestArguments: 扫描类命令支持 MATCH / COUNT', () => {
   assert.deepEqual(suggestArguments('scan 0 ').map((item) => item.value), ['COUNT', 'MATCH', 'TYPE'])
   assert.deepEqual(suggestArguments('zrange key 0 -1 wi').map((item) => item.value), ['WITHSCORES'])

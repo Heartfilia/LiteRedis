@@ -179,7 +179,8 @@ export function suggestArguments(input, limit = 8) {
     }
   }
 
-  const keywords = REDIS_COMMAND_KEYWORDS[command] || []
+  // 关键字都在参数后面，第一个参数位置不推荐，避免刚敲完命令就弹一堆选项
+  const keywords = argIndex >= 1 ? REDIS_COMMAND_KEYWORDS[command] || [] : []
   return keywords
     .filter((value) => value.startsWith(partial) && !used.has(value))
     .slice(0, limit)

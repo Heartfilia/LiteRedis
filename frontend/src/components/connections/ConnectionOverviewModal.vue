@@ -230,7 +230,8 @@ const suggestPos = ref(null)
 const suggestions = computed(() => {
   const raw = command.value || ''
   if (!raw.trim()) return []
-  const commands = filterCommandNames(raw)
+  // 已经敲了空格就说明进入参数阶段，不再推荐命令名
+  const commands = /\s$/.test(raw) ? [] : filterCommandNames(raw)
   if (commands.length) {
     return commands.map((name) => ({ value: name.toUpperCase(), hint: signatureText(name) }))
   }
@@ -263,7 +264,8 @@ function updateSuggestPosition() {
 function useSuggestion(item) {
   const value = String(item.value || '').toUpperCase()
   const raw = command.value || ''
-  if (!/\s/.test(raw.trim())) {
+  // 整行只有命令名（还没敲空格）时才整行替换
+  if (!/\s/.test(raw)) {
     command.value = value + ' '
   } else {
     const endsWithSpace = /\s$/.test(raw)
