@@ -12,9 +12,9 @@ export function normalizeLoadCount(value, fallback = DEFAULT_LOAD_COUNT) {
 }
 
 const THEME_STORAGE_KEY = 'liteRedis_themeMode'
-const THEME_PREFERENCES = ['light', 'green', 'dark', 'auto']
+const THEME_PREFERENCES = ['light', 'green', 'dark', 'geek', 'auto']
 
-// 主题选择：light / green（护眼）/ dark / auto（跟随系统）
+// 主题选择：light / green（护眼）/ dark / geek（极客终端）/ auto（跟随系统）
 export function normalizeThemePreference(value) {
   return THEME_PREFERENCES.includes(value) ? value : 'light'
 }
@@ -44,7 +44,7 @@ export const useSettingsStore = defineStore('settings', {
     debugMode: false,
     // 实际生效的主题（light | dark），组件都用它拼 theme-xxx 类名
     themeMode: 'light',
-    // 用户选择（light | green | dark | auto），auto 跟随系统
+    // 用户选择（light | green | dark | geek | auto），auto 跟随系统
     themePreference: 'light',
     keyScanCount: 200,
     hashLoadCount: 20,
@@ -80,8 +80,17 @@ export const useSettingsStore = defineStore('settings', {
 
   actions: {
     applyTheme() {
-      this.themeMode = this.themePreference === 'auto' ? systemThemeMode() : this.themePreference
+      const pref = this.themePreference
+      if (pref === 'geek') {
+        // 极客 = 暗色底 + 终端滤镜（html.skin-geek），复用暗色的全部样式
+        this.themeSkin = 'geek'
+        this.themeMode = 'dark'
+      } else {
+        this.themeSkin = 'none'
+        this.themeMode = pref === 'auto' ? systemThemeMode() : pref
+      }
       if (typeof document === 'undefined') return
+      document.documentElement.classList.toggle('skin-geek', this.themeSkin === 'geek')
       document.documentElement.setAttribute('data-theme', this.themeMode)
       document.body.setAttribute('data-theme', this.themeMode)
     },

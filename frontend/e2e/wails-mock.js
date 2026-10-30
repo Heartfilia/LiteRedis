@@ -57,6 +57,7 @@ export async function installWailsMock(page, options = {}) {
         PushCommandHistory: () => ({ success: true }),
         ClearCommandHistory: () => ({ success: true }),
         GetDatabases: () => 16,
+        DbSize: () => 5000,
         GetConnectionDB: () => 0,
         Connect: () => ({ success: true, init_db: 0 }),
         Disconnect: () => ({ success: true }),

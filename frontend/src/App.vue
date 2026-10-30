@@ -1,5 +1,8 @@
 <template>
-  <div class="app-layout" :class="[fontSizeClass, `theme-${settingsStore.themeMode || 'light'}`]">
+  <div
+    class="app-layout"
+    :class="[fontSizeClass, `theme-${settingsStore.themeMode || 'light'}`, settingsStore.themeSkin === 'geek' ? 'skin-geek' : '']"
+  >
     <Sidebar :theme-mode="settingsStore.themeMode || 'light'" />
     <MainContent />
     <ConnectionManager
@@ -264,6 +267,52 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
     radial-gradient(circle at top left, rgba(37, 99, 235, 0.18), transparent 28%),
     radial-gradient(circle at right 18%, rgba(20, 184, 166, 0.12), transparent 24%),
     linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+}
+/* 极客主题：暗色为底，整站色相转到磷光绿，配等宽字体 + CRT 扫描线 */
+html.skin-geek {
+  filter: hue-rotate(-78deg) saturate(1.4) contrast(1.05) brightness(1.02);
+}
+html.skin-geek body,
+html.skin-geek .app-layout,
+html.skin-geek button,
+html.skin-geek input,
+html.skin-geek select,
+html.skin-geek textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace !important;
+}
+html.skin-geek body {
+  text-shadow: 0 0 7px rgba(34, 197, 94, 0.22);
+}
+/* 个别固定色（主题按钮的琥珀色、连接头像的彩色底）在极客皮肤里统一压成绿色 */
+html.skin-geek .sidebar .btn-icon.btn-theme {
+  color: #60a5fa !important;
+}
+html.skin-geek .sidebar .btn-icon.btn-theme:hover {
+  color: #93c5fd !important;
+  background: rgba(96, 165, 250, 0.14) !important;
+}
+html.skin-geek .sidebar .conn-avatar {
+  background: rgba(96, 165, 250, 0.16) !important;
+  color: #bfdbfe !important;
+}
+/* 硬编码的绿色（连接状态点）经色相旋转会变黄，这里反向补偿 */
+html.skin-geek .sidebar .conn-dot.connected {
+  background: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+}
+html.skin-geek::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99999;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.12) 0px,
+    rgba(0, 0, 0, 0.12) 1px,
+    transparent 1px,
+    transparent 3px
+  );
 }
 .app-layout.theme-green {
   --app-text: #2c3a24;

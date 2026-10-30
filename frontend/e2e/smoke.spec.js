@@ -170,7 +170,7 @@ test('theme menu switches between light and dark', async ({ page }) => {
   await page.locator('.btn-theme').click()
   const menu = page.locator('.theme-menu')
   await expect(menu).toBeVisible()
-  await expect(menu.locator('.theme-menu-item')).toHaveCount(4)
+  await expect(menu.locator('.theme-menu-item')).toHaveCount(5)
 
   // 菜单从按钮上方弹出：先记录一次位置，动画结束后不能跳到别处
   const opening = await menu.boundingBox()
@@ -186,6 +186,15 @@ test('theme menu switches between light and dark', async ({ page }) => {
   await expect(layout).toHaveClass(/theme-dark/)
   await expect(page.locator('.btn-theme')).toHaveAttribute('data-theme-pref', 'dark')
   await expect(menu).toHaveCount(0)
+
+  // 极客模式：暗色为底 + 终端皮肤（html 上挂 skin-geek 滤镜）
+  await page.locator('.btn-theme').click()
+  await page.locator('.theme-menu-item', { hasText: /^极客/ }).click()
+  await expect(layout).toHaveClass(/skin-geek/)
+  await expect(layout).toHaveClass(/theme-dark/)
+  await expect(page.locator('.btn-theme')).toHaveAttribute('data-theme-pref', 'geek')
+  const skinOnHtml = await page.evaluate(() => document.documentElement.classList.contains('skin-geek'))
+  expect(skinOnHtml).toBe(true)
 
   // 护眼模式：整屏进入绿色调
   await page.locator('.btn-theme').click()

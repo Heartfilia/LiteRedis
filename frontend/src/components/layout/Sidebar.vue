@@ -490,6 +490,7 @@ const THEME_OPTIONS = [
   { value: 'light', labelKey: 'sidebar.themeLight' },
   { value: 'green', labelKey: 'sidebar.themeGreen' },
   { value: 'dark', labelKey: 'sidebar.themeDark' },
+  { value: 'geek', labelKey: 'sidebar.themeGeek' },
   { value: 'auto', labelKey: 'sidebar.themeAuto' },
 ]
 const themeMenu = ref({ visible: false, left: 0, bottom: 0 })
