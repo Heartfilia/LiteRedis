@@ -22,7 +22,7 @@
             :title="shortcutsCollapsed ? t('keyTree.expandShortcut') : t('keyTree.collapseShortcut')"
             @click="shortcutsCollapsed = !shortcutsCollapsed"
           >
-            <span v-if="shortcutsCollapsed" class="shortcut-toggle-label">{{ t('keyTree.expandShortcut') }}</span>
+            <span class="shortcut-toggle-label">{{ t('keyTree.expandShortcut') }}</span>
             <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" :class="{ flipped: !shortcutsCollapsed }">
               <path d="M4 6.2 8 10.2l4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
@@ -1162,9 +1162,9 @@ function collapseVisibleTree() {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 0;
   height: 16px;
-  padding: 0 2px;
+  padding: 0 4px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -1175,9 +1175,20 @@ function collapseVisibleTree() {
   cursor: pointer;
   transition: color var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
 }
+/* 「展开」文字常驻 DOM，用宽度+透明度补间，避免切换瞬间整块按钮跳一下 */
 .shortcut-toggle-label {
   flex: 0 0 auto;
   white-space: nowrap;
+  max-width: 0;
+  margin-right: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width var(--motion-base) var(--ease-out), margin-right var(--motion-base) var(--ease-out), opacity var(--motion-base) var(--ease-out);
+}
+.shortcut-toggle.is-collapsed .shortcut-toggle-label {
+  max-width: 48px;
+  margin-right: 3px;
+  opacity: 1;
 }
 .shortcut-toggle svg {
   width: 12px;
@@ -1197,7 +1208,6 @@ function collapseVisibleTree() {
 }
 .shortcut-toggle.is-collapsed {
   color: #2563eb;
-  padding: 0 4px;
 }
 .shortcut-toggle.is-collapsed:hover {
   color: #1d4ed8;
