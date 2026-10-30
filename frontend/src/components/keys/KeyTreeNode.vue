@@ -1,7 +1,13 @@
 <template>
   <div :class="['tree-node', `theme-${settingsStore.themeMode || 'light'}`, { expanded: isExpanded }]">
     <!-- 目录节点 -->
-    <div v-if="!node.isLeaf" class="node-row dir-row" @click="onDirClick">
+    <div
+      v-if="!node.isLeaf"
+      v-kbd-row="{ role: 'treeitem' }"
+      class="node-row dir-row"
+      :aria-expanded="isExpanded"
+      @click="onDirClick"
+    >
       <input
         v-if="selectionMode"
         class="leaf-check"
@@ -32,7 +38,9 @@
     <!-- 叶节点（key） -->
     <div
       v-else
+      v-kbd-row="{ role: 'treeitem' }"
       :class="['node-row', 'leaf-row', { selected: selectedKey === node.fullPath, checked: isChecked }]"
+      :aria-selected="selectedKey === node.fullPath"
       @click="onLeafClick(node.fullPath, $event)"
     >
       <input

@@ -36,7 +36,7 @@
 
       <div class="sidebar-layer sidebar-expanded-layer" :class="{ visible: !sidebarCollapsed }">
       <!-- 连接列表（按分组） -->
-      <div class="conn-list">
+      <div class="conn-list" tabindex="0" data-kb-container @keydown="onConnListKeydown">
         <!-- 未分组连接 -->
         <div
           class="ungrouped-zone"
@@ -56,6 +56,7 @@
         <div
           v-for="conn in (groupedConnections[''] || [])"
           :key="conn.id"
+          v-kbd-row="{ clickTarget: '.conn-main' }"
           :class="['conn-item', {
             active: activeConnID === conn.id,
             connecting: connectionsStore.isConnecting(conn.id),
@@ -139,6 +140,7 @@
         <!-- 命名分组 -->
         <div v-for="(conns, group) in namedGroups" :key="group" class="group-block">
           <div
+            v-kbd-row="{ tabindex: 0 }"
             class="group-header"
             @click="toggleGroup(group)"
             :class="{
@@ -162,6 +164,7 @@
             <div
               v-for="conn in conns"
               :key="conn.id"
+              v-kbd-row="{ clickTarget: '.conn-main' }"
               :class="['conn-item', 'grouped', {
                 active: activeConnID === conn.id,
                 connecting: connectionsStore.isConnecting(conn.id),
@@ -394,6 +397,7 @@ import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
+import { moveRovingFocus } from '../../utils/keyboard.js'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import ConnectionOverviewModal from '../connections/ConnectionOverviewModal.vue'
 import MemoryDoctorModal from '../connections/MemoryDoctorModal.vue'
@@ -568,6 +572,11 @@ function formatError(prefix, message) {
 const collapsed = ref({})
 function toggleGroup(group) {
   collapsed.value[group] = !collapsed.value[group]
+}
+
+// 连接列表：Tab 停在列表上一次，↑/↓ 在连接间移动，Enter 打开
+function onConnListKeydown(event) {
+  moveRovingFocus(event, event.currentTarget, '.conn-item')
 }
 
 // 拖拽

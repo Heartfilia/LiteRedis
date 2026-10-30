@@ -14,6 +14,7 @@
           <div
             v-for="item in favoriteKeys"
             :key="'fav-' + item"
+            v-kbd-row="{ tabindex: 0 }"
             class="shortcut-row"
             :title="item"
             @click="workspaceStore.selectKey(item)"
@@ -27,6 +28,7 @@
           <div
             v-for="item in recentKeyList"
             :key="'recent-' + item"
+            v-kbd-row="{ tabindex: 0 }"
             class="shortcut-row"
             :title="item"
             @click="workspaceStore.selectKey(item)"
@@ -50,7 +52,7 @@
         <!-- 合并模式：keepPrevSearch = true -->
         <template v-else-if="workspaceStore.keepPrevSearch">
           <div v-if="displaySessions.length === 0" class="empty-state">{{ t('keyTree.searchHint') }}</div>
-          <div v-else class="merged-scroll">
+          <div v-else class="merged-scroll" tabindex="0" data-kb-container @keydown="onTreeKeydown">
             <div v-for="sess in displaySessions" :key="sess.id" class="search-section">
               <div class="search-section-header">
                 <span class="section-pattern">🔍 {{ sess.pattern }}</span>
@@ -93,7 +95,7 @@
           <div v-if="session?.loading" class="loading">{{ t('keyTree.loading') }}</div>
           <div v-else-if="!session" class="empty-state">{{ t('keyTree.searchHint') }}</div>
           <div v-else-if="session.treeData?.length === 0" class="empty-state">{{ t('keyTree.noKeys') }}</div>
-          <div v-else class="tree-scroll">
+          <div v-else class="tree-scroll" tabindex="0" data-kb-container @keydown="onTreeKeydown">
             <KeyTreeNode
               v-for="node in session.treeData"
               :key="node.fullPath"
@@ -296,6 +298,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, ref, watch } from 'vue'
+import { moveRovingFocus } from '../../utils/keyboard.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -401,6 +404,11 @@ function syncDbBarLayout() {
 
 onMounted(syncDbBarLayout)
 onUpdated(syncDbBarLayout)
+
+// 树里用 ↑/↓ 在行之间移动焦点，Enter 打开；Tab 只停在树容器上一次
+function onTreeKeydown(event) {
+  moveRovingFocus(event, event.currentTarget, '.node-row')
+}
 
 function openMoreMenu(event) {
   if (readOnly.value || !workspaceStore.selectedKeys.length) return

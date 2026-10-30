@@ -80,6 +80,11 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 
+/* 作为"方向键导航容器"的可聚焦区域（列表/树），焦点框收到内侧，避免整块面板被外框包住 */
+[data-kb-container]:focus-visible {
+  outline-offset: -3px;
+}
+
 /* 按下反馈：抬起类按钮按下时回落到原位并轻微收缩，避免"点下去没手感" */
 button:not(:disabled):active,
 [role="button"]:not([aria-disabled="true"]):active {

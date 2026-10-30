@@ -52,7 +52,7 @@
 
     <!-- sort header -->
     <div class="set-header">
-      <span class="sortable-col" @click="cycleSortOrder">
+      <span v-kbd-row="{ tabindex: 0 }" class="sortable-col" @click="cycleSortOrder">
         {{ t('keyEditor.member') }} <span class="sort-icon" :class="sortOrder">{{ sortIcon }}</span>
       </span>
     </div>

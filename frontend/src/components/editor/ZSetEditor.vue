@@ -39,11 +39,11 @@
         <thead>
           <tr>
             <th class="num-col">#</th>
-            <th class="sortable-col score-th" :style="{ width: scoreWidth + 'px' }" @click="cycleScoreSort">
+            <th v-kbd-row="{ tabindex: 0 }" class="sortable-col score-th" :style="{ width: scoreWidth + 'px' }" @click="cycleScoreSort">
               <span class="th-content">Score <span class="sort-icon" :class="scoreSortOrder">{{ scoreSortIcon }}</span></span>
               <span class="col-resizer" @mousedown.stop="startResizeScore" />
             </th>
-            <th class="sortable-col member-th" @click="cycleMemberSort">
+            <th v-kbd-row="{ tabindex: 0 }" class="sortable-col member-th" @click="cycleMemberSort">
               Member <span class="sort-icon" :class="memberSortOrder">{{ memberSortIcon }}</span>
             </th>
             <th class="action-th"><span class="action-th-label">{{ t('keyEditor.action') }}</span></th>

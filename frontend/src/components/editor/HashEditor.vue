@@ -243,7 +243,7 @@
         <thead>
           <tr>
             <th class="num-col">#</th>
-            <th class="sortable-col field-th" @click="cycleSortOrder" :style="fieldColumnStyle">
+            <th v-kbd-row="{ tabindex: 0 }" class="sortable-col field-th" @click="cycleSortOrder" :style="fieldColumnStyle">
               <span class="th-content">Field <span class="sort-icon" :class="sortOrder">{{ sortIcon }}</span></span>
               <span class="col-resizer" @mousedown.stop="startResizeField" />
             </th>

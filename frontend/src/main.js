@@ -5,6 +5,7 @@ import './style.css'
 import { loadLanguage } from './i18n/index.js'
 import { useConnectionsStore } from './stores/connections.js'
 import { useWorkspaceStore } from './stores/workspace.js'
+import { vKbdRow } from './utils/keyboard.js'
 
 loadLanguage()
 
@@ -31,6 +32,7 @@ if (isWindows) {
 const app = createApp(App)
 const pinia = createPinia()
 app.use(pinia)
+app.directive('kbd-row', vKbdRow)
 app.mount('#app')
 
 const connectionsStore = useConnectionsStore(pinia)
