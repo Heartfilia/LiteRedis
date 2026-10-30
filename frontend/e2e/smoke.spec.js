@@ -166,10 +166,21 @@ test('theme menu switches between light and dark', async ({ page }) => {
   const layout = page.locator('.app-layout')
   await expect(layout).toHaveClass(/theme-light/)
 
+  const btnBox = await page.locator('.btn-theme').boundingBox()
   await page.locator('.btn-theme').click()
   const menu = page.locator('.theme-menu')
   await expect(menu).toBeVisible()
   await expect(menu.locator('.theme-menu-item')).toHaveCount(3)
+
+  // 菜单从按钮上方弹出：先记录一次位置，动画结束后不能跳到别处
+  const opening = await menu.boundingBox()
+  await page.waitForTimeout(260)
+  const settled = await menu.boundingBox()
+  expect(Math.abs(opening.y - settled.y)).toBeLessThan(10)
+  // 底边应该贴着按钮上沿（留一点间距），而不是跑到别的地方
+  const gap = btnBox.y - (settled.y + settled.height)
+  expect(gap).toBeGreaterThan(0)
+  expect(gap).toBeLessThan(20)
 
   await menu.locator('.theme-menu-item', { hasText: '暗色' }).click()
   await expect(layout).toHaveClass(/theme-dark/)

@@ -368,7 +368,7 @@
     <Teleport to="body">
       <div
         v-if="themeMenu.visible"
-        class="theme-menu pop-in-up"
+        class="theme-menu"
         :class="'theme-' + resolvedThemeMode"
         :style="{ left: themeMenu.left + 'px', bottom: themeMenu.bottom + 'px' }"
         @mousedown.stop
@@ -1783,9 +1783,16 @@ async function disconnectConn(id) {
   background: rgba(51, 65, 85, 0.88);
 }
 
+@keyframes themeMenuIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 .theme-menu {
   position: fixed;
   z-index: 2100;
+  /* 位置已经由 left/bottom 定好，动画只做淡入和轻微缩放，不能再位移，否则会先闪到别处 */
+  transform-origin: bottom left;
+  animation: themeMenuIn var(--motion-fast) var(--ease-out);
   min-width: 168px;
   padding: 5px;
   display: flex;
