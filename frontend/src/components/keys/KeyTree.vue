@@ -13,33 +13,23 @@
         class="shortcut-block"
         :class="{ 'is-collapsed': shortcutsCollapsed }"
       >
-        <button
-          v-if="shortcutsCollapsed"
-          type="button"
-          class="shortcut-collapsed-bar"
-          @click="shortcutsCollapsed = false"
-        >
-          <span class="shortcut-collapsed-title">{{ collapsedShortcutTitle }}</span>
-          <span class="shortcut-expand">
-            {{ t('keyTree.expandShortcut') }}
-            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M4 6.2 8 10.2l4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </span>
-        </button>
-        <div v-else class="shortcut-head">
+        <div class="shortcut-head">
+          <span v-if="shortcutsCollapsed" class="shortcut-collapsed-title">{{ collapsedShortcutTitle }}</span>
           <button
             type="button"
             class="shortcut-toggle"
-            :title="t('keyTree.collapseShortcut')"
-            @click="shortcutsCollapsed = true"
+            :class="{ 'is-collapsed': shortcutsCollapsed }"
+            :title="shortcutsCollapsed ? t('keyTree.expandShortcut') : t('keyTree.collapseShortcut')"
+            @click="shortcutsCollapsed = !shortcutsCollapsed"
           >
-            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M4 9.8 8 5.8l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            <span v-if="shortcutsCollapsed" class="shortcut-toggle-label">{{ t('keyTree.expandShortcut') }}</span>
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" :class="{ flipped: !shortcutsCollapsed }">
+              <path d="M4 6.2 8 10.2l4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
         </div>
-        <template v-if="!shortcutsCollapsed">
+        <div class="shortcut-collapse" :class="{ 'is-open': !shortcutsCollapsed }">
+        <div class="shortcut-collapse-inner">
         <div class="shortcut-body">
         <div v-if="favoriteKeys.length" class="shortcut-group">
           <div class="shortcut-title">★ {{ t('keyTree.favorites') }} · {{ favoriteKeys.length }}</div>
@@ -75,7 +65,8 @@
           </div>
         </div>
         </div>
-        </template>
+        </div>
+        </div>
       </div>
 
       <div class="tree-content">
@@ -413,8 +404,10 @@ const barNarrow = ref(false)
 // 「收藏 / 最近访问」板块的折叠状态：不做持久化，切连接或切 DB 时恢复展开
 const shortcutsCollapsed = ref(false)
 const collapsedShortcutTitle = computed(() => {
-  if (recentKeyList.value.length) return t('keyTree.recent') + ' · ' + recentKeyList.value.length
-  return t('keyTree.favorites') + ' · ' + favoriteKeys.value.length
+  const parts = []
+  if (favoriteKeys.value.length) parts.push(t('keyTree.favorites') + ' · ' + favoriteKeys.value.length)
+  if (recentKeyList.value.length) parts.push(t('keyTree.recent') + ' · ' + recentKeyList.value.length)
+  return parts.join('    ')
 })
 watch([activeConnID, () => workspaceStore.currentDB], () => {
   shortcutsCollapsed.value = false
@@ -1133,101 +1126,100 @@ function collapseVisibleTree() {
   max-height: 148px;
   overflow-y: auto;
 }
-.shortcut-block.is-collapsed {
-  padding: 2px 6px;
-  max-height: none;
-  overflow: visible;
-}
-/* 收起按钮单独占一条 16px 的顶栏，避免和下方滚动条糊在一起 */
+/* 收起态不改 padding，避免展开/收起时高度额外跳一下 */
+/* 顶栏：收起时左侧显示统计标题，右侧是「展开 ⌄」；展开时只有右上角一个 ⌃ */
 .shortcut-head {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  gap: 8px;
   height: 16px;
   flex-shrink: 0;
-  margin: -2px -2px 0 0;
+}
+.shortcut-collapsed-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.key-tree.theme-dark .shortcut-collapsed-title {
+  color: #94a3b8;
 }
 .shortcut-toggle {
-  width: 16px;
-  height: 16px;
+  margin-left: auto;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 0;
+  gap: 3px;
+  height: 16px;
+  padding: 0 2px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
   color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   transition: color var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out);
+}
+.shortcut-toggle-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .shortcut-toggle svg {
   width: 12px;
   height: 12px;
   display: block;
+  flex: 0 0 auto;
+  transition: transform var(--motion-fast) var(--ease-out);
+}
+/* 展开态箭头翻转朝上，收起态朝下 */
+.shortcut-toggle svg.flipped {
+  transform: rotate(180deg);
 }
 .shortcut-toggle:hover {
   color: #475569;
   background: rgba(241, 245, 249, 0.95);
   border-color: rgba(203, 213, 225, 0.9);
 }
+.shortcut-toggle.is-collapsed {
+  color: #2563eb;
+  padding: 0 4px;
+}
+.shortcut-toggle.is-collapsed:hover {
+  color: #1d4ed8;
+  background: rgba(239, 246, 255, 0.95);
+  border-color: rgba(191, 219, 254, 0.9);
+}
 .key-tree.theme-dark .shortcut-toggle:hover {
   color: #e2e8f0;
   background: rgba(30, 41, 59, 0.95);
   border-color: rgba(71, 85, 105, 0.95);
 }
-/* 收起后的一行：左侧标题，右侧「展开 + 箭头」，整行可点 */
-.shortcut-collapsed-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  padding: 5px 6px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
-}
-.shortcut-collapsed-bar:hover {
-  background: rgba(241, 245, 249, 0.95);
-  color: #334155;
-}
-.key-tree.theme-dark .shortcut-collapsed-bar {
-  color: #94a3b8;
-}
-.key-tree.theme-dark .shortcut-collapsed-bar:hover {
-  background: rgba(30, 41, 59, 0.95);
-  color: #e2e8f0;
-}
-.shortcut-collapsed-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.shortcut-expand {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  flex: 0 0 auto;
-  white-space: nowrap;
-  color: #2563eb;
-}
-.shortcut-expand svg {
-  width: 11px;
-  height: 11px;
-  display: block;
-}
-.key-tree.theme-dark .shortcut-expand {
+.key-tree.theme-dark .shortcut-toggle.is-collapsed {
   color: #93c5fd;
+}
+.key-tree.theme-dark .shortcut-toggle.is-collapsed:hover {
+  color: #dbeafe;
+  background: rgba(30, 64, 175, 0.3);
+  border-color: rgba(96, 165, 250, 0.5);
+}
+/* 展开/收起用 grid-template-rows 补间，内容高度自适应且不会突跳 */
+.shortcut-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--motion-base) var(--ease-out);
+}
+.shortcut-collapse.is-open {
+  grid-template-rows: 1fr;
+}
+.shortcut-collapse-inner {
+  overflow: hidden;
+  min-height: 0;
 }
 /* 当前正在查看的 key 在列表里高亮 */
 .shortcut-row.active {
