@@ -100,3 +100,63 @@ test('没有可见行时安全返回', () => {
     false
   )
 })
+
+function makeScroller(box, metrics) {
+  const scroller = {
+    __style: { overflowY: 'auto' },
+    scrollTop: 0,
+    scrollHeight: metrics.scrollHeight,
+    clientHeight: metrics.clientHeight,
+    getBoundingClientRect: () => box,
+    parentElement: null,
+  }
+  return scroller
+}
+
+test('revealRow 把行滚进最近的滚动容器（下方越界）', async () => {
+  const { revealRow } = await import('./keyboard.js')
+  globalThis.window = { getComputedStyle: (node) => node.__style }
+  globalThis.document = { body: {}, documentElement: {} }
+
+  const scroller = makeScroller({ top: 100, bottom: 300 }, { scrollHeight: 1000, clientHeight: 200 })
+  const row = {
+    getBoundingClientRect: () => ({ top: 260, bottom: 340 }),
+    parentElement: scroller,
+  }
+  revealRow(row)
+  // 下边界 300 - 8 = 292，行底 340 越界 48
+  assert.equal(scroller.scrollTop, 48)
+})
+
+test('revealRow 把行滚进最近的滚动容器（上方越界）', async () => {
+  const { revealRow } = await import('./keyboard.js')
+  globalThis.window = { getComputedStyle: (node) => node.__style }
+  globalThis.document = { body: {}, documentElement: {} }
+
+  const scroller = makeScroller({ top: 100, bottom: 300 }, { scrollHeight: 1000, clientHeight: 200 })
+  const row = {
+    getBoundingClientRect: () => ({ top: 90, bottom: 120 }),
+    parentElement: scroller,
+  }
+  revealRow(row)
+  // 上边界 100 + 8 = 108，行顶 90 越界 18
+  assert.equal(scroller.scrollTop, -18)
+})
+
+test('行完全可见时不滚动', async () => {
+  const { revealRow } = await import('./keyboard.js')
+  globalThis.window = { getComputedStyle: (node) => node.__style }
+  globalThis.document = { body: {}, documentElement: {} }
+
+  const scroller = makeScroller({ top: 100, bottom: 300 }, { scrollHeight: 1000, clientHeight: 200 })
+  const row = { getBoundingClientRect: () => ({ top: 150, bottom: 180 }), parentElement: scroller }
+  revealRow(row)
+  assert.equal(scroller.scrollTop, 0)
+})
+
+test('找不到可滚动容器时安全返回', async () => {
+  const { revealRow } = await import('./keyboard.js')
+  const row = { getBoundingClientRect: () => ({ top: 0, bottom: 10 }), parentElement: null }
+  revealRow(row)
+  revealRow(null)
+})

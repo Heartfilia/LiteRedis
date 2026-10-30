@@ -59,9 +59,36 @@ export function moveRovingFocus(event, container, selector) {
       return false
   }
   event.preventDefault()
-  rows[next].focus()
-  if (typeof rows[next].scrollIntoView === 'function') {
-    rows[next].scrollIntoView({ block: 'nearest' })
+  const target = rows[next]
+  // 手动滚，不用 scrollIntoView：树里 .node-row 带 content-visibility: auto，
+  // 屏幕外的行没有真实布局，scrollIntoView 会滚不到位甚至不滚
+  try {
+    target.focus({ preventScroll: true })
+  } catch (e) {
+    target.focus()
   }
+  revealRow(target)
   return true
+}
+
+// 把某一行滚进最近的滚动容器（左右/上下留 8px 余量）
+export function revealRow(row) {
+  if (!row || typeof row.getBoundingClientRect !== 'function') return
+  const rect = row.getBoundingClientRect()
+  const padding = 8
+  let node = row.parentElement
+  while (node && node !== document.body && node !== document.documentElement) {
+    const style = typeof window !== 'undefined' && window.getComputedStyle ? window.getComputedStyle(node) : null
+    const overflowY = style ? style.overflowY : ''
+    if (/(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight + 1) {
+      const box = node.getBoundingClientRect()
+      if (rect.top < box.top + padding) {
+        node.scrollTop -= box.top + padding - rect.top
+      } else if (rect.bottom > box.bottom - padding) {
+        node.scrollTop += rect.bottom - (box.bottom - padding)
+      }
+      return
+    }
+    node = node.parentElement
+  }
 }
