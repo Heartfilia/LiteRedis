@@ -408,14 +408,13 @@
           <span class="label-hint">{{ t('diagnostics.subtitle') }}</span>
         </label>
         <div class="input-unit">
-          <button type="button" class="local-api-btn" @click="showDiagnostics = true">
+          <button type="button" class="local-api-btn" @click="openDiagnostics">
             {{ t('diagnostics.open') }}
           </button>
         </div>
       </div>
     </div>
 
-    <DiagnosticsModal v-if="showDiagnostics" @close="showDiagnostics = false" />
     <InstallGuideModal v-if="showGuide" @close="showGuide = false" />
 
     <!-- floating toast -->
@@ -462,7 +461,6 @@
 import { ref, reactive, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useUpdateStore } from '../../stores/update.js'
-import DiagnosticsModal from './DiagnosticsModal.vue'
 import InstallGuideModal from '../common/InstallGuideModal.vue'
 import { useI18n } from '../../i18n/index.js'
 import { getAppVersion, getLocalAPIInfo, regenerateLocalAPIToken, exportConnectionsToFile, importConnectionsFromFile } from '../../api/wails.js'
@@ -474,7 +472,6 @@ import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 
 const { t, setLanguage } = useI18n()
 
-const emit = defineEmits(['close'])
 const settingsStore = useSettingsStore()
 
 const form = reactive({
@@ -503,7 +500,10 @@ const form = reactive({
 })
 
 const saving = ref(false)
-const showDiagnostics = ref(false)
+// 诊断面板由 App 统一渲染，这里只发事件
+function openDiagnostics() {
+  window.dispatchEvent(new CustomEvent('literedis:open-diagnostics'))
+}
 const showGuide = ref(false)
 const exportConfirming = ref(false)
 const importing = ref(false)

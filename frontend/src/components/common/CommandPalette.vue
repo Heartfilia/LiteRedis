@@ -30,7 +30,8 @@
               :key="item.id"
               type="button"
               class="cmdk-item"
-              :class="{ active: item.index === activeIndex }"
+              :class="{ active: item.index === activeIndex, disabled: item.disabled }"
+              :aria-disabled="item.disabled ? 'true' : undefined"
               @mouseenter="activeIndex = item.index"
               @click="run(item.index)"
             >
@@ -57,6 +58,7 @@ import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
+import { copyToClipboard } from '../../utils/clipboard.js'
 import { getDatabases } from '../../api/wails.js'
 
 const emit = defineEmits(['close'])
@@ -78,6 +80,24 @@ function close() {
   emit('close')
 }
 
+const activeConn = computed(() => {
+  const id = workspaceStore.activeConnID
+  return (connectionsStore.connections || []).find((conn) => conn.id === id) || null
+})
+const connReady = computed(() => !!activeConn.value && connectionsStore.isConnected(activeConn.value.id))
+const activeKey = computed(() => workspaceStore.selectedKey || '')
+
+// 连接级面板由 Sidebar 里的监听器打开，这里只负责发事件
+function emitUiEvent(name) {
+  window.dispatchEvent(new CustomEvent(name))
+}
+
+async function copyActiveKey() {
+  if (!activeKey.value) return
+  const ok = await copyToClipboard(activeKey.value)
+  connectionsStore.showGlobalToast(ok ? t('cmdk.copiedKey') : t('cmdk.copyFailed'), ok)
+}
+
 // 动作：只放全局能直接执行的，避免引入跨组件的事件总线
 const actions = computed(() => {
   const items = []
@@ -97,11 +117,55 @@ const actions = computed(() => {
       run: () => openSettings(),
     })
   }
+  const connHint = connReady.value
+    ? activeConn.value.name || workspaceStore.activeConnID
+    : t('cmdk.needConnection')
+  items.push({
+    id: 'action:console',
+    label: t('cmdk.openConsole'),
+    hint: connReady.value && activeConn.value.is_cluster ? t('cmdk.clusterUnsupported') : connHint,
+    disabled: !connReady.value || !!activeConn.value.is_cluster,
+    run: () => emitUiEvent('literedis:open-overview'),
+  })
+  items.push({
+    id: 'action:pubsub',
+    label: t('cmdk.openPubSub'),
+    hint: connHint,
+    disabled: !connReady.value,
+    run: () => emitUiEvent('literedis:open-pubsub'),
+  })
+  items.push({
+    id: 'action:monitor',
+    label: t('cmdk.openMonitor'),
+    hint: connHint,
+    disabled: !connReady.value,
+    run: () => emitUiEvent('literedis:open-monitor'),
+  })
+  items.push({
+    id: 'action:memory',
+    label: t('cmdk.openMemory'),
+    hint: connHint,
+    disabled: !connReady.value,
+    run: () => emitUiEvent('literedis:open-memory'),
+  })
+  items.push({
+    id: 'action:diagnostics',
+    label: t('cmdk.openDiagnostics'),
+    hint: t('cmdk.hintDiagnostics'),
+    run: () => emitUiEvent('literedis:open-diagnostics'),
+  })
+  items.push({
+    id: 'action:copy-key',
+    label: t('cmdk.copyKey'),
+    hint: activeKey.value || t('cmdk.needKey'),
+    disabled: !activeKey.value,
+    run: () => copyActiveKey(),
+  })
   items.push({
     id: 'action:refresh',
     label: t('cmdk.refreshKey'),
     hint: '⌘R',
-    run: () => window.dispatchEvent(new CustomEvent('literedis:refresh-key')),
+    run: () => emitUiEvent('literedis:refresh-key'),
   })
   items.push({
     id: 'action:theme',
@@ -189,7 +253,12 @@ const groupedResults = computed(() => {
 function move(delta) {
   const total = results.value.length
   if (!total) return
-  activeIndex.value = (activeIndex.value + delta + total) % total
+  // 跳过暂时用不了的条目（比如没连接时的连接级面板）
+  for (let step = 0; step < total; step++) {
+    const next = (activeIndex.value + delta + total) % total
+    activeIndex.value = next
+    if (!results.value[next].disabled) break
+  }
   scrollActiveIntoView()
 }
 
@@ -203,11 +272,16 @@ function scrollActiveIntoView() {
 }
 
 function run(index) {
-  const item = results.value[typeof index === 'number' ? index : activeIndex.value]
-  if (!item) return
+  const current = results.value[typeof index === 'number' ? index : activeIndex.value]
+  if (!current) return
+  if (current.disabled) {
+    // 面板留着，只提示为什么不能执行
+    connectionsStore.showGlobalToast(current.hint || t('cmdk.needConnection'), false)
+    return
+  }
   close()
   try {
-    item.run()
+    current.run()
   } catch (e) {
     // 动作失败不应该让面板卡住
   }
@@ -325,6 +399,12 @@ onBeforeUnmount(() => {
 .cmdk-item.active {
   background: rgba(239, 246, 255, 0.96);
 }
+.cmdk-item.disabled .cmdk-item-label {
+  color: #a2aec0;
+}
+.cmdk-item.disabled .cmdk-item-hint {
+  color: #c3cdd9;
+}
 .cmdk-item-label {
   flex: 1;
   min-width: 0;
@@ -368,6 +448,8 @@ onBeforeUnmount(() => {
 .cmdk-overlay.theme-dark .cmdk-input { color: #e2e8f0; }
 .cmdk-overlay.theme-dark .cmdk-item.active { background: rgba(30, 64, 175, 0.32); }
 .cmdk-overlay.theme-dark .cmdk-item-label { color: #cbd5e1; }
+.cmdk-overlay.theme-dark .cmdk-item.disabled .cmdk-item-label { color: #64748b; }
+.cmdk-overlay.theme-dark .cmdk-item.disabled .cmdk-item-hint { color: #526379; }
 .cmdk-overlay.theme-dark .cmdk-item.active .cmdk-item-label { color: #dbeafe; }
 .cmdk-overlay.theme-dark .cmdk-footer {
   border-top-color: rgba(51, 65, 85, 0.94);

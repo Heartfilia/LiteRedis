@@ -8,6 +8,7 @@
       @close="showConnManager = false"
     />
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
+    <DiagnosticsModal v-if="showDiagnostics" @close="showDiagnostics = false" />
     <CommandPalette v-if="showPalette" @close="showPalette = false" />
     <WelcomeWizard
       v-if="showWelcome"
@@ -36,7 +37,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onBeforeUnmount, ref, provide, Teleport, Transition, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, provide, watch } from 'vue'
 import { installGlobalShortcuts } from './utils/shortcuts.js'
 import Sidebar from './components/layout/Sidebar.vue'
 import MainContent from './components/layout/MainContent.vue'
@@ -45,6 +46,7 @@ import WhatsNewModal from './components/common/WhatsNewModal.vue'
 import WelcomeWizard from './components/common/WelcomeWizard.vue'
 import CommandPalette from './components/common/CommandPalette.vue'
 import SettingsModal from './components/settings/SettingsModal.vue'
+import DiagnosticsModal from './components/settings/DiagnosticsModal.vue'
 import { useConnectionsStore } from './stores/connections.js'
 import { useSettingsStore } from './stores/settings.js'
 import { getAppVersion, getReleaseNotes, markVersionSeen, completeOnboarding } from './api/wails.js'
@@ -55,6 +57,8 @@ const settingsStore = useSettingsStore()
 
 const showConnManager = ref(false)
 const showSettings = ref(false)
+// 诊断面板放在最外层，设置面板和命令面板都能直接打开
+const showDiagnostics = ref(false)
 const connManagerInitialConnection = ref(null)
 const fontSizeClass = computed(() => `font-${settingsStore.fontSizeLevel || 'small'}`)
 
@@ -63,6 +67,7 @@ provide('openConnManager', (connection = null) => {
   showConnManager.value = true
 })
 provide('openSettings', () => { showSettings.value = true })
+provide('openDiagnostics', () => { showDiagnostics.value = true })
 
 // ---- 每个版本第一次打开时提示「更新内容」 ----
 const showWhatsNew = ref(false)
@@ -131,6 +136,10 @@ async function closeWhatsNew() {
   }
 }
 
+function openDiagnostics() {
+  showDiagnostics.value = true
+}
+
 // ---- Cmd/Ctrl+K 命令面板 ----
 const showPalette = ref(false)
 function togglePalette() {
@@ -168,6 +177,7 @@ onMounted(async () => {
   // 屏蔽原生右键菜单（输入框/可编辑区域保留，编辑器行首的自定义菜单另行处理）
   document.addEventListener('contextmenu', suppressContextMenu)
   window.addEventListener('literedis:command-palette', togglePalette)
+  window.addEventListener('literedis:open-diagnostics', openDiagnostics)
   // 新用户先看引导；已经弹过引导就不再叠加「更新内容」弹窗
   const welcomed = await maybeShowWelcome()
   if (!welcomed) maybeShowWhatsNew()
@@ -184,6 +194,7 @@ function suppressContextMenu(e) {
 onBeforeUnmount(() => {
   document.removeEventListener('contextmenu', suppressContextMenu)
   window.removeEventListener('literedis:command-palette', togglePalette)
+  window.removeEventListener('literedis:open-diagnostics', openDiagnostics)
 })
 
 let toastTimer = null
@@ -319,7 +330,8 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
   top: 18px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 6000;
+  /* 浮在最上层：面板/弹窗里触发的提示也要能看见 */
+  z-index: 12100;
   padding: 10px 14px;
   border-radius: 11px;
   font-size: 12px;

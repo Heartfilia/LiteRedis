@@ -540,14 +540,47 @@ watch(() => diagMenu.value.visible, (visible) => {
   }
 })
 
+// 命令面板等外部入口通过 window 事件打开连接级面板
+const CONN_PANEL_EVENTS = {
+  'literedis:open-overview': 'overview',
+  'literedis:open-memory': 'memory',
+  'literedis:open-pubsub': 'pubsub',
+  'literedis:open-monitor': 'monitor',
+}
+
+function openPanelForActiveConn(kind) {
+  const conn = activeConn.value
+  if (!conn || !connectionsStore.isConnected(conn.id)) return
+  if (kind === 'overview') {
+    // 集群连接没有概览/命令台
+    if (conn.is_cluster) return
+    overviewConn.value = conn
+    return
+  }
+  if (kind === 'memory') memoryConn.value = conn
+  if (kind === 'pubsub') pubsubConn.value = conn
+  if (kind === 'monitor') monitorConn.value = conn
+}
+
+function handlePanelEvent(event) {
+  const kind = CONN_PANEL_EVENTS[event.type]
+  if (kind) openPanelForActiveConn(kind)
+}
+
 onMounted(() => {
   document.addEventListener('click', closeCtxMenu)
   document.addEventListener('click', closeDiagMenu)
+  for (const name of Object.keys(CONN_PANEL_EVENTS)) {
+    window.addEventListener(name, handlePanelEvent)
+  }
 })
 onBeforeUnmount(() => {
   if (disposeMenuEscape) disposeMenuEscape()
   document.removeEventListener('click', closeCtxMenu)
   document.removeEventListener('click', closeDiagMenu)
+  for (const name of Object.keys(CONN_PANEL_EVENTS)) {
+    window.removeEventListener(name, handlePanelEvent)
+  }
   if (toastTimer) clearTimeout(toastTimer)
   if (dragExpandTimer) clearTimeout(dragExpandTimer)
 })
