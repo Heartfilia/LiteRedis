@@ -159,3 +159,38 @@ test('big JSON values render through a windowed tree', async ({ page }) => {
   })
   await expect.poll(firstKey).not.toBe(before)
 })
+test('theme menu switches between light and dark', async ({ page }) => {
+  await installWailsMock(page, { keyCount: 20 })
+  await page.goto('/')
+
+  const layout = page.locator('.app-layout')
+  await expect(layout).toHaveClass(/theme-light/)
+
+  await page.locator('.btn-theme').click()
+  const menu = page.locator('.theme-menu')
+  await expect(menu).toBeVisible()
+  await expect(menu.locator('.theme-menu-item')).toHaveCount(3)
+
+  await menu.locator('.theme-menu-item', { hasText: '暗色' }).click()
+  await expect(layout).toHaveClass(/theme-dark/)
+  await expect(page.locator('.btn-theme')).toHaveAttribute('data-theme-pref', 'dark')
+  await expect(menu).toHaveCount(0)
+
+  await page.locator('.btn-theme').click()
+  await page.locator('.theme-menu-item', { hasText: '浅色' }).click()
+  await expect(layout).toHaveClass(/theme-light/)
+})
+
+test.describe('follow system theme', () => {
+  test.use({ colorScheme: 'dark' })
+
+  test('auto theme uses the system preference', async ({ page }) => {
+    await installWailsMock(page, { keyCount: 20 })
+    await page.goto('/')
+
+    await page.locator('.btn-theme').click()
+    await page.locator('.theme-menu-item', { hasText: '跟随系统' }).click()
+    await expect(page.locator('.app-layout')).toHaveClass(/theme-dark/)
+    await expect(page.locator('.btn-theme')).toHaveAttribute('data-theme-pref', 'auto')
+  })
+})

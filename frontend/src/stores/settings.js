@@ -11,11 +11,41 @@ export function normalizeLoadCount(value, fallback = DEFAULT_LOAD_COUNT) {
   return Math.min(10000, Math.trunc(numeric))
 }
 
+const THEME_STORAGE_KEY = 'liteRedis_themeMode'
+const THEME_PREFERENCES = ['light', 'dark', 'auto']
+
+// 主题选择：light / dark / auto（跟随系统）
+export function normalizeThemePreference(value) {
+  return THEME_PREFERENCES.includes(value) ? value : 'light'
+}
+
+// 系统当前的明暗偏好
+export function systemThemeMode() {
+  if (typeof window === 'undefined' || !window.matchMedia) return 'light'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+// 系统主题变化时，只有选了「跟随系统」才需要重算
+let systemWatcher = null
+function watchSystemTheme(store) {
+  if (systemWatcher || typeof window === 'undefined' || !window.matchMedia) return
+  const query = window.matchMedia('(prefers-color-scheme: dark)')
+  const handler = () => {
+    if (store && store.themePreference === 'auto') store.applyTheme()
+  }
+  if (query.addEventListener) query.addEventListener('change', handler)
+  else if (query.addListener) query.addListener(handler)
+  systemWatcher = query
+}
+
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
     loaded: false,
     debugMode: false,
+    // 实际生效的主题（light | dark），组件都用它拼 theme-xxx 类名
     themeMode: 'light',
+    // 用户选择（light | dark | auto），auto 跟随系统
+    themePreference: 'light',
     keyScanCount: 200,
     hashLoadCount: 20,
     listLoadCount: 20,
@@ -50,17 +80,26 @@ export const useSettingsStore = defineStore('settings', {
 
   actions: {
     applyTheme() {
+      this.themeMode = this.themePreference === 'auto' ? systemThemeMode() : this.themePreference
       if (typeof document === 'undefined') return
       document.documentElement.setAttribute('data-theme', this.themeMode)
       document.body.setAttribute('data-theme', this.themeMode)
     },
 
-    toggleTheme() {
-      this.themeMode = this.themeMode === 'dark' ? 'light' : 'dark'
+    // 切换主题：菜单里选具体的一项（light | dark | auto）
+    setTheme(preference) {
+      const next = normalizeThemePreference(preference)
+      this.themePreference = next
       try {
-        localStorage.setItem('liteRedis_themeMode', this.themeMode)
+        localStorage.setItem(THEME_STORAGE_KEY, next)
       } catch (e) {}
+      watchSystemTheme(this)
       this.applyTheme()
+    },
+
+    // 命令面板里的快捷切换：只在明暗之间切，不动「跟随系统」的选择
+    toggleTheme() {
+      this.setTheme(this.themeMode === 'dark' ? 'light' : 'dark')
     },
 
     enableDebugMode() {
@@ -70,11 +109,10 @@ export const useSettingsStore = defineStore('settings', {
     async load() {
       try {
         try {
-          const savedThemeMode = localStorage.getItem('liteRedis_themeMode')
-          if (savedThemeMode === 'light' || savedThemeMode === 'dark') {
-            this.themeMode = savedThemeMode
-          }
+          const savedThemeMode = localStorage.getItem(THEME_STORAGE_KEY)
+          if (savedThemeMode) this.themePreference = normalizeThemePreference(savedThemeMode)
         } catch (e) {}
+        watchSystemTheme(this)
         const s = await getSettings()
         this.keyScanCount = normalizeLoadCount(s.key_scan_count)
         this.hashLoadCount = normalizeLoadCount(s.hash_load_count)

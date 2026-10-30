@@ -266,17 +266,13 @@
         <div class="footer-actions">
           <button
             class="btn-icon btn-theme"
-            :title="settingsStore.themeMode === 'dark' ? '切换浅色主题' : '切换暗色主题'"
-            @click="settingsStore.toggleTheme()"
+            :class="{ 'is-open': themeMenu.visible }"
+            :title="t('sidebar.themeMenu')"
+            :data-theme-pref="settingsStore.themePreference"
+            @click.stop="toggleThemeMenu"
           >
             <span class="btn-icon-glyph" aria-hidden="true">
-              <svg v-if="settingsStore.themeMode === 'dark'" viewBox="0 0 24 24" fill="none">
-                <path d="M18 14.5A7.5 7.5 0 119.5 6 6 6 0 0018 14.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-              </svg>
-              <svg v-else viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/>
-                <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9L5.3 5.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              </svg>
+              <ThemeIcon :name="themeIconName" />
             </span>
           </button>
           <button class="btn-icon" :title="t('sidebar.manageConn')" @click="openConnManager()">
@@ -370,6 +366,31 @@
     </Teleport>
 
     <Teleport to="body">
+      <div
+        v-if="themeMenu.visible"
+        class="theme-menu pop-in-up"
+        :class="'theme-' + resolvedThemeMode"
+        :style="{ left: themeMenu.left + 'px', bottom: themeMenu.bottom + 'px' }"
+        @mousedown.stop
+        @click.stop
+      >
+        <div class="theme-menu-title">{{ t('sidebar.themeMenu') }}</div>
+        <button
+          v-for="option in THEME_OPTIONS"
+          :key="option.value"
+          type="button"
+          class="theme-menu-item"
+          :class="{ active: settingsStore.themePreference === option.value }"
+          @click="pickTheme(option.value)"
+        >
+          <span class="theme-menu-icon" aria-hidden="true"><ThemeIcon :name="option.value" /></span>
+          <span class="theme-menu-label">{{ t(option.labelKey) }}</span>
+          <span v-if="settingsStore.themePreference === option.value" class="theme-menu-check">✓</span>
+        </button>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
       <Transition name="toast">
         <div v-if="toastMsg" class="sidebar-toast" :class="toastOk ? 'ok' : 'err'">{{ toastMsg }}</div>
       </Transition>
@@ -421,6 +442,7 @@ import RealtimeMonitorModal from '../connections/RealtimeMonitorModal.vue'
 import PubSubModal from '../connections/PubSubModal.vue'
 import { formatDebugMessage } from '../../utils/debug.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
+import ThemeIcon from '../common/ThemeIcon.vue'
 
 const props = defineProps({
   themeMode: {
@@ -454,6 +476,45 @@ const connectedConnections = computed(() =>
   connectionsStore.connections.filter(c => connectionsStore.isConnected(c.id))
 )
 const hasConnections = computed(() => connectionsStore.connections.length > 0)
+// —— 主题切换菜单（浅色 / 暗色 / 跟随系统，后续主题效果继续往这里加）——
+const THEME_OPTIONS = [
+  { value: 'light', labelKey: 'sidebar.themeLight' },
+  { value: 'dark', labelKey: 'sidebar.themeDark' },
+  { value: 'auto', labelKey: 'sidebar.themeAuto' },
+]
+const themeMenu = ref({ visible: false, left: 0, bottom: 0 })
+// 按钮上显示当前选择对应的图标（跟随系统用显示器图标）
+const themeIconName = computed(() => {
+  if (settingsStore.themePreference === 'auto') return 'auto'
+  return settingsStore.themeMode === 'dark' ? 'dark' : 'light'
+})
+
+function toggleThemeMenu(event) {
+  if (themeMenu.value.visible) {
+    themeMenu.value.visible = false
+    return
+  }
+  const rect = event.currentTarget.getBoundingClientRect()
+  themeMenu.value = {
+    visible: true,
+    left: Math.round(Math.max(8, Math.min(rect.left, window.innerWidth - 190))),
+    // 从按钮位置向上弹出
+    bottom: Math.round(window.innerHeight - rect.top + 8),
+  }
+}
+
+function pickTheme(value) {
+  settingsStore.setTheme(value)
+  themeMenu.value.visible = false
+}
+
+function closeThemeMenu(event) {
+  if (!themeMenu.value.visible) return
+  const target = event && event.target
+  if (target && target.closest && target.closest('.theme-menu, .btn-theme')) return
+  themeMenu.value.visible = false
+}
+
 const overviewConn = ref(null)
 // 命令面板点了「最近命令」时，带一条命令进命令台直接执行
 const overviewCommand = ref('')
@@ -530,6 +591,19 @@ function pickDiag(kind) {
   }
 }
 
+// 主题菜单打开期间接管 Esc
+let disposeThemeEscape = null
+watch(() => themeMenu.value.visible, (visible) => {
+  if (visible) {
+    disposeThemeEscape = registerEscapeHandler(() => { themeMenu.value.visible = false })
+    return
+  }
+  if (disposeThemeEscape) {
+    disposeThemeEscape()
+    disposeThemeEscape = null
+  }
+})
+
 // 菜单打开期间接管 Esc
 let disposeMenuEscape = null
 watch(() => diagMenu.value.visible, (visible) => {
@@ -587,6 +661,7 @@ function handleRunCommand(event) {
 onMounted(() => {
   document.addEventListener('click', closeCtxMenu)
   document.addEventListener('click', closeDiagMenu)
+  document.addEventListener('click', closeThemeMenu)
   for (const name of Object.keys(CONN_PANEL_EVENTS)) {
     window.addEventListener(name, handlePanelEvent)
   }
@@ -596,6 +671,8 @@ onBeforeUnmount(() => {
   if (disposeMenuEscape) disposeMenuEscape()
   document.removeEventListener('click', closeCtxMenu)
   document.removeEventListener('click', closeDiagMenu)
+  document.removeEventListener('click', closeThemeMenu)
+  if (disposeThemeEscape) disposeThemeEscape()
   for (const name of Object.keys(CONN_PANEL_EVENTS)) {
     window.removeEventListener(name, handlePanelEvent)
   }
@@ -1704,6 +1781,74 @@ async function disconnectConn(id) {
 }
 .ctx-menu.theme-dark .ctx-divider {
   background: rgba(51, 65, 85, 0.88);
+}
+
+.theme-menu {
+  position: fixed;
+  z-index: 2100;
+  min-width: 168px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(203, 213, 225, 0.94);
+  background: #fff;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.05);
+}
+.theme-menu-title {
+  padding: 4px 8px 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+.theme-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.theme-menu-item:hover,
+.theme-menu-item.active {
+  background: rgba(239, 246, 255, 0.96);
+  color: #1d4ed8;
+}
+.theme-menu-icon {
+  display: inline-flex;
+  color: #64748b;
+}
+.theme-menu-item.active .theme-menu-icon {
+  color: #1d4ed8;
+}
+.theme-menu-label { flex: 1; }
+.theme-menu-check { font-size: 11px; color: #1d4ed8; }
+.theme-menu.theme-dark {
+  background: rgba(15, 23, 42, 0.98);
+  border-color: rgba(71, 85, 105, 0.92);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.5);
+}
+.theme-menu.theme-dark .theme-menu-title { color: #64748b; }
+.theme-menu.theme-dark .theme-menu-item { color: #cbd5e1; }
+.theme-menu.theme-dark .theme-menu-item:hover,
+.theme-menu.theme-dark .theme-menu-item.active {
+  background: rgba(30, 41, 59, 0.94);
+  color: #dbeafe;
+}
+.theme-menu.theme-dark .theme-menu-icon { color: #94a3b8; }
+.theme-menu.theme-dark .theme-menu-item.active .theme-menu-icon { color: #93c5fd; }
+.theme-menu.theme-dark .theme-menu-check { color: #93c5fd; }
+.btn-icon.btn-theme.is-open {
+  background: rgba(239, 246, 255, 0.96);
+  color: #1d4ed8;
 }
 
 .sidebar-toast {
