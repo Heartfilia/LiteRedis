@@ -6,9 +6,18 @@
         :key="tab.id"
         type="button"
         class="conn-tab"
-        :class="{ active: tab.id === workspaceStore.activeConnID, off: !tab.connected }"
+        :class="[
+          { active: tab.id === workspaceStore.activeConnID, off: !tab.connected, dragging: dragId === tab.id },
+          dropClass(tab.id),
+        ]"
         :title="tab.title"
+        draggable="true"
         @click="activate(tab)"
+        @auxclick="onAuxClick($event, tab.id)"
+        @dragstart="onDragStart(tab.id, $event)"
+        @dragover.prevent="onDragOver(tab.id, $event)"
+        @drop.prevent="onDrop(tab.id)"
+        @dragend="onDragEnd"
       >
         <span class="tab-dot" :class="{ on: tab.connected }" />
         <span class="tab-name">{{ tab.name }}</span>
@@ -21,7 +30,7 @@
 </template>
 
 <script setup>
-import { computed, inject, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -51,7 +60,71 @@ const tabs = computed(() =>
     .filter(Boolean)
 )
 
+// —— 拖拽排序 / 中键关闭 ——
+const dragId = ref('')
+const dropTarget = ref({ id: '', placement: 'before' })
+// 拖拽松手那一下浏览器还会派发 click，短暂屏蔽避免误切换
+let suppressClickUntil = 0
+
+function onDragStart(id, event) {
+  dragId.value = id
+  dropTarget.value = { id: '', placement: 'before' }
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    try { event.dataTransfer.setData('text/plain', id) } catch (e) {}
+  }
+}
+
+function onDragOver(id, event) {
+  if (!dragId.value || dragId.value === id) return
+  const rect = event.currentTarget.getBoundingClientRect()
+  const placement = event.clientX - rect.left > rect.width / 2 ? 'after' : 'before'
+  dropTarget.value = { id, placement }
+}
+
+function dropClass(id) {
+  if (!dragId.value || dropTarget.value.id !== id) return ''
+  return dropTarget.value.placement === 'after' ? 'drop-after' : 'drop-before'
+}
+
+function onDrop(id) {
+  const source = dragId.value
+  if (!source || source === id) {
+    onDragEnd()
+    return
+  }
+  moveTab(source, id, dropTarget.value.placement)
+  onDragEnd()
+}
+
+function onDragEnd() {
+  if (dragId.value) suppressClickUntil = Date.now() + 240
+  dragId.value = ''
+  dropTarget.value = { id: '', placement: 'before' }
+}
+
+function moveTab(sourceId, targetId, placement) {
+  const list = [...(workspaceStore.openTabs || [])]
+  const from = list.indexOf(sourceId)
+  if (from === -1 || !list.includes(targetId)) return
+  list.splice(from, 1)
+  let insertAt = list.indexOf(targetId)
+  if (insertAt === -1) insertAt = list.length
+  if (placement === 'after') insertAt += 1
+  list.splice(insertAt, 0, sourceId)
+  if (list.join(',') === (workspaceStore.openTabs || []).join(',')) return
+  workspaceStore.openTabs = list
+}
+
+function onAuxClick(event, id) {
+  // 中键关闭，和浏览器标签页的习惯保持一致
+  if (event.button !== 1) return
+  event.preventDefault()
+  closeTab(id)
+}
+
 async function activate(tab) {
+  if (Date.now() < suppressClickUntil) return
   if (tab.id === workspaceStore.activeConnID) return
   const conn = (connectionsStore.connections || []).find((item) => item.id === tab.id)
   if (!conn) return
@@ -122,6 +195,7 @@ watch(
   display: none;
 }
 .conn-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -150,6 +224,26 @@ watch(
 }
 .conn-tab.off {
   color: #94a3b8;
+}
+/* 拖拽中的标签变淡，目标位置画一条竖线 */
+.conn-tab.dragging {
+  opacity: 0.45;
+}
+.conn-tab.drop-before::after,
+.conn-tab.drop-after::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: #3b82f6;
+}
+.conn-tab.drop-before::after { left: -4px; }
+.conn-tab.drop-after::after { right: -4px; }
+.conn-tabs.theme-dark .conn-tab.drop-before::after,
+.conn-tabs.theme-dark .conn-tab.drop-after::after {
+  background: #60a5fa;
 }
 .tabs-empty {
   font-size: 11px;
