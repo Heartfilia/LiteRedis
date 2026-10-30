@@ -27,17 +27,18 @@
             </svg>
           </span>
         </button>
-        <button
-          v-else
-          type="button"
-          class="shortcut-toggle"
-          :title="t('keyTree.collapseShortcut')"
-          @click="shortcutsCollapsed = true"
-        >
-          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M4 9.8 8 5.8l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
+        <div v-else class="shortcut-head">
+          <button
+            type="button"
+            class="shortcut-toggle"
+            :title="t('keyTree.collapseShortcut')"
+            @click="shortcutsCollapsed = true"
+          >
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M4 9.8 8 5.8l4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </div>
         <template v-if="!shortcutsCollapsed">
         <div class="shortcut-body">
         <div v-if="favoriteKeys.length" class="shortcut-group">
@@ -1137,14 +1138,19 @@ function collapseVisibleTree() {
   max-height: none;
   overflow: visible;
 }
-/* 板块右上角的收起按钮 */
+/* 收起按钮单独占一条 16px 的顶栏，避免和下方滚动条糊在一起 */
+.shortcut-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 16px;
+  flex-shrink: 0;
+  margin: -2px -2px 0 0;
+}
 .shortcut-toggle {
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  z-index: 2;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
