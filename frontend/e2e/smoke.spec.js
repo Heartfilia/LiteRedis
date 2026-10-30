@@ -131,3 +131,31 @@ test('command palette finds keys in the current database', async ({ page }) => {
   await expect(page.locator('.cmdk-group-title', { hasText: '匹配的 key' })).toBeVisible()
   await expect(page.locator('.cmdk-item-label', { hasText: 'user:1:field:1' }).first()).toBeVisible()
 })
+test('big JSON values render through a windowed tree', async ({ page }) => {
+  await installWailsMock(page, { keyCount: 60 })
+  await page.goto('/')
+  await connectFirst(page)
+  await expandAll(page)
+
+  // 打开一个 string key，切到树形视图
+  await page.locator('.tree-scroll .node-row.leaf-row').first().click()
+  const treeBtn = page.locator('.string-editor .btn-json', { hasText: '树形' })
+  await expect(treeBtn).toBeVisible()
+  await treeBtn.click()
+
+  const jsonTree = page.locator('.json-viewer .json-tree')
+  await expect(jsonTree).toBeVisible()
+  await expect(page.locator('.json-tree .json-row').first()).toBeVisible()
+
+  // 3000 个字段全部展开，但 DOM 里只保留可视区附近的行
+  const rendered = await page.locator('.json-tree [data-vrow]').count()
+  expect(rendered).toBeGreaterThan(5)
+  expect(rendered).toBeLessThan(200)
+
+  const firstKey = () => page.locator('.json-tree [data-vrow]').first().getAttribute('data-vkey')
+  const before = await firstKey()
+  await jsonTree.evaluate((el) => {
+    el.scrollTop = Math.floor(el.scrollHeight / 2)
+  })
+  await expect.poll(firstKey).not.toBe(before)
+})

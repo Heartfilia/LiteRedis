@@ -16,7 +16,7 @@
       </button>
     </div>
     <div class="json-viewer-body">
-      <JsonTree :data="data" :depth="0" :wrap="wrap" />
+      <JsonTree :data="data" :wrap="wrap" />
     </div>
   </div>
 </template>
@@ -123,7 +123,8 @@ const wrap = ref(false)
 .json-viewer-body {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  display: flex;
+  overflow: hidden;
   padding: 4px 8px 10px;
 }
 </style>

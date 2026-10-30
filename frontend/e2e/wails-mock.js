@@ -69,7 +69,15 @@ export async function installWailsMock(page, options = {}) {
           next_cursor: 0,
           has_more: false,
         }),
-        GetValue: () => ({ key: '', type: 'string', string_val: '' }),
+        GetValue: () => ({
+          key: '',
+          type: 'string',
+          string_val: JSON.stringify(
+            Object.fromEntries(
+              Array.from({ length: 3000 }, (_, i) => ['field_' + String(i).padStart(4, '0'), 'value-' + i + '-' + 'x'.repeat(20)])
+            )
+          ),
+        }),
         GetConnectionOverview: () => ({
           host: '127.0.0.1',
           port: 6379,

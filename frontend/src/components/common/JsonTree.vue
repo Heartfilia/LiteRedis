@@ -1,25 +1,27 @@
 <template>
-  <div class="json-tree">
-    <div class="json-row" :class="{ 'is-wrap': wrap }" @click="toggle" @contextmenu.stop.prevent="openNodeMenu">
-      <span v-if="isContainer" class="json-caret">{{ collapsed ? '▸' : '▾' }}</span>
+  <div ref="rootRef" class="json-tree">
+    <div v-if="topPad" class="json-pad" :style="{ height: topPad + 'px' }" aria-hidden="true" />
+    <div
+      v-for="row in windowRows"
+      :key="row.path"
+      class="json-row"
+      :class="{ 'is-wrap': wrap }"
+      data-vrow
+      :data-vkey="row.path"
+      :data-vindex="row.index"
+      @click="toggleRow(row)"
+      @contextmenu.stop.prevent="openNodeMenu($event, row)"
+    >
+      <span v-if="row.isContainer" class="json-caret">{{ expandedPaths.has(row.path) ? '▾' : '▸' }}</span>
       <span v-else class="json-caret placeholder" />
-      <span v-if="label !== null" class="json-key">{{ label }}</span>
-      <span v-if="label !== null" class="json-sep">:</span>
-      <span v-if="!isContainer" class="json-value" :class="valueClass">{{ displayValue }}</span>
-      <span v-else class="json-summary">{{ summary }}</span>
+      <span v-if="row.label !== null" class="json-key">{{ row.label }}</span>
+      <span v-if="row.label !== null" class="json-sep">:</span>
+      <span v-if="!row.isContainer" class="json-value" :class="valueClass(row.value)">{{ displayValue(row.value) }}</span>
+      <span v-else class="json-summary">{{ summary(row) }}</span>
     </div>
-    <div v-if="isContainer && !collapsed">
-      <JsonTree
-        v-for="child in children"
-        :key="child.key"
-        :data="child.value"
-        :label="child.label"
-        :depth="depth + 1"
-        :wrap="wrap"
-      />
-    </div>
+    <div v-if="bottomPad" class="json-pad" :style="{ height: bottomPad + 'px' }" aria-hidden="true" />
 
-    <Teleport v-if="isRoot" to="body">
+    <Teleport to="body">
       <div
         v-if="menu.visible"
         class="json-menu pop-in"
@@ -43,15 +45,15 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
+import { flattenJsonRows } from '../../utils/jsonTree.js'
+import { useVariableVirtualizer } from '../../utils/virtualList.js'
 
 const props = defineProps({
   data: { type: null, default: null },
-  label: { type: [String, Number], default: null },
-  depth: { type: Number, default: 0 },
   wrap: { type: Boolean, default: false },
 })
 
@@ -59,54 +61,82 @@ const { t } = useI18n()
 const settingsStore = useSettingsStore()
 const theme = computed(() => settingsStore.themeMode || 'light')
 
-const isArray = computed(() => Array.isArray(props.data))
-const isContainer = computed(() => props.data !== null && typeof props.data === 'object')
-
-const children = computed(() => {
-  if (!isContainer.value) return []
-  if (isArray.value) {
-    return props.data.map((value, index) => ({ key: String(index), label: index, value }))
+// 展开状态按路径记；根节点默认展开，其余默认折叠，避免大 JSON 一屏铺满
+const expandedPaths = ref(new Set(['']))
+watch(
+  () => props.data,
+  () => {
+    expandedPaths.value = new Set([''])
   }
-  return Object.keys(props.data).map(key => ({ key, label: key, value: props.data[key] }))
+)
+
+const rows = computed(() => flattenJsonRows(props.data, (path) => expandedPaths.value.has(path)))
+
+// 大 JSON 只渲染可视区附近的行；换行模式下行高不固定，用变高窗口
+const rootRef = ref(null)
+const virtualizer = useVariableVirtualizer({
+  containerRef: rootRef,
+  items: rows,
+  keyOf: (row) => row.path,
+  resetToken: () => props.data,
+  estimate: () => (props.wrap ? 44 : 22),
+  overscan: 10,
+  threshold: 200,
+})
+// 换行开关会改变每行高度，量一量让窗口重新对齐
+watch(
+  () => props.wrap,
+  () => {
+    nextTick(() => virtualizer.measureRows())
+  }
+)
+
+const topPad = computed(() => virtualizer.topPad.value)
+const bottomPad = computed(() => virtualizer.bottomPad.value)
+const windowRows = computed(() => {
+  const list = rows.value
+  if (!virtualizer.active.value) {
+    return list.map((row, index) => ({ ...row, index }))
+  }
+  const start = virtualizer.start.value
+  const end = virtualizer.end.value
+  const out = []
+  for (let i = start; i < end; i++) {
+    out.push({ ...list[i], index: i })
+  }
+  return out
 })
 
-// 第一层展开，更深的默认折叠，避免大 JSON 一屏铺满
-const collapsed = ref(props.depth >= 1)
-watch(() => props.data, () => {
-  collapsed.value = props.depth >= 1
-})
+function toggleRow(row) {
+  if (!row.isContainer) return
+  const next = new Set(expandedPaths.value)
+  if (next.has(row.path)) next.delete(row.path)
+  else next.add(row.path)
+  expandedPaths.value = next
+}
 
-const summary = computed(() => {
-  if (!isContainer.value) return ''
-  const count = children.value.length
-  return (isArray.value ? '[' : '{') + ' ' + count + ' 项 ' + (isArray.value ? ']' : '}')
-})
+function summary(row) {
+  const value = row.value
+  const isArray = Array.isArray(value)
+  const count = isArray ? value.length : Object.keys(value).length
+  return (isArray ? '[' : '{') + ' ' + count + ' 项 ' + (isArray ? ']' : '}')
+}
 
-const valueClass = computed(() => {
-  const value = props.data
+function valueClass(value) {
   if (value === null) return 'null'
   if (typeof value === 'string') return 'string'
   if (typeof value === 'number') return 'number'
   if (typeof value === 'boolean') return 'boolean'
   return 'string'
-})
+}
 
-const displayValue = computed(() => {
-  const value = props.data
+function displayValue(value) {
   if (value === null) return 'null'
   if (typeof value === 'string') return '"' + value + '"'
   return String(value)
-})
-
-function toggle() {
-  if (!isContainer.value) return
-  collapsed.value = !collapsed.value
 }
 
-// ---- 右键菜单：只有根节点渲染菜单，子节点共用同一份状态 ----
-const injectedMenu = inject('jsonTreeMenu', null)
-const isRoot = injectedMenu === null
-
+// ---- 右键菜单：复制 key / value ----
 const menu = reactive({ visible: false, x: 0, y: 0, key: '', value: '' })
 const tip = ref('')
 const tipX = ref(0)
@@ -117,29 +147,24 @@ function valueText(value) {
   if (value === undefined) return ''
   if (value === null) return 'null'
   if (typeof value === 'object') {
-    try { return JSON.stringify(value, null, 2) } catch (e) { return String(value) }
+    try {
+      return JSON.stringify(value, null, 2)
+    } catch (e) {
+      return String(value)
+    }
   }
   return String(value)
 }
 
-function openMenu(event, key, value) {
-  if (key === null || key === undefined) return
-  menu.key = String(key)
-  menu.value = valueText(value)
+function openNodeMenu(event, row) {
+  if (row.label === null || row.label === undefined) return
+  menu.key = String(row.label)
+  menu.value = valueText(row.value)
   const width = 150
   const height = 84
   menu.x = Math.max(8, Math.min(event.clientX, window.innerWidth - width - 8))
   menu.y = Math.max(8, Math.min(event.clientY, window.innerHeight - height - 8))
   menu.visible = true
-}
-
-const menuApi = { open: openMenu }
-if (isRoot) provide('jsonTreeMenu', menuApi)
-
-const nodeMenu = isRoot ? menuApi : injectedMenu
-
-function openNodeMenu(event) {
-  nodeMenu.open(event, props.label, props.data)
 }
 
 function showTip(text) {
@@ -170,18 +195,15 @@ function onDocumentMousedown(event) {
 function onDocumentKeydown(event) {
   if (event.key === 'Escape' && menu.visible) {
     menu.visible = false
-    event.stopPropagation()
   }
 }
 
 onMounted(() => {
-  if (!isRoot) return
   document.addEventListener('mousedown', onDocumentMousedown, true)
   document.addEventListener('keydown', onDocumentKeydown, true)
 })
 
 onBeforeUnmount(() => {
-  if (!isRoot) return
   document.removeEventListener('mousedown', onDocumentMousedown, true)
   document.removeEventListener('keydown', onDocumentKeydown, true)
   if (tipTimer) clearTimeout(tipTimer)
@@ -189,10 +211,18 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* 自己就是滚动容器，窗口化才能拿到准确的视口高度 */
 .json-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   line-height: 1.7;
+}
+.json-pad {
+  pointer-events: none;
 }
 .json-row {
   display: flex;

@@ -260,16 +260,19 @@ export function useVariableVirtualizer(options) {
     if (old) unbind()
     if (el) bind()
   })
-  // 换了 key（首行 id 变了）才清缓存并回到顶部；加载更多只是追加，不能跳回顶部
-  let lastFirstKey = null
+  // 数据源整体换了（resetToken 变化，默认用首行 key）才清缓存并回到顶部；
+  // 加载更多只是追加，不能跳回顶部
+  const resetToken = options.resetToken
+  let lastResetKey = null
   watch(
     () => options.items.value,
     (list) => {
-      const firstKey = list && list.length ? keyOf(list[0]) : null
-      if (firstKey !== lastFirstKey) {
-        lastFirstKey = firstKey
+      const token = resetToken ? resetToken() : list && list.length ? keyOf(list[0]) : null
+      if (token !== lastResetKey) {
+        lastResetKey = token
         heights.clear()
         scrollTop.value = 0
+        if (containerRef.value) containerRef.value.scrollTop = 0
       }
       version.value += 1
       nextTick(() => {
