@@ -312,7 +312,7 @@
     <Teleport to="body">
       <div
         v-if="ctxMenu.visible"
-        class="ctx-menu"
+        class="ctx-menu pop-in"
         :class="'theme-' + resolvedThemeMode"
         :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
         @click.stop

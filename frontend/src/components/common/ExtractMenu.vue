@@ -7,7 +7,7 @@
       @contextmenu.prevent="emit('close')"
     >
       <div
-        class="extract-menu"
+        class="extract-menu pop-in"
         :class="`theme-${theme}`"
         :style="{ left: x + 'px', top: y + 'px' }"
         @click.stop

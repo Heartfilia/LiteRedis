@@ -203,7 +203,7 @@
     <Teleport to="body">
       <div v-if="moreMenu.visible" class="more-menu-backdrop" @mousedown.self="closeMoreMenu">
         <div
-          class="more-menu"
+          class="more-menu pop-in-up"
           :class="'theme-' + (settingsStore.themeMode || 'light')"
           :style="{ left: moreMenu.x + 'px', top: moreMenu.y + 'px' }"
           @mousedown.stop
@@ -714,6 +714,19 @@ function collapseVisibleTree() {
   padding: 8px 8px 10px;
 }
 .loading,
+.loading::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  border: 2px solid rgba(148, 163, 184, 0.35);
+  border-top-color: #60a5fa;
+  animation: loadingSpin 720ms linear infinite;
+}
+@keyframes loadingSpin {
+  to { transform: rotate(360deg); }
+}
 .empty-state {
   flex: 1;
   display: flex;

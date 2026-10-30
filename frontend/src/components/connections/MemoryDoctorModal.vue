@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
-    <div class="doctor-backdrop" :class="'theme-' + themeMode" @mousedown.self="handleClose">
-      <div class="doctor-card">
+    <div class="doctor-backdrop backdrop-in" :class="'theme-' + themeMode" @mousedown.self="handleClose">
+      <div class="doctor-card dialog-in">
         <header class="doctor-header">
           <div class="doctor-title-wrap">
             <div class="doctor-title">{{ t('memoryDoctor.title') }}</div>

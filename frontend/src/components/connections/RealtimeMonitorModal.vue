@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
-    <div class="monitor-backdrop" :class="'theme-' + themeMode" @mousedown.self="handleClose">
-      <div class="monitor-card">
+    <div class="monitor-backdrop backdrop-in" :class="'theme-' + themeMode" @mousedown.self="handleClose">
+      <div class="monitor-card dialog-in">
         <header class="monitor-header">
           <div class="monitor-title-wrap">
             <div class="monitor-title">{{ t('monitor.title') }}</div>

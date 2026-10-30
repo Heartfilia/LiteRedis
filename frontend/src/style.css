@@ -86,6 +86,37 @@ button:not(:disabled):active,
   transform: translateY(0) scale(0.985);
 }
 
+/* ---- 浮层入场：菜单/下拉用 pop-in，对话框用 dialog-in ---- */
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes dialogIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.pop-in {
+  animation: popIn var(--motion-fast) var(--ease-out);
+}
+/* 向上翻转定位的菜单（本身带 translateY(-100%)）用这个，避免入场时位置闪一下 */
+@keyframes popInUp {
+  from { opacity: 0; transform: translateY(calc(-100% + 4px)) scale(0.98); }
+  to { opacity: 1; transform: translateY(-100%) scale(1); }
+}
+.pop-in-up {
+  animation: popInUp var(--motion-fast) var(--ease-out);
+}
+.dialog-in {
+  animation: dialogIn var(--motion-base) var(--ease-out);
+}
+.backdrop-in {
+  animation: overlayFadeIn var(--motion-fast) var(--ease-out);
+}
+
 /* 拖拽连接、拖拽调宽时统一光标，避免指针在子元素上闪成默认箭头 */
 body.is-conn-dragging,
 body.is-conn-dragging * {

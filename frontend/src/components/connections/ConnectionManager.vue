@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div class="cm-backdrop" :class="`theme-${settingsStore.themeMode || 'light'}`">
-      <div class="cm-card">
+      <div class="cm-card dialog-in">
         <!-- 顶部 header -->
         <div class="cm-header">
           <span class="cm-title">{{ t('connManager.title') }}</span>
@@ -133,7 +133,7 @@
       <!-- 右键菜单 -->
       <div
         v-if="ctxMenu.visible"
-        class="ctx-menu"
+        class="ctx-menu pop-in"
         :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
         @click.stop
       >

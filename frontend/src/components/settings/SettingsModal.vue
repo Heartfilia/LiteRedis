@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
-    <div class="settings-backdrop" :class="`theme-${settingsStore.themeMode || 'light'}`">
-      <div class="settings-card">
+    <div class="settings-backdrop backdrop-in" :class="`theme-${settingsStore.themeMode || 'light'}`">
+      <div class="settings-card dialog-in">
         <SettingsPanel @close="$emit('close')" />
       </div>
     </div>

@@ -22,7 +22,7 @@
     <Teleport v-if="isRoot" to="body">
       <div
         v-if="menu.visible"
-        class="json-menu"
+        class="json-menu pop-in"
         :class="`theme-${theme}`"
         :style="{ left: menu.x + 'px', top: menu.y + 'px' }"
         @mousedown.stop
