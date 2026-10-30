@@ -142,10 +142,6 @@ function openNodeMenu(event) {
   nodeMenu.open(event, props.label, props.data)
 }
 
-function closeMenu() {
-  menu.visible = false
-}
-
 function showTip(text) {
   tip.value = text
   tipX.value = menu.x

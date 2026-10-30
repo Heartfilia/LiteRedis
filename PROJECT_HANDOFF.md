@@ -94,12 +94,18 @@ Vue 组件
 
 详细逐项记录和涉及位置以 `API_OPTIMIZATION_PLAN.md` 为准。
 
+## 代码风格
+
+- ESLint（`frontend/eslint.config.js`，flat config + eslint-plugin-vue essential）与 Prettier（`frontend/.prettierrc.json`）已接入，CI 在构建前跑 `npm run lint`，有报错就失败。
+- 格式化暂不设门禁：`npm run format` / `npm run format:check` 手动使用，避免一次性重排几十个文件盖掉业务 diff；新文件建议先格式化再提交。
+
 ## 已通过验证
 
 ```bash
 GOCACHE=/tmp/literedis-go-cache go test ./...
 GOCACHE=/tmp/literedis-go-cache go test -race ./...
 GOCACHE=/tmp/literedis-go-cache go vet ./...
+npm --prefix frontend run lint
 npm --prefix frontend run build
 node --test frontend/src/utils/*.test.js frontend/src/stores/*.test.js
 GOCACHE=/tmp/literedis-go-cache wails build -platform darwin/arm64 -clean -v 2 -nocolour

@@ -107,7 +107,7 @@
 </template>
 
 <script setup>
-import { Teleport, computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { executeRedisCommand, executeRedisCommandForce, getConnectionOverview, getCommandHistory, pushCommandHistory } from '../../api/wails.js'
 import { useI18n } from '../../i18n/index.js'

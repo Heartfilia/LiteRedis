@@ -49,7 +49,7 @@
 </template>
 
 <script setup>
-import { Teleport, computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 
 const props = defineProps({

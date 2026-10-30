@@ -24,7 +24,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from '../../i18n/index.js'
 
 const props = defineProps({

@@ -174,8 +174,8 @@
                 <option value="==">==</option>
                 <option value=">">></option>
                 <option value=">=">>=</option>
-                <option value="<"><</option>
-                <option value="<="><=</option>
+                <option value="<">&lt;</option>
+                <option value="<=">&lt;=</option>
                 <option value="!=">!=</option>
               </select>
               <input v-model="subRule.value" class="calc-subrule-value" type="text" />
@@ -1172,11 +1172,6 @@ async function runCalculation() {
     if (requestGuard.isCurrent(request)) calculating.value = false
     requestGuard.finish(request)
   }
-}
-
-function startEdit(field, val) {
-  editingField.value = field
-  editValue.value = val
 }
 
 function cancelEdit() {

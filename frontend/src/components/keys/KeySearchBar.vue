@@ -96,7 +96,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, Teleport, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useConnectionsStore } from '../../stores/connections.js'

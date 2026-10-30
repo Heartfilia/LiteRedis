@@ -193,7 +193,6 @@ const namedGroups = computed(() => {
   delete g['']
   return g
 })
-const hasNamedGroups = computed(() => Object.keys(namedGroups.value).length > 0)
 const existingGroups = computed(() => Object.keys(namedGroups.value))
 
 function newConnection() {
@@ -381,7 +380,7 @@ async function moveToGroup(conn, targetGroup) {
 async function moveToNewGroup(conn) {
   closeCtxMenu()
   // WebView 不支持原生 prompt，直接打开编辑表单，在分组输入框里填新分组
-  openEdit(conn)
+  selectConn(conn)
 }
 
 async function deleteConn(conn) {

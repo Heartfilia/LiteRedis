@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { listConnections, saveConnection, reorderConnections, deleteConnection, testConnection, connect, disconnect as disconnectAPI, isConnected, pingConnection } from '../api/wails.js'
+import { listConnections, saveConnection, reorderConnections, deleteConnection, testConnection, connect, disconnect as disconnectAPI, pingConnection } from '../api/wails.js'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../utils/connection.js'
 import { useI18n } from '../i18n/index.js'
 
@@ -215,7 +215,7 @@ export const useConnectionsStore = defineStore('connections', {
         return result
       } catch (e) {
         if (timedOut) {
-          try { await disconnect(id) } catch (_) { /* 尽力回收即可 */ }
+          try { await disconnectAPI(id) } catch (_) { /* 尽力回收即可 */ }
         }
         return { success: false, message: e.message || String(e) }
       } finally {

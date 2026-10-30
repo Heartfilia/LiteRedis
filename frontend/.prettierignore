@@ -1,0 +1,5 @@
+dist
+node_modules
+wailsjs
+frontend
+package-lock.json
