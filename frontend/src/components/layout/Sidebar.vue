@@ -272,7 +272,10 @@
             @click.stop="toggleThemeMenu"
           >
             <span class="btn-icon-glyph" aria-hidden="true">
-              <ThemeIcon :name="themeIconName" />
+              <!-- 固定的「主题/外观」图标（衣服），不随所选主题变化 -->
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M8.3 3.2 3.5 6.1l1.8 3.2 2-1.1V21h9.4V8.2l2 1.1 1.8-3.2-4.8-2.9a3.9 3.9 0 0 1-7.6 0z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+              </svg>
             </span>
           </button>
           <button class="btn-icon" :title="t('sidebar.manageConn')" @click="openConnManager()">
@@ -384,7 +387,13 @@
           @click="pickTheme(option.value)"
         >
           <span class="theme-menu-icon" aria-hidden="true"><ThemeIcon :name="option.value" /></span>
-          <span class="theme-menu-label">{{ t(option.labelKey) }}</span>
+          <span class="theme-menu-label">
+            {{ t(option.labelKey) }}
+            <span
+              v-if="option.value === 'auto'"
+              class="theme-menu-sub"
+            >{{ t('sidebar.themeAutoCurrent').replace('{mode}', settingsStore.themeMode === 'dark' ? t('sidebar.themeDark') : t('sidebar.themeLight')) }}</span>
+          </span>
           <span v-if="settingsStore.themePreference === option.value" class="theme-menu-check">✓</span>
         </button>
       </div>
@@ -485,11 +494,6 @@ const THEME_OPTIONS = [
 ]
 const themeMenu = ref({ visible: false, left: 0, bottom: 0 })
 // 按钮上显示当前选择对应的图标（跟随系统用显示器图标）
-const themeIconName = computed(() => {
-  if (settingsStore.themePreference === 'auto') return 'auto'
-  return settingsStore.themeMode === 'dark' ? 'dark' : 'light'
-})
-
 function toggleThemeMenu(event) {
   if (themeMenu.value.visible) {
     themeMenu.value.visible = false
@@ -1838,6 +1842,14 @@ async function disconnectConn(id) {
   color: #1d4ed8;
 }
 .theme-menu-label { flex: 1; }
+.theme-menu-sub {
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 10.5px;
+}
+.theme-menu.theme-dark .theme-menu-sub {
+  color: #7c8aa5;
+}
 .theme-menu-check { font-size: 11px; color: #1d4ed8; }
 .theme-menu.theme-dark {
   background: rgba(15, 23, 42, 0.98);

@@ -55,6 +55,8 @@ test('setTheme: 明暗直接生效，auto 跟随系统当前偏好', () => {
   store.setTheme('auto')
   assert.equal(store.themePreference, 'auto')
   assert.equal(store.themeMode, 'dark')
+  // 跟随系统只在浅色 / 暗色之间切换，永远不会落到其它主题
+  assert.ok(['light', 'dark'].includes(store.themeMode))
 })
 
 test('toggleTheme: 只在明暗之间切，auto 也会被具体选择覆盖', () => {

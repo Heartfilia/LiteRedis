@@ -266,16 +266,16 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
     linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
 }
 .app-layout.theme-green {
-  --app-text: #223528;
-  --app-muted: #57705d;
-  --app-panel-border: rgba(186, 210, 172, 0.94);
-  --app-panel-bg: rgba(252, 255, 249, 0.96);
-  --app-sidebar-bg: linear-gradient(180deg, rgba(238, 248, 229, 0.98), rgba(226, 240, 214, 0.98));
+  --app-text: #2c3a24;
+  --app-muted: #6d7c4f;
+  --app-panel-border: rgba(199, 213, 164, 0.94);
+  --app-panel-bg: rgba(253, 255, 246, 0.96);
+  --app-sidebar-bg: linear-gradient(180deg, rgba(245, 250, 234, 0.98), rgba(236, 244, 218, 0.98));
   /* 底色比面板更深一档，乘上叠层之后才能看出层次 */
   background:
-    radial-gradient(circle at top left, rgba(198, 226, 178, 0.72), transparent 36%),
-    radial-gradient(circle at right 18%, rgba(210, 234, 189, 0.6), transparent 30%),
-    linear-gradient(180deg, #e2f0d6 0%, #d2e6c4 100%);
+    radial-gradient(circle at top left, rgba(210, 230, 172, 0.72), transparent 36%),
+    radial-gradient(circle at right 18%, rgba(222, 237, 187, 0.6), transparent 30%),
+    linear-gradient(180deg, #eaf3d8 0%, #dbe9c4 100%);
 }
 /* 护眼模式的淡绿叠层：只影响颜色，不吃事件 */
 .theme-tint {
@@ -284,7 +284,7 @@ body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe 
   z-index: 99999;
   pointer-events: none;
   mix-blend-mode: multiply;
-  background: rgba(217, 236, 200, 0.46);
+  background: rgba(224, 237, 191, 0.48);
 }
 .app-layout.font-medium {
   --ui-font-title: 14px;
@@ -427,7 +427,7 @@ body[data-theme='dark'] {
   color: #e2e8f0;
 }
 body[data-theme='green'] {
-  background: #e9f3e1;
-  color: #24382a;
+  background: #edf4da;
+  color: #2c3a24;
 }
 </style>

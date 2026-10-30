@@ -182,7 +182,7 @@ test('theme menu switches between light and dark', async ({ page }) => {
   expect(gap).toBeGreaterThan(0)
   expect(gap).toBeLessThan(20)
 
-  await menu.locator('.theme-menu-item', { hasText: '暗色' }).click()
+  await menu.locator('.theme-menu-item', { hasText: /^暗色/ }).click()
   await expect(layout).toHaveClass(/theme-dark/)
   await expect(page.locator('.btn-theme')).toHaveAttribute('data-theme-pref', 'dark')
   await expect(menu).toHaveCount(0)
@@ -195,7 +195,7 @@ test('theme menu switches between light and dark', async ({ page }) => {
   await expect(page.locator('.theme-tint')).toBeVisible()
 
   await page.locator('.btn-theme').click()
-  await page.locator('.theme-menu-item', { hasText: '浅色' }).click()
+  await page.locator('.theme-menu-item', { hasText: /^浅色/ }).click()
   await expect(layout).toHaveClass(/theme-light/)
 })
 
@@ -207,7 +207,7 @@ test.describe('follow system theme', () => {
     await page.goto('/')
 
     await page.locator('.btn-theme').click()
-    await page.locator('.theme-menu-item', { hasText: '跟随系统' }).click()
+    await page.locator('.theme-menu-item', { hasText: /^跟随系统/ }).click()
     await expect(page.locator('.app-layout')).toHaveClass(/theme-dark/)
     await expect(page.locator('.btn-theme')).toHaveAttribute('data-theme-pref', 'auto')
   })
