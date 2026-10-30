@@ -55,7 +55,12 @@
                 <div class="console-tip">{{ t('sidebar.redisConsoleHint') }}</div>
               </div>
 
-              <div ref="consoleOutputRef" class="console-output" @mousedown="handleConsoleMouseDown">
+              <div
+                ref="consoleOutputRef"
+                class="console-output"
+                @mousedown="handleConsoleMouseDown"
+                @scroll="updateSuggestPosition"
+              >
                 <template v-if="consoleHistory.length">
                   <div
                     v-for="(entry, index) in consoleHistory"
@@ -64,7 +69,13 @@
                   >
                     <div class="console-line console-command-line">
                       <span class="console-prompt">{{ entry.prompt }}</span>
-                      <span class="console-command-text">{{ entry.command }}</span>
+                      <span class="console-command-text">
+                        <span
+                          v-for="(token, tokenIndex) in tokenizeCommandLine(entry.command)"
+                          :key="tokenIndex"
+                          :class="{ 'cmd-name': tokenIndex === 0 }"
+                        >{{ token }}</span>
+                      </span>
                     </div>
                     <div v-if="entry.meta" class="console-meta">{{ entry.meta }}</div>
                     <div v-if="entry.output" class="console-result" :class="{ error: !entry.success }">{{ entry.output }}</div>
@@ -89,14 +100,36 @@
                       autocapitalize="off"
                       :disabled="running"
                       :placeholder="t('sidebar.redisConsolePlaceholder')"
-                      @keydown.enter.prevent="runCommand"
-                      @keydown.up.prevent="showPreviousCommand"
-                      @keydown.down.prevent="showNextCommand"
-                      @keydown.esc.prevent="resetHistoryNavigation"
+                      @keydown.enter.prevent="onEnterKey"
+                      @keydown.tab.prevent="acceptSuggestion"
+                      @keydown.up.prevent="onSuggestUp"
+                      @keydown.down.prevent="onSuggestDown"
+                      @keydown.esc.prevent="onEscKey"
                     />
                   </div>
                   <span v-if="running" class="console-status">{{ t('settings.checkingUpdate') }}</span>
                 </div>
+
+                <Teleport to="body">
+                  <div
+                    v-if="suggestVisible && suggestPos"
+                    class="console-suggest"
+                    :style="{ left: suggestPos.left + 'px', top: suggestPos.top + 'px', width: suggestPos.width + 'px' }"
+                  >
+                    <button
+                      v-for="(name, index) in suggestions"
+                      :key="name"
+                      type="button"
+                      class="console-suggest-item"
+                      :class="{ active: index === suggestIndex }"
+                      @mousedown.prevent="useSuggestion(name)"
+                      @mouseenter="suggestIndex = index"
+                    >
+                      <span class="suggest-name">{{ name.toUpperCase() }}</span>
+                      <span class="suggest-args">{{ signatureText(name) }}</span>
+                    </button>
+                  </div>
+                </Teleport>
               </div>
             </div>
           </template>
@@ -109,6 +142,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
+import { REDIS_COMMAND_HINTS, filterCommandNames, tokenizeCommandLine } from '../../utils/redisCommands.js'
 import { executeRedisCommand, executeRedisCommandForce, getConnectionOverview, getCommandHistory, pushCommandHistory } from '../../api/wails.js'
 import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -148,68 +182,6 @@ const consoleInputRef = ref(null)
 let refreshTimer = null
 let refocusTimer = null
 
-const REDIS_COMMAND_HINTS = {
-  append: ['key', 'value'],
-  decr: ['key'],
-  decrby: ['key', 'decrement'],
-  del: ['key', '[key ...]'],
-  exists: ['key', '[key ...]'],
-  expire: ['key', 'seconds'],
-  get: ['key'],
-  hdel: ['key', 'field', '[field ...]'],
-  hexists: ['key', 'field'],
-  hget: ['key', 'field'],
-  hgetall: ['key'],
-  hincrby: ['key', 'field', 'increment'],
-  hkeys: ['key'],
-  hlen: ['key'],
-  hmget: ['key', 'field', '[field ...]'],
-  hmset: ['key', 'field', 'value', '[field value ...]'],
-  hset: ['key', 'field', 'value', '[field value ...]'],
-  hvals: ['key'],
-  incr: ['key'],
-  incrby: ['key', 'increment'],
-  info: ['[section]'],
-  keys: ['pattern'],
-  llen: ['key'],
-  lpop: ['key', '[count]'],
-  lpush: ['key', 'element', '[element ...]'],
-  lrange: ['key', 'start', 'stop'],
-  lrem: ['key', 'count', 'element'],
-  lset: ['key', 'index', 'element'],
-  ltrim: ['key', 'start', 'stop'],
-  mget: ['key', '[key ...]'],
-  mset: ['key', 'value', '[key value ...]'],
-  persist: ['key'],
-  ping: ['[message]'],
-  rename: ['key', 'newkey'],
-  rpop: ['key', '[count]'],
-  rpush: ['key', 'element', '[element ...]'],
-  sadd: ['key', 'member', '[member ...]'],
-  scard: ['key'],
-  set: ['key', 'value', '[EX seconds|PX milliseconds|NX|XX ...]'],
-  select: ['index'],
-  setex: ['key', 'seconds', 'value'],
-  sembers: ['key'],
-  smembers: ['key'],
-  sismember: ['key', 'member'],
-  smismember: ['key', 'member', '[member ...]'],
-  spop: ['key', '[count]'],
-  srem: ['key', 'member', '[member ...]'],
-  strlen: ['key'],
-  ttl: ['key'],
-  type: ['key'],
-  unlink: ['key', '[key ...]'],
-  zadd: ['key', 'score', 'member', '[score member ...]'],
-  zcard: ['key'],
-  zcount: ['key', 'min', 'max'],
-  zrange: ['key', 'start', 'stop', '[WITHSCORES]'],
-  zrangebyscore: ['key', 'min', 'max', '[WITHSCORES]', '[LIMIT offset count]'],
-  zrank: ['key', 'member'],
-  zrem: ['key', 'member', '[member ...]'],
-  zrevrange: ['key', 'start', 'stop', '[WITHSCORES]'],
-  zscore: ['key', 'member'],
-}
 
 const isActiveConnection = computed(() => workspaceStore.activeConnID === props.connId)
 const effectiveDB = computed(() => {
@@ -247,6 +219,103 @@ const commandHint = computed(() => {
   const typedArgCount = Math.max(parts.length - 1, 0)
   const remaining = signature.slice(typedArgCount)
   return remaining.join(' ')
+})
+
+// —— 命令名补全 ——
+const suggestIndex = ref(0)
+const suggestDismissed = ref(false)
+const suggestPos = ref(null)
+
+// 只在输入第一个词（还没敲空格）时补全命令名；敲了空格就进入参数阶段
+const suggestions = computed(() => {
+  const raw = command.value || ''
+  if (!raw || /\s$/.test(raw)) return []
+  return filterCommandNames(raw)
+})
+const suggestVisible = computed(() => !running.value && !suggestDismissed.value && suggestions.value.length > 0)
+
+function signatureText(name) {
+  return (REDIS_COMMAND_HINTS[name] || []).join(' ')
+}
+
+function updateSuggestPosition() {
+  if (!suggestVisible.value) {
+    suggestPos.value = null
+    return
+  }
+  const el = consoleInputRef.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const height = Math.min(240, suggestions.value.length * 30 + 10)
+  const width = Math.max(260, Math.min(420, rect.width + 24))
+  suggestPos.value = {
+    left: Math.round(Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))),
+    top: Math.round(Math.max(12, rect.top - height - 8)),
+    width: Math.round(width),
+  }
+}
+
+function useSuggestion(name) {
+  command.value = name.toUpperCase() + ' '
+  suggestDismissed.value = true
+  suggestIndex.value = 0
+  nextTick(() => {
+    updateSuggestPosition()
+    consoleInputRef.value?.focus()
+  })
+}
+
+function acceptSuggestion() {
+  const name = suggestions.value[suggestIndex.value]
+  if (name) useSuggestion(name)
+}
+
+function onEnterKey() {
+  const highlighted = suggestions.value[suggestIndex.value]
+  // 输入还不完整时回车先补全，输全了才执行
+  if (suggestVisible.value && highlighted && command.value.trim().toLowerCase() !== highlighted) {
+    useSuggestion(highlighted)
+    return
+  }
+  runCommand()
+}
+
+function onSuggestUp() {
+  if (suggestVisible.value) {
+    const total = suggestions.value.length
+    suggestIndex.value = (suggestIndex.value - 1 + total) % total
+    return
+  }
+  showPreviousCommand()
+}
+
+function onSuggestDown() {
+  if (suggestVisible.value) {
+    const total = suggestions.value.length
+    suggestIndex.value = (suggestIndex.value + 1) % total
+    return
+  }
+  showNextCommand()
+}
+
+function onEscKey() {
+  if (suggestVisible.value) {
+    suggestDismissed.value = true
+    return
+  }
+  resetHistoryNavigation()
+}
+
+watch(command, () => {
+  suggestIndex.value = 0
+  suggestDismissed.value = false
+})
+watch(suggestVisible, (visible) => {
+  if (!visible) {
+    suggestPos.value = null
+    return
+  }
+  nextTick(() => updateSuggestPosition())
 })
 
 async function refreshOverview() {
@@ -695,6 +764,62 @@ onBeforeUnmount(() => {
   color: #e2e8f0;
   min-width: 0;
   user-select: text;
+}
+
+/* 历史里命令名单独上色，一眼能看出执行了什么 */
+.console-command-text .cmd-name {
+  color: #7dd3fc;
+  font-weight: 700;
+}
+
+/* 命令名补全下拉 */
+.console-suggest {
+  position: fixed;
+  /* 要盖在连接概览的浮层（12000）之上，但仍低于全局 toast（12100） */
+  z-index: 12050;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(51, 65, 85, 0.92);
+  background: rgba(15, 23, 42, 0.985);
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.45);
+}
+
+.console-suggest-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #dbeafe;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.console-suggest-item.active {
+  background: rgba(37, 99, 235, 0.35);
+}
+
+.suggest-name {
+  flex: 0 0 auto;
+  color: #7dd3fc;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.suggest-args {
+  flex: 1;
+  min-width: 0;
+  color: #94a3b8;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .console-input {
