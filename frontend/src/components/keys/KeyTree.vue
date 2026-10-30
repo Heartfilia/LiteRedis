@@ -92,11 +92,12 @@
               <div v-if="sess.loading" class="section-tip">{{ t('keyTree.loading') }}</div>
               <div v-else-if="!sess.treeData?.length" class="section-tip">{{ t('keyTree.noKeys') }}</div>
               <div v-else>
-                <KeyTreeNode
-                  v-for="node in sess.treeData"
-                  :key="node.fullPath"
-                  :node="node"
-                  :depth="0"
+                <KeyTreeRow
+                  v-for="row in mergedRows(sess)"
+                  :key="sess.id + '|' + row.node.fullPath"
+                  :node="row.node"
+                  :depth="row.depth"
+                  :index="row.index"
                 />
               </div>
               <div class="section-load-more">
@@ -124,13 +125,16 @@
           <div v-if="session?.loading" class="loading">{{ t('keyTree.loading') }}</div>
           <div v-else-if="!session" class="empty-state">{{ t('keyTree.searchHint') }}</div>
           <div v-else-if="session.treeData?.length === 0" class="empty-state">{{ t('keyTree.noKeys') }}</div>
-          <div v-else class="tree-scroll" tabindex="0" data-kb-container @keydown="onTreeKeydown">
-            <KeyTreeNode
-              v-for="node in session.treeData"
-              :key="node.fullPath"
-              :node="node"
-              :depth="0"
+          <div v-else ref="treeScrollRef" class="tree-scroll" tabindex="0" data-kb-container @keydown="onTreeKeydown">
+            <div v-if="treeTopPad" class="tree-pad" :style="{ height: treeTopPad + 'px' }" aria-hidden="true" />
+            <KeyTreeRow
+              v-for="row in treeWindowRows"
+              :key="row.node.fullPath"
+              :node="row.node"
+              :depth="row.depth"
+              :index="row.index"
             />
+            <div v-if="treeBottomPad" class="tree-pad" :style="{ height: treeBottomPad + 'px' }" aria-hidden="true" />
           </div>
         </template>
       </div>
@@ -327,15 +331,16 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, ref, watch } from 'vue'
-import { moveRovingFocus } from '../../utils/keyboard.js'
+import { moveRovingFocus, revealRow } from '../../utils/keyboard.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import KeySearchBar from './KeySearchBar.vue'
 import SearchTabs from './SearchTabs.vue'
-import KeyTreeNode from './KeyTreeNode.vue'
-import { buildKeyTree } from '../../utils/keyTree.js'
+import KeyTreeRow from './KeyTreeRow.vue'
+import { buildKeyTree, flattenVisibleRows } from '../../utils/keyTree.js'
+import { useRowVirtualizer } from '../../utils/virtualList.js'
 import { exportKeysToFile, copyKeysToConnection, copyKeysToDatabase, getDatabases, getConnectionDB, importKeysFromFile } from '../../api/wails.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
 
@@ -354,6 +359,40 @@ const favoriteKeys = computed(() => workspaceStore.favoriteKeys)
 const recentKeyList = computed(() => workspaceStore.recentKeyList)
 const favoriteKeySet = computed(() => workspaceStore.favoriteKeySet)
 const readOnly = computed(() => connectionsStore.isReadOnly(activeConnID.value))
+
+// —— 树窗口化 ——
+// 展开状态在 store 里，按当前展开情况把树压平，只渲染可视区附近的行
+const treeScrollRef = ref(null)
+function expansionPredicate(node, depth) {
+  return workspaceStore.isNodeExpanded(node.fullPath, depth)
+}
+const treeVisibleRows = computed(() =>
+  flattenVisibleRows(session.value?.treeData || [], expansionPredicate)
+)
+const treeVirtualizer = useRowVirtualizer({
+  containerRef: treeScrollRef,
+  count: computed(() => treeVisibleRows.value.length),
+  threshold: 150,
+  overscan: 10,
+})
+const treeTopPad = computed(() => treeVirtualizer.topPad.value)
+const treeBottomPad = computed(() => treeVirtualizer.bottomPad.value)
+const treeWindowRows = computed(() => {
+  const rows = treeVisibleRows.value
+  const start = treeVirtualizer.start.value
+  const end = treeVirtualizer.end.value
+  const out = []
+  for (let i = start; i < end; i++) {
+    out.push({ ...rows[i], index: i })
+  }
+  return out
+})
+
+// 合并搜索模式不窗口化，但同样按展开状态压平
+function mergedRows(source) {
+  const rows = flattenVisibleRows(source?.treeData || [], expansionPredicate)
+  return rows.map((row, index) => ({ ...row, index }))
+}
 
 // 批量操作「更多」菜单：改前缀 / 导出 / 复制到其他连接
 const moreMenu = ref({ visible: false, x: 0, y: 0, mode: 'more' })
@@ -453,7 +492,56 @@ onUpdated(syncDbBarLayout)
 
 // 树里用 ↑/↓ 在行之间移动焦点，Enter 打开；Tab 只停在树容器上一次
 function onTreeKeydown(event) {
-  moveRovingFocus(event, event.currentTarget, '.node-row')
+  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+  // 合并搜索分组没有窗口化，直接按 DOM 顺序移动
+  if (workspaceStore.keepPrevSearch) {
+    moveRovingFocus(event, event.currentTarget, '.node-row')
+    return
+  }
+  const rows = treeVisibleRows.value
+  if (!rows.length) return
+  event.preventDefault()
+  const focusedRow = document.activeElement && document.activeElement.closest
+    ? document.activeElement.closest('.tree-row')
+    : null
+  const current = focusedRow ? Number(focusedRow.dataset.rowIndex) : -1
+  let target = current
+  if (event.key === 'ArrowDown') target = current < 0 ? 0 : Math.min(rows.length - 1, current + 1)
+  else if (event.key === 'ArrowUp') target = current <= 0 ? 0 : current - 1
+  else if (event.key === 'Home') target = 0
+  else target = rows.length - 1
+  focusTreeRow(target)
+}
+
+// 窗口化后目标行可能还没渲染：先把滚动位置算到位，渲染出来再聚焦
+async function focusTreeRow(index) {
+  const container = treeScrollRef.value
+  if (!container) return
+  const rowHeight = measureTreeRowHeight(container)
+  const top = index * rowHeight
+  const bottom = top + rowHeight
+  if (top < container.scrollTop) {
+    container.scrollTop = top
+  } else if (bottom > container.scrollTop + container.clientHeight) {
+    container.scrollTop = bottom - container.clientHeight
+  }
+  // 目标行可能还在窗口外，先把滚动位置同步给窗口，再等 DOM 渲染
+  treeVirtualizer.syncScroll()
+  await nextTick()
+  const row = container.querySelector(`.tree-row[data-row-index="${index}"] .node-row`)
+  if (!row) return
+  try {
+    row.focus({ preventScroll: true })
+  } catch (e) {
+    row.focus()
+  }
+  revealRow(row)
+}
+
+function measureTreeRowHeight(container) {
+  const row = container.querySelector('[data-vrow]')
+  const height = row ? row.getBoundingClientRect().height : 0
+  return height > 4 ? height : 32
 }
 
 function openMoreMenu(event) {

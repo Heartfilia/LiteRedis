@@ -93,5 +93,10 @@ export function useRowVirtualizer(options) {
     if (el) bind()
   })
 
-  return { active, start, end, topPad, bottomPad, measure }
+  // 程序化设置 scrollTop 后（比如键盘跳行）立刻同步，避免等下一帧滚动事件才更新窗口
+  function syncScroll() {
+    scrollTop.value = containerRef.value ? containerRef.value.scrollTop : 0
+  }
+
+  return { active, start, end, topPad, bottomPad, measure, syncScroll }
 }

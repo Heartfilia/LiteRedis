@@ -56,3 +56,19 @@ export function buildKeyTree(keys, sep = ':') {
 
   return toArray(root)
 }
+
+/**
+ * 把树按展开状态压平成可见行（深度优先），用于窗口化渲染。
+ * isExpanded(node, depth) 决定目录节点的子节点要不要展开。
+ */
+export function flattenVisibleRows(nodes = [], isExpanded = () => true, depth = 0, output = []) {
+  for (const node of nodes) {
+    output.push({ node, depth })
+    if (!node) continue
+    const children = node.children || []
+    if (node.isLeaf || !children.length) continue
+    if (!isExpanded(node, depth)) continue
+    flattenVisibleRows(children, isExpanded, depth + 1, output)
+  }
+  return output
+}

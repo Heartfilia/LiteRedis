@@ -1,10 +1,25 @@
 <template>
-  <div :class="['tree-node', `theme-${settingsStore.themeMode || 'light'}`, { expanded: isExpanded }]">
+  <div
+    class="tree-row"
+    :class="`theme-${settingsStore.themeMode || 'light'}`"
+    :style="{ paddingLeft: depth * 24 + 'px' }"
+    data-vrow
+    :data-row-index="index"
+  >
+    <span
+      v-for="level in depth"
+      :key="level"
+      class="row-guide"
+      :style="{ left: (level - 1) * 24 + 'px' }"
+      aria-hidden="true"
+    />
+
     <!-- 目录节点 -->
     <div
       v-if="!node.isLeaf"
       v-kbd-row="{ role: 'treeitem' }"
       class="node-row dir-row"
+      :class="{ expanded: isExpanded }"
       :aria-expanded="isExpanded"
       @click="onDirClick"
     >
@@ -58,16 +73,6 @@
         {{ getTypeColor(node.keyType).label }}
       </span>
     </div>
-
-    <!-- 子节点递归 -->
-    <div v-if="!node.isLeaf && isExpanded" class="children">
-      <KeyTreeNode
-        v-for="child in node.children"
-        :key="child.fullPath"
-        :node="child"
-        :depth="depth + 1"
-      />
-    </div>
   </div>
 </template>
 
@@ -80,6 +85,7 @@ import { getTypeColor } from '../../utils/typeColors.js'
 const props = defineProps({
   node: { type: Object, required: true },
   depth: { type: Number, default: 0 },
+  index: { type: Number, default: 0 },
 })
 
 const workspaceStore = useWorkspaceStore()
@@ -156,7 +162,20 @@ function onLeafClick(fullPath, event) {
 </script>
 
 <style scoped>
-.tree-node { user-select: none; }
+.tree-row {
+  position: relative;
+}
+/* 每层目录画一条虚线导轨，和原来嵌套 children 的边框观感一致 */
+.row-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed rgba(203, 213, 225, 0.72);
+  pointer-events: none;
+}
+.tree-row.theme-dark .row-guide {
+  border-left-color: rgba(71, 85, 105, 0.72);
+}
 .leaf-check {
   width: 13px;
   height: 13px;
@@ -167,9 +186,6 @@ function onLeafClick(fullPath, event) {
 }
 .theme-dark .leaf-check { accent-color: #60a5fa; }
 .node-row {
-  /* 行数很多时跳过屏幕外的布局与绘制，避免整列表滚动卡顿 */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 32px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -179,7 +195,7 @@ function onLeafClick(fullPath, event) {
   font-size: 13px;
   min-height: 32px;
   color: #27364a;
-  transition: background var(--motion-base) ease, color var(--motion-base) ease, transform var(--motion-base) ease, box-shadow var(--motion-base) ease;
+  transition: background var(--motion-base) ease, color var(--motion-base) ease, box-shadow var(--motion-base) ease;
 }
 .node-row:hover {
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(241, 245, 249, 0.92));
@@ -249,49 +265,37 @@ function onLeafClick(fullPath, event) {
   font-weight: 600;
   flex-shrink: 0;
 }
-.children {
-  padding-left: 14px;
-  margin-left: 9px;
-  border-left: 1px dashed rgba(203, 213, 225, 0.72);
-}
-.tree-node.theme-dark .node-row {
+.tree-row.theme-dark .node-row {
   color: #e5edf8;
 }
-.tree-node.theme-dark .node-row:hover {
+.tree-row.theme-dark .node-row:hover {
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.94));
   color: #f8fafc;
 }
-.tree-node.theme-dark .node-row.selected {
+.tree-row.theme-dark .node-row.selected {
   background: linear-gradient(180deg, rgba(30, 64, 175, 0.3), rgba(30, 64, 175, 0.2));
   color: #dbeafe;
   box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.46);
 }
-.tree-node.theme-dark .dir-row,
-.tree-node.theme-dark .node-count,
-.tree-node.theme-dark .expand-icon {
+.tree-row.theme-dark .dir-row,
+.tree-row.theme-dark .node-count,
+.tree-row.theme-dark .expand-icon {
   color: #94a3b8;
 }
-.tree-node.theme-dark .ttl-badge {
+.tree-row.theme-dark .ttl-badge {
   background: rgba(120, 53, 15, 0.42);
   color: #fdba74;
 }
-.tree-node.theme-dark .children {
-  border-left-color: rgba(71, 85, 105, 0.72);
-}
-
-.tree-node {
+.tree-row {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
-
-:global(.platform-windows) .tree-node .node-row {
+:global(.platform-windows) .tree-row .node-row {
   min-height: 31px;
 }
-
-:global(.platform-windows) .tree-node .leaf-label {
+:global(.platform-windows) .tree-row .leaf-label {
   letter-spacing: 0;
   font-weight: 600;
 }
-
 </style>
