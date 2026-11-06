@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"LiteRedis/backend/config"
@@ -79,38 +80,31 @@ func ScanMemory(ctx context.Context, client redis.UniversalClient, pattern strin
 	mode := detectSizeMode(ctx, client, pattern)
 
 	if clusterClient, ok := client.(*redis.ClusterClient); ok {
-		var scanned int64
+		// ForEachMaster 会为每个 master 起独立 goroutine 并发扫描，
+		// 累加器内部用锁保护；limit 按全局已扫描数扣减，进度上报的是全局值
 		err := clusterClient.ForEachMaster(ctx, func(ctx context.Context, master *redis.Client) error {
-			remaining := maxKeys - scanned
-			if remaining <= 0 {
-				return nil
-			}
-			nodeScanned, err := scanMemoryNode(ctx, master, pattern, remaining, mode, acc, func(delta int64) {
+			_, err := scanMemoryNode(ctx, master, pattern, maxKeys, mode, acc, func(total int64) {
 				if onProgress != nil {
-					onProgress(scanned+delta, totalKeys)
+					onProgress(total, totalKeys)
 				}
 			})
-			scanned += nodeScanned
 			return err
 		})
 		if err != nil {
 			return config.MemoryReport{}, err
 		}
-		acc.scanned = scanned
 	} else {
 		singleClient, ok := client.(*redis.Client)
 		if !ok {
 			return config.MemoryReport{}, fmt.Errorf("unsupported redis client type")
 		}
-		scanned, err := scanMemoryNode(ctx, singleClient, pattern, maxKeys, mode, acc, func(scanned int64) {
+		if _, err := scanMemoryNode(ctx, singleClient, pattern, maxKeys, mode, acc, func(total int64) {
 			if onProgress != nil {
-				onProgress(scanned, totalKeys)
+				onProgress(total, totalKeys)
 			}
-		})
-		if err != nil {
+		}); err != nil {
 			return config.MemoryReport{}, err
 		}
-		acc.scanned = scanned
 	}
 
 	report := acc.build()
@@ -124,43 +118,45 @@ func ScanMemory(ctx context.Context, client redis.UniversalClient, pattern strin
 	return report, nil
 }
 
-// scanMemoryNode 扫描单个节点，返回扫描到的 key 数量
+// scanMemoryNode 扫描单个节点，返回本节点扫描到的 key 数量。
+// 集群下多个节点会并发进入，limit 按 acc 里的全局已扫描数扣减。
 func scanMemoryNode(ctx context.Context, client *redis.Client, pattern string, limit int64, mode memorySizeMode, acc *memoryAccumulator, onProgress func(int64)) (int64, error) {
 	var (
-		cursor  uint64
-		scanned int64
+		cursor      uint64
+		nodeScanned int64
 	)
 	for {
 		if err := ctx.Err(); err != nil {
-			return scanned, err
+			return nodeScanned, err
 		}
 		keys, nextCursor, err := client.Scan(ctx, cursor, pattern, memoryScanBatchSize).Result()
 		if err != nil {
-			return scanned, err
+			return nodeScanned, err
 		}
 		cursor = nextCursor
 
-		remaining := limit - scanned
+		remaining := limit - acc.scannedTotal()
 		if remaining <= 0 {
-			acc.truncated = true
-			return scanned, nil
+			acc.markTruncated()
+			return nodeScanned, nil
 		}
 		// SCAN 的 COUNT 只是提示，单批可能超出上限，这里按上限截断
 		if int64(len(keys)) > remaining {
 			keys = keys[:remaining]
-			acc.truncated = true
+			acc.markTruncated()
 		}
 		if len(keys) > 0 {
 			if err := acc.addBatch(ctx, client, keys, mode); err != nil {
-				return scanned, err
+				return nodeScanned, err
 			}
-			scanned += int64(len(keys))
+			nodeScanned += int64(len(keys))
+			total := acc.addScanned(int64(len(keys)))
 			if onProgress != nil {
-				onProgress(scanned)
+				onProgress(total)
 			}
 		}
-		if acc.truncated || cursor == 0 {
-			return scanned, nil
+		if acc.truncatedFlag() || cursor == 0 {
+			return nodeScanned, nil
 		}
 	}
 }
@@ -175,7 +171,10 @@ type memoryPrefixAgg struct {
 	bytes int64
 }
 
+// memoryAccumulator 聚合扫描结果。集群模式下多个节点并发写入，
+// 所有读写都经过 mu 保护，避免 concurrent map 之类的 fatal。
 type memoryAccumulator struct {
+	mu         sync.Mutex
 	scanned    int64
 	bytes      int64
 	noTTL      int64
@@ -194,6 +193,43 @@ func newMemoryAccumulator() *memoryAccumulator {
 	}
 	heap.Init(&acc.bigKeys)
 	return acc
+}
+
+// addScanned 累计全局已扫描数并返回当前值
+func (acc *memoryAccumulator) addScanned(delta int64) int64 {
+	acc.mu.Lock()
+	defer acc.mu.Unlock()
+	acc.scanned += delta
+	return acc.scanned
+}
+
+func (acc *memoryAccumulator) scannedTotal() int64 {
+	acc.mu.Lock()
+	defer acc.mu.Unlock()
+	return acc.scanned
+}
+
+func (acc *memoryAccumulator) markTruncated() {
+	acc.mu.Lock()
+	defer acc.mu.Unlock()
+	acc.truncated = true
+}
+
+func (acc *memoryAccumulator) truncatedFlag() bool {
+	acc.mu.Lock()
+	defer acc.mu.Unlock()
+	return acc.truncated
+}
+
+// countSize 记录单个 key 的大小是否取到（集群下多节点并发调用）
+func (acc *memoryAccumulator) countSize(available bool) {
+	acc.mu.Lock()
+	defer acc.mu.Unlock()
+	if available {
+		acc.withSize++
+	} else {
+		acc.sizeErrors++
+	}
 }
 
 // detectSizeMode 用第一个 key 探测服务端支持哪种大小查询方式
@@ -251,10 +287,10 @@ func (acc *memoryAccumulator) addBatchMemory(ctx context.Context, client *redis.
 		succeeded++
 		size, sizeErr := sizeCmds[i].Result()
 		if sizeErr != nil || size < 0 {
-			acc.sizeErrors++
 			size = 0
+			acc.countSize(false)
 		} else {
-			acc.withSize++
+			acc.countSize(true)
 		}
 		samples = append(samples, memoryKeySample{key: key, keyType: keyType, size: size, ttl: readTTL(ttlCmds[i])})
 	}
@@ -292,9 +328,9 @@ func (acc *memoryAccumulator) addBatchDebug(ctx context.Context, client *redis.C
 			size, parsed = parseSerializedLength(raw)
 		}
 		if parsed {
-			acc.withSize++
+			acc.countSize(true)
 		} else {
-			acc.sizeErrors++
+			acc.countSize(false)
 		}
 		samples = append(samples, memoryKeySample{key: key, keyType: keyType, size: size, ttl: readTTL(ttlCmds[i])})
 	}
@@ -376,6 +412,9 @@ type memoryKeySample struct {
 }
 
 func (acc *memoryAccumulator) consume(samples []memoryKeySample) {
+	// 集群多节点并发进入，聚合计数必须在锁内完成
+	acc.mu.Lock()
+	defer acc.mu.Unlock()
 	for _, sample := range samples {
 		acc.bytes += sample.size
 		if sample.ttl < 0 {

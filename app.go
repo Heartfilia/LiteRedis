@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -645,7 +646,16 @@ func (a *App) GetSlowLog(connID string, count int) ([]config.SlowLogEntry, error
 }
 
 // ScanMemoryReport 对流式扫描 key 并生成内存体检报告
-func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (config.MemoryReport, error) {
+func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (report config.MemoryReport, err error) {
+	// 集群体检涉及多节点并发扫描，兜底 recover：任何 panic 都转成错误
+	// 并写进连接诊断日志，而不是让整个应用闪退
+	defer func() {
+		if r := recover(); r != nil {
+			config.AppendDebugLog("[memory] panic conn=%s pattern=%q: %v\n%s", connID, pattern, r, debug.Stack())
+			report = config.MemoryReport{}
+			err = fmt.Errorf("内存体检发生内部错误，已记录到诊断日志: %v", r)
+		}
+	}()
 	client, err := a.manager.GetClient(connID)
 	if err != nil {
 		return config.MemoryReport{}, err
@@ -676,8 +686,12 @@ func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (co
 		a.memoryScanMu.Unlock()
 	}()
 
+	// 集群体检时进度回调会从多个 goroutine 并发进入，lastEmit 需要锁保护
+	var progressMu sync.Mutex
 	lastEmit := time.Time{}
 	onProgress := func(scanned, total int64) {
+		progressMu.Lock()
+		defer progressMu.Unlock()
 		if a.ctx == nil || time.Since(lastEmit) < 200*time.Millisecond {
 			return
 		}
@@ -696,13 +710,18 @@ func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (co
 		})
 	}
 
-	report, err := redisbackend.ScanMemory(ctx, client, pattern, maxKeys, onProgress)
+	startedAt := time.Now()
+	config.AppendDebugLog("[memory] begin conn=%s pattern=%q maxKeys=%d", connID, pattern, maxKeys)
+	report, err = redisbackend.ScanMemory(ctx, client, pattern, maxKeys, onProgress)
 	if err != nil {
+		config.AppendDebugLog("[memory] error conn=%s pattern=%q: %v", connID, pattern, err)
 		if errors.Is(err, context.Canceled) {
 			return config.MemoryReport{}, errors.New("体检已取消")
 		}
 		return config.MemoryReport{}, err
 	}
+	config.AppendDebugLog("[memory] done conn=%s scanned=%d totalKeys=%d bytes=%d elapsedMs=%d",
+		connID, report.ScannedKeys, report.TotalKeys, report.TotalBytes, time.Since(startedAt).Milliseconds())
 	report.ConnID = connID
 	report.DB = db
 	if a.ctx != nil {

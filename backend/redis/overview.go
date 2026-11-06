@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"LiteRedis/backend/config"
@@ -77,20 +78,27 @@ func GetConnectionOverview(ctx context.Context, client redis.UniversalClient, cf
 // 不设置 used_memory_human，让上层回退到按求和字节数格式化。
 func aggregateClusterInfo(ctx context.Context, client *redis.ClusterClient) (map[string]string, error) {
 	var (
+		mu        sync.Mutex
 		nodeInfos []map[string]string
 		firstErr  error
 		nodes     int
 	)
+	// ForEachMaster 并发执行回调，聚合状态需要锁保护
 	err := client.ForEachMaster(ctx, func(ctx context.Context, master *redis.Client) error {
 		info, err := master.Info(ctx).Result()
 		if err != nil {
+			mu.Lock()
 			if firstErr == nil {
 				firstErr = err
 			}
+			mu.Unlock()
 			return nil
 		}
-		nodeInfos = append(nodeInfos, parseInfoText(info))
+		parsed := parseInfoText(info)
+		mu.Lock()
+		nodeInfos = append(nodeInfos, parsed)
 		nodes++
+		mu.Unlock()
 		return nil
 	})
 	if err != nil {

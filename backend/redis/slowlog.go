@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"LiteRedis/backend/config"
 
@@ -29,19 +30,29 @@ func GetSlowLog(ctx context.Context, client redis.UniversalClient, count int64) 
 
 	if clusterClient, ok := client.(*redis.ClusterClient); ok {
 		entries := make([]config.SlowLogEntry, 0, count)
-		var firstErr error
+		var (
+			mu       sync.Mutex
+			firstErr error
+		)
+		// ForEachMaster 并发执行回调，聚合状态需要锁保护
 		_ = clusterClient.ForEachMaster(ctx, func(ctx context.Context, master *redis.Client) error {
 			list, err := master.SlowLogGet(ctx, count).Result()
 			if err != nil {
+				mu.Lock()
 				if firstErr == nil {
 					firstErr = err
 				}
+				mu.Unlock()
 				return nil
 			}
 			addr := master.Options().Addr
+			local := make([]config.SlowLogEntry, 0, len(list))
 			for _, item := range list {
-				entries = append(entries, slowLogEntry(item, addr))
+				local = append(local, slowLogEntry(item, addr))
 			}
+			mu.Lock()
+			entries = append(entries, local...)
+			mu.Unlock()
 			return nil
 		})
 		if len(entries) == 0 && firstErr != nil {
