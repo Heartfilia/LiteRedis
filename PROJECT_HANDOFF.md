@@ -24,7 +24,7 @@ LiteRedis 是一个跨平台 Redis 桌面客户端，使用 Wails 将 Go 后端�
 - 前端：Vue 3、Pinia、Vite。
 - 连接能力：普通 Redis、Cluster、SSH 隧道、HTTP/SOCKS Proxy、多 DB。
 - 数据能力：Key 扫描和搜索，String/Hash/List/Set/ZSet 等类型查看与编辑，分页加载，内置 Redis Console。
-- 发布能力：GitHub tag 作为版本号，GitHub Actions 构建 macOS/Linux/Windows，并通过 GitHub Releases 检查更新。
+- 发布能力：GitHub tag 作为版本号，GitHub Actions 只在推送 tag 时构建：test job 先跑 lint / vet / build / 单测 / e2e，通过后出 macOS/Linux/Windows 包并发布 GitHub Releases。push main 不触发任何流水线。
 
 关键调用链：
 
@@ -96,7 +96,7 @@ Vue 组件
 
 ## 代码风格
 
-- ESLint（`frontend/eslint.config.js`，flat config + eslint-plugin-vue essential）与 Prettier（`frontend/.prettierrc.json`）已接入，CI 在构建前跑 `npm run lint`，有报错就失败。
+- ESLint（`frontend/eslint.config.js`，flat config + eslint-plugin-vue essential）与 Prettier（`frontend/.prettierrc.json`）已接入，发版流程在构建前跑 `npm run lint`，有报错就失败。
 - 格式化暂不设门禁：`npm run format` / `npm run format:check` 手动使用，避免一次性重排几十个文件盖掉业务 diff；新文件建议先格式化再提交。
 - 交互冒烟用 Playwright（`frontend/e2e`，`npm run e2e`）：跑 Vite dev + 注入假的 `window.go`，覆盖树窗口化滚动、键盘导航、标签拖拽/中键关闭、命令台补全、命令面板搜 key。默认用系统 Chrome，CI 里装 Playwright 自带 chromium 后设 `PW_CHANNEL=bundled`。
 

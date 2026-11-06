@@ -39,6 +39,10 @@ jobs:
         run: npm run build
         working-directory: frontend
 
+      - name: Frontend lint
+        run: npm run lint
+        working-directory: frontend
+
       - name: Go vet
         run: CGO_ENABLED=0 go vet ./...
 
@@ -51,6 +55,24 @@ jobs:
       - name: Frontend unit tests
         run: node --test src/utils/*.test.js src/stores/*.test.js
         working-directory: frontend
+
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Frontend smoke tests
+        run: npm run e2e
+        working-directory: frontend
+        env:
+          PW_CHANNEL: bundled
+
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: frontend/test-results
+          if-no-files-found: ignore
 
   # ─────────────────────────────────────────
   # macOS ARM64 (Apple Silicon)
