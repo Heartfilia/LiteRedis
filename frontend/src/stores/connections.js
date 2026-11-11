@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { listConnections, saveConnection, reorderConnections, deleteConnection, testConnection, connect, disconnect as disconnectAPI, pingConnection } from '../api/wails.js'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../utils/connection.js'
 import { useI18n } from '../i18n/index.js'
+import { confirmDiscardEdits } from '../utils/editSafety.js'
 
 const { t } = useI18n()
 
@@ -51,6 +52,7 @@ export const useConnectionsStore = defineStore('connections', {
     },
 
     async save(cfg) {
+      if (cfg.id && !await confirmDiscardEdits()) return { success: false, cancelled: true }
       const result = await saveConnection(cfg)
       if (result.success) {
         if (result.disconnected && cfg.id) {
@@ -123,6 +125,7 @@ export const useConnectionsStore = defineStore('connections', {
     },
 
     async remove(id) {
+      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
       const result = await deleteConnection(id)
       if (result.success) {
         this.connectedIds.delete(id)
@@ -224,6 +227,7 @@ export const useConnectionsStore = defineStore('connections', {
     },
 
     async disconnect(id) {
+      if (!await confirmDiscardEdits()) return false
       await disconnectAPI(id)
       this.connectedIds.delete(id)
       this.connectingIds.delete(id)
@@ -232,6 +236,7 @@ export const useConnectionsStore = defineStore('connections', {
         delete nextFailures[id]
         this.heartbeatFailures = nextFailures
       }
+      return true
     },
 
     setHeartbeatVisibility(visible) {

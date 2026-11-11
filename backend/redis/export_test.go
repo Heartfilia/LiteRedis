@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -63,6 +64,91 @@ func TestReadAndWriteExportedKey(t *testing.T) {
 	}
 	if score, err := dst.ZScore(ctx, "rank", "p2").Result(); err != nil || score != 2 {
 		t.Fatalf("zset copy = %v, err=%v", score, err)
+	}
+}
+
+func TestInvalidImportNeverDeletesExistingKey(t *testing.T) {
+	ctx := context.Background()
+	client := testRedisClient(t)
+	entries := []config.ExportedKey{
+		{Type: "unknown"},
+		{Type: "hash"},
+		{Type: "list"},
+		{Type: "set"},
+		{Type: "zset", ZSet: []config.ZSetMember{{Member: "a", Score: math.NaN()}}},
+		{Type: "stream", Stream: []config.StreamEntry{{ID: "0-0", Fields: map[string]string{"f": "v"}}}},
+		{Type: "stream", Stream: []config.StreamEntry{{ID: "1-0", Fields: map[string]string{}}}},
+		{Type: "string", TTL: math.MaxInt64},
+	}
+	for _, entry := range entries {
+		t.Run(entry.Type, func(t *testing.T) {
+			entry.Key = "existing"
+			if err := client.Set(ctx, entry.Key, "original", time.Hour).Err(); err != nil {
+				t.Fatal(err)
+			}
+			if written, err := WriteExportedKey(ctx, client, entry, true); err == nil || written {
+				t.Fatalf("invalid entry accepted: written=%v err=%v", written, err)
+			}
+			if value, err := client.Get(ctx, entry.Key).Result(); err != nil || value != "original" {
+				t.Fatalf("original data lost: %q %v", value, err)
+			}
+		})
+	}
+}
+
+func TestImportDoesNotOverwriteConcurrentWriter(t *testing.T) {
+	ctx := context.Background()
+	client := testRedisClient(t)
+	writer := redis.NewClient(&redis.Options{Addr: client.Options().Addr})
+	defer writer.Close()
+	client.AddHook(exportCommandHook{before: func(cmd redis.Cmder) error {
+		if cmd.Name() == "eval" {
+			if err := writer.Set(ctx, "k", "concurrent", 0).Err(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return nil
+	}})
+	written, err := WriteExportedKey(ctx, client, config.ExportedKey{Key: "k", Type: "string", String: "import", TTL: -1}, false)
+	if written || err != nil {
+		t.Fatalf("expected atomic skip: written=%v err=%v", written, err)
+	}
+	if value := writer.Get(ctx, "k").Val(); value != "concurrent" {
+		t.Fatalf("concurrent target overwritten: %q", value)
+	}
+}
+
+func TestWriteExportedKeyStreamAndZeroTTL(t *testing.T) {
+	ctx := context.Background()
+	client := testRedisClient(t)
+	entry := config.ExportedKey{Key: "s", Type: "stream", TTL: -1, Stream: []config.StreamEntry{
+		{ID: "1-0", Fields: map[string]string{"f": "one"}},
+		{ID: "1-1", Fields: map[string]string{"f": "two"}},
+	}}
+	if written, err := WriteExportedKey(ctx, client, entry, false); err != nil || !written {
+		t.Fatalf("write stream: %v %v", written, err)
+	}
+	if n := client.XLen(ctx, "s").Val(); n != 2 {
+		t.Fatalf("stream length = %d", n)
+	}
+	entry = config.ExportedKey{Key: "expires", Type: "string", String: "v", TTL: 0}
+	if _, err := WriteExportedKey(ctx, client, entry, false); err != nil {
+		t.Fatal(err)
+	}
+	if client.Exists(ctx, entry.Key).Val() != 0 {
+		t.Fatal("zero TTL was turned into a permanent key")
+	}
+}
+
+func TestFormatExportCommandsRejectsLineInjection(t *testing.T) {
+	output := FormatExportCommands([]config.ExportedKey{{
+		Key: "key\nFLUSHALL\r\n#", Type: "stream", TTL: -1,
+		Stream: []config.StreamEntry{{ID: "1-0\nFLUSHDB", Fields: map[string]string{"f": "v"}}},
+	}})
+	for _, line := range strings.Split(output, "\n") {
+		if strings.HasPrefix(line, "FLUSH") || strings.ContainsRune(line, '\r') {
+			t.Fatalf("injected command in export: %q", output)
+		}
 	}
 }
 

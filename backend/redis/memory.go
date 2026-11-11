@@ -74,10 +74,10 @@ func ScanMemory(ctx context.Context, client redis.UniversalClient, pattern strin
 
 	startedAt := time.Now()
 	acc := newMemoryAccumulator()
-	totalKeys, _ := DBSize(ctx, client)
+	totalKeys, totalErr := DBSize(ctx, client)
 	// 老版本 Redis（<4.0）没有 MEMORY USAGE，云厂商也可能禁用 DEBUG，
 	// 先探测一次能力，再决定整轮扫描用哪种方式取大小
-	mode := detectSizeMode(ctx, client, pattern)
+	mode, sizeReason := detectSizeCapability(ctx, client, pattern)
 
 	if clusterClient, ok := client.(*redis.ClusterClient); ok {
 		// ForEachMaster 会为每个 master 起独立 goroutine 并发扫描，
@@ -111,11 +111,69 @@ func ScanMemory(ctx context.Context, client redis.UniversalClient, pattern strin
 	report.Pattern = pattern
 	report.TotalKeys = totalKeys
 	report.SizeSource = mode.source()
+	report.SizeUnavailableReason = sizeReason
 	// 即便服务端支持 MEMORY USAGE，也可能因为 ACL/命令被禁用而全部失败，
 	// 这时同样要按"大小不可用"降级展示，而不是显示成 0 B
 	report.SizeUnavailable = report.SizeUnavailable || mode == sizeModeLength
+	report.MemorySharePartial = pattern != "*" || report.Truncated || totalErr != nil || report.ScannedKeys != totalKeys || acc.sizeErrors > 0
+	usedMemory, memoryErr := redisUsedMemory(ctx, client)
+	if err := ctx.Err(); err != nil {
+		return config.MemoryReport{}, err
+	}
+	if memoryErr == nil {
+		report.RedisUsedMemoryBytes = usedMemory
+	}
+	if memoryErr == nil && usedMemory > 0 && mode == sizeModeMemory && !report.SizeUnavailable {
+		share := float64(report.TotalBytes) / float64(usedMemory) * 100
+		// 两次采样非原子；并发写入可能使比值超过 100%，此时不给出误导值。
+		if share >= 0 && share <= 100 {
+			report.MemorySharePercent = &share
+		}
+	}
+	if report.MemorySharePercent == nil {
+		switch {
+		case mode != sizeModeMemory:
+			report.MemoryShareUnavailableReason = "memory_usage_" + sizeReason
+		case memoryErr != nil:
+			report.MemoryShareUnavailableReason = "info_" + CapabilityErrorCode(memoryErr)
+		case report.SizeUnavailable:
+			report.MemoryShareUnavailableReason = "size_read_failed"
+		default:
+			report.MemoryShareUnavailableReason = "inconsistent_sample"
+		}
+	}
 	report.ElapsedMs = time.Since(startedAt).Milliseconds()
 	return report, nil
+}
+
+func redisUsedMemory(ctx context.Context, client redis.UniversalClient) (int64, error) {
+	read := func(ctx context.Context, c redis.UniversalClient) (int64, error) {
+		text, err := c.Info(ctx, "memory").Result()
+		if err != nil {
+			return 0, err
+		}
+		value, err := strconv.ParseInt(parseInfoText(text)["used_memory"], 10, 64)
+		if err != nil || value <= 0 {
+			return 0, fmt.Errorf("Redis used_memory unavailable")
+		}
+		return value, nil
+	}
+	if cluster, ok := client.(*redis.ClusterClient); ok {
+		var mu sync.Mutex
+		var total int64
+		err := cluster.ForEachMaster(ctx, func(ctx context.Context, master *redis.Client) error {
+			value, err := read(ctx, master)
+			if err != nil {
+				return err
+			}
+			mu.Lock()
+			total += value
+			mu.Unlock()
+			return nil
+		})
+		return total, err
+	}
+	return read(ctx, client)
 }
 
 // scanMemoryNode 扫描单个节点，返回本节点扫描到的 key 数量。
@@ -125,6 +183,7 @@ func scanMemoryNode(ctx context.Context, client *redis.Client, pattern string, l
 		cursor      uint64
 		nodeScanned int64
 	)
+	seen := make(map[string]struct{})
 	for {
 		if err := ctx.Err(); err != nil {
 			return nodeScanned, err
@@ -134,18 +193,25 @@ func scanMemoryNode(ctx context.Context, client *redis.Client, pattern string, l
 			return nodeScanned, err
 		}
 		cursor = nextCursor
-
-		remaining := limit - acc.scannedTotal()
-		if remaining <= 0 {
-			acc.markTruncated()
-			return nodeScanned, nil
+		unique := keys[:0]
+		batchSeen := make(map[string]struct{})
+		for _, key := range keys {
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			if _, exists := batchSeen[key]; exists {
+				continue
+			}
+			unique = append(unique, key)
+			batchSeen[key] = struct{}{}
 		}
-		// SCAN 的 COUNT 只是提示，单批可能超出上限，这里按上限截断
-		if int64(len(keys)) > remaining {
-			keys = keys[:remaining]
-			acc.markTruncated()
-		}
+		keys = unique
+		// 原子预留全局额度，避免集群多个主节点同时读取剩余额度后超限。
+		keys = keys[:acc.reserveKeys(int64(len(keys)), limit)]
 		if len(keys) > 0 {
+			for _, key := range keys {
+				seen[key] = struct{}{}
+			}
 			if err := acc.addBatch(ctx, client, keys, mode); err != nil {
 				return nodeScanned, err
 			}
@@ -176,6 +242,7 @@ type memoryPrefixAgg struct {
 type memoryAccumulator struct {
 	mu         sync.Mutex
 	scanned    int64
+	reserved   int64
 	bytes      int64
 	noTTL      int64
 	withSize   int64
@@ -184,6 +251,18 @@ type memoryAccumulator struct {
 	types      map[string]*memoryTypeAgg
 	prefixes   map[string]*memoryPrefixAgg
 	bigKeys    memoryKeyHeap
+}
+
+func (acc *memoryAccumulator) reserveKeys(count, limit int64) int64 {
+	acc.mu.Lock()
+	defer acc.mu.Unlock()
+	remaining := max(int64(0), limit-acc.reserved)
+	if count > remaining {
+		count = remaining
+		acc.truncated = true
+	}
+	acc.reserved += count
+	return count
 }
 
 func newMemoryAccumulator() *memoryAccumulator {
@@ -234,21 +313,34 @@ func (acc *memoryAccumulator) countSize(available bool) {
 
 // detectSizeMode 用第一个 key 探测服务端支持哪种大小查询方式
 func detectSizeMode(ctx context.Context, client redis.UniversalClient, pattern string) memorySizeMode {
+	mode, _ := detectSizeCapability(ctx, client, pattern)
+	return mode
+}
+
+func detectSizeCapability(ctx context.Context, client redis.UniversalClient, pattern string) (memorySizeMode, string) {
 	keys, _, err := client.Scan(ctx, 0, pattern, 1).Result()
-	if err != nil || len(keys) == 0 {
-		// 空库或探测失败时保持默认，后续批次自然拿到空结果
-		return sizeModeMemory
+	if err != nil {
+		return sizeModeMemory, CapabilityErrorCode(err)
 	}
-	probe := keys[0]
-	if err := client.MemoryUsage(ctx, probe).Err(); err == nil || errors.Is(err, redis.Nil) {
-		return sizeModeMemory
+	// MEMORY USAGE 对不存在的 key 返回 nil，不写入探测 key；空库也能识别旧版本/ACL。
+	probe := "__literedis_capability_probe__"
+	if len(keys) > 0 {
+		probe = keys[0]
+	}
+	err = client.MemoryUsage(ctx, probe).Err()
+	if err == nil || errors.Is(err, redis.Nil) {
+		return sizeModeMemory, ""
+	}
+	reason := CapabilityErrorCode(err)
+	if reason == "read_failed" || reason == "cancelled" {
+		return sizeModeMemory, reason
 	}
 	if raw, err := client.Do(ctx, "DEBUG", "OBJECT", probe).Text(); err == nil {
 		if _, ok := parseSerializedLength(raw); ok {
-			return sizeModeDebug
+			return sizeModeDebug, reason
 		}
 	}
-	return sizeModeLength
+	return sizeModeLength, reason
 }
 
 // addBatch 按探测到的能力选择取大小的方式；单条命令失败不影响整体，
@@ -282,6 +374,7 @@ func (acc *memoryAccumulator) addBatchMemory(ctx context.Context, client *redis.
 	for i, key := range keys {
 		keyType, ok := readKeyType(typeCmds[i])
 		if !ok {
+			acc.countSize(false)
 			continue
 		}
 		succeeded++

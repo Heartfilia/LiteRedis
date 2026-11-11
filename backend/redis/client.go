@@ -63,6 +63,9 @@ func (m *ClientManager) nextOperationVersionLocked(id string) uint64 {
 
 // Connect 建立连接
 func (m *ClientManager) Connect(cfg config.ConnectionConfig) error {
+	if err := validateConnectionTransport(cfg); err != nil {
+		return err
+	}
 	start := time.Now()
 	m.mu.Lock()
 	operationVersion := m.nextOperationVersionLocked(cfg.ID)
@@ -218,6 +221,67 @@ func (m *ClientManager) GetClient(id string) (redis.UniversalClient, error) {
 		return nil, fmt.Errorf("connection %s not found or not connected", id)
 	}
 	return conn.client, nil
+}
+
+// NewReadClientForDB 使用独立连接池选择 DB，不对共享连接执行 SELECT。
+// db=-1 沿用当前 DB。调用方必须调用返回的 release。
+func (m *ClientManager) NewReadClientForDB(id string, db int) (redis.UniversalClient, int, func(), error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	conn, ok := m.clients[id]
+	if !ok {
+		return nil, 0, nil, fmt.Errorf("connection %s not connected", id)
+	}
+	if db == -1 {
+		db = conn.currentDB
+	}
+	if conn.cfg.IsCluster {
+		if db != 0 {
+			return nil, 0, nil, fmt.Errorf("cluster mode only supports DB 0")
+		}
+		return conn.client, 0, func() {}, nil
+	}
+	if db < 0 || db > 4095 {
+		return nil, 0, nil, fmt.Errorf("invalid DB index: %d", db)
+	}
+	single, ok := conn.client.(*redis.Client)
+	if !ok {
+		return nil, 0, nil, fmt.Errorf("unsupported redis client type")
+	}
+	// 复用实际拨号选项，保留 SSH/代理/TLS/ACL，但不与主界面共用连接池。
+	opts := *single.Options()
+	opts.DB = db
+	opts.PoolSize = 2
+	opts.MinIdleConns = 0
+	opts.MaxIdleConns = 2
+	opts.MaxActiveConns = 2
+	opts.MaxRetries = -1 // 独立操作不自动重放：写入响应丢失时应报告结果未知。
+	// RESP3 推送处理器包含连接池相关 handler，独立 client 需重新创建，不能共享。
+	opts.PushNotificationProcessor = nil
+	if opts.TLSConfig != nil {
+		opts.TLSConfig = opts.TLSConfig.Clone()
+	}
+	client := redis.NewClient(&opts)
+	return client, db, func() { _ = client.Close() }, nil
+}
+
+// NewOperationClientForDB 用于一次性写入任务，不复用自动重试的 Cluster 客户端。
+func (m *ClientManager) NewOperationClientForDB(id string, db int) (redis.UniversalClient, func(), error) {
+	client, _, release, err := m.NewReadClientForDB(id, db)
+	if err != nil {
+		return nil, nil, err
+	}
+	cluster, ok := client.(*redis.ClusterClient)
+	if !ok {
+		return client, release, nil
+	}
+	opts := *cluster.Options()
+	opts.MaxRetries = -1
+	opts.MaxRedirects = -1
+	opts.PoolSize, opts.MinIdleConns, opts.MaxIdleConns, opts.MaxActiveConns = 2, 0, 2, 2
+	opts.PushNotificationProcessor = nil
+	operation := redis.NewClusterClient(&opts)
+	return operation, func() { _ = operation.Close() }, nil
 }
 
 func (m *ClientManager) GetConnectionState(id string) (config.ConnectionConfig, int, error) {
@@ -415,6 +479,9 @@ func buildActiveRedisOptions(conn *activeConn, db int) (*redis.Options, error) {
 
 // TestConnection 测试连通性（不持久化，不保存连接池）
 func TestConnection(cfg config.ConnectionConfig) error {
+	if err := validateConnectionTransport(cfg); err != nil {
+		return err
+	}
 	start := time.Now()
 	config.AppendDebugLog("[test] begin name=%s redis=%s:%d cluster=%v ssh=%v", cfg.Name, cfg.Host, cfg.Port, cfg.IsCluster, cfg.SSHEnabled)
 	var sshClient *gossh.Client
@@ -621,17 +688,45 @@ func makeProxyDialer(rawURL string, timeout time.Duration) (func(ctx context.Con
 	}
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, fmt.Errorf("invalid proxy url: %w", err)
+		return nil, fmt.Errorf("invalid proxy url")
+	}
+	if parsed.Hostname() == "" {
+		return nil, fmt.Errorf("proxy host is required")
 	}
 	baseDialer := &net.Dialer{Timeout: timeout}
 
 	switch strings.ToLower(parsed.Scheme) {
 	case "http", "https":
+		proxyAddr := parsed.Host
+		if parsed.Port() == "" {
+			port := "80"
+			if parsed.Scheme == "https" {
+				port = "443"
+			}
+			proxyAddr = net.JoinHostPort(parsed.Hostname(), port)
+		}
 		return func(ctx context.Context, network, addr string) (net.Conn, error) {
-			conn, err := baseDialer.DialContext(ctx, network, parsed.Host)
+			if strings.ContainsAny(addr, "\r\n\x00") {
+				return nil, fmt.Errorf("invalid proxy target address")
+			}
+			ctx, cancel := context.WithTimeout(ctx, effectiveProxyTimeout(timeout))
+			defer cancel()
+			conn, err := baseDialer.DialContext(ctx, network, proxyAddr)
 			if err != nil {
 				return nil, err
 			}
+			// CONNECT 握手也要响应取消；返回连接前等待回调结束，防止误关已交付的连接。
+			cancelDone := make(chan struct{})
+			rawConn := conn
+			stopCancel := context.AfterFunc(ctx, func() {
+				_ = rawConn.Close()
+				close(cancelDone)
+			})
+			defer func() {
+				if !stopCancel() {
+					<-cancelDone
+				}
+			}()
 			// 按 ctx 截止时间设置 deadline，防止代理不应答时 Read 永久挂起
 			deadline := time.Time{}
 			if d, ok := ctx.Deadline(); ok {
@@ -644,6 +739,14 @@ func makeProxyDialer(rawURL string, timeout time.Duration) (func(ctx context.Con
 					conn.Close()
 					return nil, err
 				}
+			}
+			if strings.EqualFold(parsed.Scheme, "https") {
+				tlsConn := tls.Client(conn, &tls.Config{ServerName: parsed.Hostname(), MinVersion: tls.VersionTLS12})
+				if err := tlsConn.HandshakeContext(ctx); err != nil {
+					conn.Close()
+					return nil, fmt.Errorf("https proxy TLS handshake: %w", err)
+				}
+				conn = tlsConn
 			}
 
 			connectHost := addr
@@ -697,26 +800,38 @@ func makeProxyDialer(rawURL string, timeout time.Duration) (func(ctx context.Con
 		if err != nil {
 			return nil, err
 		}
+		contextDialer, ok := d.(proxy.ContextDialer)
+		if !ok {
+			return nil, fmt.Errorf("SOCKS5 proxy does not support context cancellation")
+		}
 		return func(ctx context.Context, network, addr string) (net.Conn, error) {
-			type result struct {
-				conn net.Conn
-				err  error
-			}
-			done := make(chan result, 1)
-			go func() {
-				conn, err := d.Dial(network, addr)
-				done <- result{conn: conn, err: err}
-			}()
-			select {
-			case r := <-done:
-				return r.conn, r.err
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
+			ctx, cancel := context.WithTimeout(ctx, effectiveProxyTimeout(timeout))
+			defer cancel()
+			return contextDialer.DialContext(ctx, network, addr)
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported proxy scheme: %s", parsed.Scheme)
 	}
+}
+
+func effectiveProxyTimeout(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return redisConnectTimeout
+	}
+	return timeout
+}
+
+func validateConnectionTransport(cfg config.ConnectionConfig) error {
+	if cfg.SSHEnabled && cfg.SSH == nil {
+		return fmt.Errorf("SSH 隧道已启用，但缺少 SSH 配置")
+	}
+	if cfg.SSHEnabled && cfg.ProxyEnabled {
+		return fmt.Errorf("SSH 隧道与代理不可同时启用，请二选一")
+	}
+	if cfg.ProxyEnabled && strings.TrimSpace(cfg.ProxyURL) == "" {
+		return fmt.Errorf("代理已启用，但代理地址为空")
+	}
+	return nil
 }
 
 func redactProxyURL(rawURL string) string {
@@ -811,7 +926,7 @@ func buildRedisOptions(addr string, cfg config.ConnectionConfig, db int, dialer 
 		MaxRetries:   1,
 	}
 	if dialer != nil {
-		opts.Dialer = dialer
+		opts.Dialer = withTLS(dialer, tlsConfig)
 	}
 	return opts
 }
@@ -829,7 +944,7 @@ func buildClusterOptions(addrs []string, cfg config.ConnectionConfig, dialer fun
 		MaxRetries:   1,
 	}
 	if dialer != nil {
-		opts.Dialer = dialer
+		opts.Dialer = withTLS(dialer, tlsConfig)
 		// SSH + Cluster 在 Windows 上更容易触发大量 socket 占用。
 		// 这里主动压低每个节点的连接池和并发拨号规模，优先保证稳定性。
 		opts.PoolSize = 2
@@ -843,6 +958,36 @@ func buildClusterOptions(addrs []string, cfg config.ConnectionConfig, dialer fun
 		opts.ConnMaxLifetime = 2 * time.Minute
 	}
 	return opts
+}
+
+// go-redis 的自定义 Dialer 优先于 TLSConfig；代理/SSH Cluster 必须自行完成 TLS。
+func withTLS(dialer func(context.Context, string, string) (net.Conn, error), cfg *tls.Config) func(context.Context, string, string) (net.Conn, error) {
+	if cfg == nil {
+		return dialer
+	}
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		ctx, cancel := context.WithTimeout(ctx, redisConnectTimeout)
+		defer cancel()
+		conn, err := dialer(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+		tlsCfg := cfg.Clone()
+		if tlsCfg.ServerName == "" {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				conn.Close()
+				return nil, err
+			}
+			tlsCfg.ServerName = host
+		}
+		tlsConn := tls.Client(conn, tlsCfg)
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			conn.Close()
+			return nil, err
+		}
+		return tlsConn, nil
+	}
 }
 
 func remainingConnectTimeout(start time.Time) time.Duration {

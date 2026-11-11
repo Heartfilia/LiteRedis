@@ -21,7 +21,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.5'
+          go-version-file: go.mod
           cache: true
 
       - name: Setup Node
@@ -42,6 +42,13 @@ jobs:
       - name: Frontend lint
         run: npm run lint
         working-directory: frontend
+
+      - name: Frontend dependency audit
+        run: npm audit --audit-level=moderate
+        working-directory: frontend
+
+      - name: Go vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
       - name: Go vet
         run: CGO_ENABLED=0 go vet ./...
@@ -87,7 +94,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.5'
+          go-version-file: go.mod
           cache: true
 
       - name: Setup Node
@@ -134,7 +141,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.5'
+          go-version-file: go.mod
           cache: true
 
       - name: Setup Node
@@ -180,7 +187,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.5'
+          go-version-file: go.mod
           cache: true
 
       - name: Setup Node

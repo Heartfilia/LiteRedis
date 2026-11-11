@@ -13,7 +13,7 @@
           </div>
           <div class="ps-header-actions">
             <button class="ps-btn" :disabled="!messages.length" @click="clearMessages">{{ t('pubsub.clear') }}</button>
-            <button class="ps-close" :title="t('keyEditor.close')" @click="$emit('close')">✕</button>
+            <button class="ps-close" :title="t('keyEditor.close')" @click="closePanel">✕</button>
           </div>
         </div>
 
@@ -80,6 +80,7 @@ import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
+import { confirmDiscardEdits, registerEditorGuard } from '../../utils/editSafety.js'
 import { startPubSub, stopPubSub, getPubSubStatus, publishMessage } from '../../api/wails.js'
 
 const props = defineProps({
@@ -104,6 +105,12 @@ const publishPayload = ref('')
 const publishing = ref(false)
 const publishStatus = ref('')
 const publishFailed = ref(false)
+const unregisterEditor = registerEditorGuard(Symbol('publish'), () => ({
+  dirty: publishPayload.value !== '', saving: publishing.value,
+  discard: () => { publishPayload.value = '' },
+}))
+onBeforeUnmount(unregisterEditor)
+async function closePanel() { if (await confirmDiscardEdits()) emit('close') }
 let publishTimer = null
 let seq = 0
 
@@ -191,7 +198,7 @@ async function doPublish() {
   } finally {
     publishing.value = false
     if (publishTimer) clearTimeout(publishTimer)
-    publishTimer = setTimeout(() => { publishStatus.value = '' }, 3000)
+    if (!publishFailed.value) publishTimer = setTimeout(() => { publishStatus.value = '' }, 3000)
   }
 }
 
@@ -206,7 +213,7 @@ async function copyPayload(msg) {
 
 let disposeEscape = null
 onMounted(async () => {
-  disposeEscape = registerEscapeHandler(() => emit('close'))
+  disposeEscape = registerEscapeHandler(closePanel)
   EventsOn('pubsub:batch', onBatch)
   try {
     const status = await getPubSubStatus(props.connId)

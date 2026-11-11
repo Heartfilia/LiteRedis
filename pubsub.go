@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -178,15 +179,18 @@ func (a *App) flushPubSub(sess *pubSubSession) {
 func (a *App) PublishMessage(connID, channel, payload string) (int64, error) {
 	channel = strings.TrimSpace(channel)
 	if channel == "" {
-		return 0, errors.New("请填写要发布的频道")
+		return 0, errors.New("invalid: 请填写要发布的频道")
 	}
-	client, err := a.manager.GetClient(connID)
+	ctx, client, done, err := a.operationClient(connID, 5*time.Second)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("rejected: %w", err)
 	}
-	ctx, cancel := context.WithTimeout(a.pubSubContext(), 5*time.Second)
-	defer cancel()
-	return client.Publish(ctx, channel, payload).Result()
+	defer done()
+	n, err := client.Publish(ctx, channel, payload).Result()
+	if err != nil {
+		return 0, fmt.Errorf("%s: %s", writeResult(err).Code, writeResult(err).Message)
+	}
+	return n, nil
 }
 
 // StopPubSub 停止订阅

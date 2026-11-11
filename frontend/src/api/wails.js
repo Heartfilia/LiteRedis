@@ -3,8 +3,39 @@
  * 所有后端方法通过 window.go.main.App.XXX() 调用
  */
 
-function callGo(method, ...args) {
-  return window.go.main.App[method](...args)
+import { guardedWrite } from '../utils/writeSafety.js'
+
+const writes = new Set(['DeleteKey', 'RenameKey', 'SetTTL', 'SetString', 'CreateKey', 'HSet', 'HDel', 'LPush', 'RPush', 'LSet', 'LRem', 'SAdd', 'SRem', 'RenameSetMember', 'ZAdd', 'ZRem', 'RenameZSetMember', 'BatchDeleteKeys', 'BatchSetKeysTTL', 'BatchRenamePrefix', 'ExecuteRedisCommand', 'ExecuteRedisCommandForce'])
+const wholeConnectionWrites = new Set(['RenameKey', 'BatchDeleteKeys', 'BatchSetKeysTTL', 'BatchRenamePrefix', 'ExecuteRedisCommand', 'ExecuteRedisCommandForce'])
+const consoleVerificationRead = /^(?:GET|MGET|TYPE|TTL|PTTL|EXISTS|STRLEN|LLEN|LRANGE|LINDEX|SCARD|SMEMBERS|SISMEMBER|HLEN|HGET|HMGET|HGETALL|ZCARD|ZSCORE|ZRANGE|XLEN|XRANGE|INFO|DBSIZE|PING)\s/i
+
+async function callGo(method, ...args) {
+  const invoke = () => window.go.main.App[method](...args)
+  if (method === 'ImportKeysFromFile' || method === 'CopyKeysToDatabase' || method === 'CopyKeysToConnection') {
+    const target = method === 'CopyKeysToConnection' ? args[1] : args[0]
+    return guardedWrite(method, [target], invoke, true)
+  }
+  if (method === 'PublishMessage') {
+    const result = await guardedWrite(method, args, async () => {
+      try { return { success: true, receivers: await invoke() } }
+      catch (error) {
+        const message = String(error?.message || error)
+        const code = /^(invalid|rejected|permission_denied|unsupported|cluster_redirect):/.exec(message)?.[1] || 'outcome_unknown'
+        return { success: false, code, message }
+      }
+    }, true)
+    if (!result.success) throw new Error(result.message)
+    return result.receivers
+  }
+  // Let users verify uncertain writes in the Console without first unlocking.
+  if (method.startsWith('ExecuteRedisCommand') && consoleVerificationRead.test(args[1] + ' ')) {
+    try { return await invoke() } catch { return { success: false, code: 'read_failed', error: '读取失败，请检查连接' } }
+  }
+  if (method === 'SetStringChecked' || method === 'HSetChecked') return guardedWrite(method, [args[0], args[2]], invoke)
+  if (method === 'CreateKey') return guardedWrite(method, [args[0], args[1].key.trim()], invoke)
+  if (writes.has(method)) return guardedWrite(method, args, invoke, wholeConnectionWrites.has(method))
+  const result = await invoke()
+  return result
 }
 
 // ===== 连接管理 =====
@@ -22,6 +53,7 @@ export const selectDB = (id, db) => callGo('SelectDB', id, db)
 export const getConnectionOverview = (id) => callGo('GetConnectionOverview', id)
 export const getConnectionDB = (connID) => callGo('GetConnectionDB', connID)
 export const scanMemoryReport = (connID, pattern, maxKeys) => callGo('ScanMemoryReport', connID, pattern, maxKeys)
+export const scanMemoryReportForDB = (connID, db, pattern, maxKeys) => callGo('ScanMemoryReportForDB', connID, db, pattern, maxKeys)
 export const cancelMemoryScan = () => callGo('CancelMemoryScan')
 export const getSlowLog = (connID, count) => callGo('GetSlowLog', connID, count)
 
@@ -31,6 +63,7 @@ export const stopPubSub = (connID) => callGo('StopPubSub', connID)
 export const getPubSubStatus = (connID) => callGo('GetPubSubStatus', connID)
 export const publishMessage = (connID, channel, payload) => callGo('PublishMessage', connID, channel, payload)
 export const exportKeysToFile = (connID, keys, format) => callGo('ExportKeysToFile', connID, keys, format)
+export const cancelKeyExport = () => callGo('CancelKeyExport')
 export const copyKeysToConnection = (srcConnID, dstConnID, keys, overwrite) => callGo('CopyKeysToConnection', srcConnID, dstConnID, keys, overwrite)
 export const copyKeysToDatabase = (connID, keys, dstDB, overwrite) => callGo('CopyKeysToDatabase', connID, keys, dstDB, overwrite)
 export const getDatabases = (connID) => callGo('GetDatabases', connID)
@@ -60,6 +93,12 @@ export const getValue = (connID, key, cursor, offset, zsetSort = '', streamStart
 export const searchValue = (connID, key, keyType, pattern, exact = false, cursor = 0) =>
   callGo('SearchValue', connID, key, keyType, pattern, exact, cursor)
 export const setString = (connID, key, value) => callGo('SetString', connID, key, value)
+export const setStringChecked = (connID, db, key, value, token) => callGo('SetStringChecked', connID, db, key, value, token)
+export const hSetChecked = (connID, db, key, field, value, expected, existed) => callGo('HSetChecked', connID, db, key, field, value, expected, existed)
+export const closeApp = () => callGo('CloseApp')
+export const frontendReady = () => callGo('FrontendReady')
+export const listOperationTasks = () => callGo('ListOperationTasks')
+export const cancelOperationTask = (id) => callGo('CancelOperationTask', id)
 export const createKey = (connID, req) => callGo('CreateKey', connID, req)
 export const hSet = (connID, key, field, value) => callGo('HSet', connID, key, field, value)
 export const hDel = (connID, key, field) => callGo('HDel', connID, key, field)

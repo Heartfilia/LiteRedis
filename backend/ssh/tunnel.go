@@ -92,9 +92,7 @@ func sshAddress(host string, port int) string {
 
 func buildAuthMethods(password string, privateKeyPath string, passphrase string) ([]gossh.AuthMethod, error) {
 	authMethods := make([]gossh.AuthMethod, 0, 4)
-	password = strings.TrimSpace(password)
 	privateKeyPath = strings.TrimSpace(privateKeyPath)
-	passphrase = strings.TrimSpace(passphrase)
 
 	if password != "" {
 		config.AppendDebugLog("[ssh] add password auth")
@@ -468,54 +466,26 @@ func MakeDialer(sshClient *gossh.Client, timeout time.Duration) func(network, ad
 		timeout = defaultSSHDialTimeout
 	}
 	return func(network, addr string) (net.Conn, error) {
-		type result struct {
-			conn net.Conn
-			err  error
-		}
-		done := make(chan result, 1)
-		go func() {
-			config.AppendDebugLog("[ssh] tunnel dial begin network=%s addr=%s timeout=%s", network, addr, timeout)
-			conn, err := sshClient.Dial(network, addr)
-			if err != nil {
-				config.AppendDebugLog("[ssh] tunnel dial failed addr=%s err=%v", addr, err)
-				done <- result{nil, err}
-				return
-			}
-			config.AppendDebugLog("[ssh] tunnel dial ok addr=%s", addr)
-			done <- result{&deadlineConn{Conn: conn}, nil}
-		}()
-		select {
-		case r := <-done:
-			return r.conn, r.err
-		case <-time.After(timeout):
-			config.AppendDebugLog("[ssh] tunnel dial timeout addr=%s timeout=%s", addr, timeout)
-			return nil, fmt.Errorf("ssh dial %s timeout after %v", addr, timeout)
-		}
+		return MakeContextDialer(sshClient, timeout)(context.Background(), network, addr)
 	}
 }
 
 // MakeContextDialer 返回一个符合 go-redis Dialer 签名的函数（带 context）
 // 会同时尊重 ctx 取消和 timeout 限制
 func MakeContextDialer(sshClient *gossh.Client, timeout time.Duration) func(ctx context.Context, network, addr string) (net.Conn, error) {
-	dialer := MakeDialer(sshClient, timeout)
-	if dialer == nil {
+	if sshClient == nil {
 		return nil
 	}
+	if timeout <= 0 {
+		timeout = defaultSSHDialTimeout
+	}
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		type result struct {
-			conn net.Conn
-			err  error
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		conn, err := sshClient.DialContext(ctx, network, addr)
+		if err != nil {
+			return nil, err
 		}
-		done := make(chan result, 1)
-		go func() {
-			conn, err := dialer(network, addr)
-			done <- result{conn, err}
-		}()
-		select {
-		case r := <-done:
-			return r.conn, r.err
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
+		return &deadlineConn{Conn: conn}, nil
 	}
 }

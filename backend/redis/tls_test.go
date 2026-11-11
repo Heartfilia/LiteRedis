@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -9,6 +10,9 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,6 +20,36 @@ import (
 
 	"LiteRedis/backend/config"
 )
+
+func TestCustomDialersNegotiateTLS(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	defer srv.Close()
+	addr := srv.Listener.Addr().String()
+	dialer := (&net.Dialer{}).DialContext
+	tlsCfg := srv.Client().Transport.(*http.Transport).TLSClientConfig.Clone()
+	for _, cluster := range []bool{false, true} {
+		var dial func(context.Context, string, string) (net.Conn, error)
+		if cluster {
+			dial = buildClusterOptions([]string{addr}, config.ConnectionConfig{}, dialer, tlsCfg).Dialer
+		} else {
+			dial = buildRedisOptions(addr, config.ConnectionConfig{}, 0, dialer, tlsCfg).Dialer
+		}
+		conn, err := dial(context.Background(), "tcp", addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tlsConn, ok := conn.(*tls.Conn)
+		if !ok || !tlsConn.ConnectionState().HandshakeComplete {
+			conn.Close()
+			t.Fatalf("cluster=%v: custom dialer returned a plaintext connection", cluster)
+		}
+		conn.Close()
+	}
+	if conn, err := withTLS(dialer, &tls.Config{MinVersion: tls.VersionTLS12})(context.Background(), "tcp", addr); err == nil {
+		conn.Close()
+		t.Fatal("untrusted server certificate was accepted")
+	}
+}
 
 func writeTestCA(t *testing.T) string {
 	t.Helper()

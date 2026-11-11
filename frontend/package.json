@@ -17,16 +17,16 @@
   },
   "dependencies": {
     "pinia": "^3.0.4",
-    "vue": "^3.2.37"
+    "vue": "^3.5.45"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.64.1",
-    "@vitejs/plugin-vue": "^3.0.3",
+    "@vitejs/plugin-vue": "^5.2.4",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-vue": "^9.33.0",
     "prettier": "^3.9.10",
-    "vite": "^3.0.7"
+    "vite": "^6.4.5"
   }
 }

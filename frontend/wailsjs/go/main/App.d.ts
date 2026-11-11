@@ -9,11 +9,17 @@ export function BatchRenamePrefix(arg1:string,arg2:Array<string>,arg3:string,arg
 
 export function BatchSetKeysTTL(arg1:string,arg2:Array<string>,arg3:number):Promise<config.BatchKeyResult>;
 
+export function CancelKeyExport():Promise<config.OperationResult>;
+
 export function CancelMemoryScan():Promise<config.OperationResult>;
+
+export function CancelOperationTask(arg1:string):Promise<boolean>;
 
 export function CheckLatestRelease():Promise<main.VersionInfo>;
 
 export function ClearCommandHistory():Promise<config.OperationResult>;
+
+export function CloseApp():Promise<void>;
 
 export function CompleteOnboarding():Promise<config.OperationResult>;
 
@@ -45,6 +51,8 @@ export function ExportKeysToFile(arg1:string,arg2:Array<string>,arg3:string):Pro
 
 export function ForgetSSHHostFingerprint(arg1:string,arg2:number):Promise<config.OperationResult>;
 
+export function FrontendReady():Promise<void>;
+
 export function GetAppVersion():Promise<string>;
 
 export function GetCommandHistory():Promise<Array<string>>;
@@ -75,6 +83,8 @@ export function HDel(arg1:string,arg2:string,arg3:string):Promise<config.Operati
 
 export function HSet(arg1:string,arg2:string,arg3:string,arg4:string):Promise<config.OperationResult>;
 
+export function HSetChecked(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string,arg7:boolean):Promise<config.EditResult>;
+
 export function ImportConnectionsFromFile():Promise<config.ImportSummary>;
 
 export function ImportKeysFromFile(arg1:string,arg2:boolean):Promise<config.BatchKeyResult>;
@@ -88,6 +98,8 @@ export function LRem(arg1:string,arg2:string,arg3:number,arg4:string):Promise<co
 export function LSet(arg1:string,arg2:string,arg3:number,arg4:string):Promise<config.OperationResult>;
 
 export function ListConnections():Promise<Array<config.ConnectionConfig>>;
+
+export function ListOperationTasks():Promise<Array<main.OperationTask>>;
 
 export function MarkVersionSeen(arg1:string):Promise<config.OperationResult>;
 
@@ -123,11 +135,15 @@ export function ScanKeys(arg1:string,arg2:string,arg3:number,arg4:number):Promis
 
 export function ScanMemoryReport(arg1:string,arg2:string,arg3:number):Promise<config.MemoryReport>;
 
+export function ScanMemoryReportForDB(arg1:string,arg2:number,arg3:string,arg4:number):Promise<config.MemoryReport>;
+
 export function SearchValue(arg1:string,arg2:string,arg3:string,arg4:string,arg5:boolean,arg6:number):Promise<config.KeyValue>;
 
 export function SelectDB(arg1:string,arg2:number):Promise<config.OperationResult>;
 
 export function SetString(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
+
+export function SetStringChecked(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string):Promise<config.EditResult>;
 
 export function SetTTL(arg1:string,arg2:string,arg3:number):Promise<config.OperationResult>;
 

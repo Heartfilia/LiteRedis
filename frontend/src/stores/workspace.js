@@ -4,6 +4,7 @@ import { buildKeyTree } from '../utils/keyTree.js'
 import { useSettingsStore } from './settings.js'
 import { useConnectionsStore } from './connections.js'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../utils/connection.js'
+import { confirmDiscardEdits, hasUnsavedEdits } from '../utils/editSafety.js'
 
 function ensureConnSearchEntry(entry) {
   if (Array.isArray(entry)) {
@@ -214,6 +215,7 @@ export const useWorkspaceStore = defineStore('workspace', {
       const connectionsStore = useConnectionsStore()
       await connectionsStore.handleConnectionFailure(this.activeConnID, error)
       const message = formatConnectionLostMessage(error)
+      if (hasUnsavedEdits()) return { success: false, disconnected: true, message }
       if (options.clearKeyValue !== false) {
         this.keyValue = null
       }
@@ -232,6 +234,7 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     applyConnectionLostState(connId, message) {
       if (!connId || this.activeConnID !== connId) return
+      if (hasUnsavedEdits()) return // Keep the mounted editor and its draft after network loss.
       this._invalidateRequests()
       this.searchSessions = this.searchSessions.map(session => ({
         ...session,
@@ -247,6 +250,7 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     async refreshAfterReconnect(connId) {
       if (!connId || this.activeConnID !== connId) return
+      if (hasUnsavedEdits()) return
       const request = this._beginRequest('reconnect')
       this.keyValueError = null
       const connectionsStore = useConnectionsStore()
@@ -385,7 +389,8 @@ export const useWorkspaceStore = defineStore('workspace', {
       return updated
     },
 
-    setActiveConn(id, name, initDB = 0) {
+    async setActiveConn(id, name, initDB = 0) {
+      if (!await confirmDiscardEdits()) return null
       this._invalidateRequests()
       // 切换连接必须清空多选，否则批量操作会作用到另一个连接的同名 key
       this.selectionMode = false
@@ -769,7 +774,8 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
     },
 
-    closeSession(id) {
+    async closeSession(id) {
+      if (!await confirmDiscardEdits()) return
       this._invalidateRequestScope(`keys:${id}`)
       this.searchSessions = this.searchSessions.filter(s => s.id !== id)
       if (this.activeSessionId === id) {
@@ -786,7 +792,8 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
     },
 
-    removeSession(sessionId) {
+    async removeSession(sessionId) {
+      if (!await confirmDiscardEdits()) return
       this._invalidateRequestScope(`keys:${sessionId}`)
       this.searchSessions = this.searchSessions.filter(s => s.id !== sessionId)
       if (this.activeSessionId === sessionId) {
@@ -803,12 +810,34 @@ export const useWorkspaceStore = defineStore('workspace', {
       }
     },
 
+    // Close only the key view, leaving the connection, DB and search intact.
+    async closeCurrentKey() {
+      if (!this.selectedKey) return false
+      const connID = this.activeConnID
+      const db = this.currentDB
+      const key = this.selectedKey
+      const sequence = this._selectionSequence
+      if (!await confirmDiscardEdits()) return false
+      if (this.activeConnID !== connID || this.currentDB !== db || this.selectedKey !== key || this._selectionSequence !== sequence) return false
+      // Ignore a pending read so closing cannot reopen the editor later.
+      this._selectionSequence++
+      this._invalidateRequestScope('keyValue')
+      this.selectedKey = null
+      this.keyValue = null
+      this.keyValueError = null
+      this.keyValueLoading = false
+      this.keyValueRefreshing = false
+      this._loadingKey = null
+      return true
+    },
+
     /**
      * 选中一个 key，立即更新 selectedKey（UI 即时响应），
      * 异步加载 value。使用"令牌"机制丢弃过时的响应：
      * 若用户在本次请求返回前又点击了其他 key，本次结果自动丢弃。
      */
     async selectKey(key, options = {}) {
+      if (!await confirmDiscardEdits()) return
       const preserveCurrentValue = options?.preserveCurrentValue === true
       this._selectionSequence++
       // 立即切换选中状态，让 UI 即时响应
@@ -1000,6 +1029,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     async batchDeleteSelected() {
+      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
       const keys = [...this.selectedKeys]
       if (!keys.length || !this.activeConnID) return { success: false }
       const connID = this.activeConnID
@@ -1021,6 +1051,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     async batchSetTTLSelected(ttlSec) {
+      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
       const keys = [...this.selectedKeys]
       if (!keys.length || !this.activeConnID) return { success: false }
       const connID = this.activeConnID
@@ -1049,6 +1080,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     async batchRenameSelectedPrefix(oldPrefix, newPrefix) {
+      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
       const keys = [...this.selectedKeys]
       if (!keys.length || !this.activeConnID) return { success: false }
       const connID = this.activeConnID
@@ -1071,6 +1103,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     async deleteCurrentKey() {
+      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
       if (!this.selectedKey || !this.activeConnID) return
       const deletedKey = this.selectedKey
       const request = this._beginRequest('deleteKey', { key: deletedKey, requireSelectedKey: true })
@@ -1125,6 +1158,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     async renameCurrentKey(newKey) {
+      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
       if (!this.selectedKey || !this.activeConnID) return
       const oldKey = this.selectedKey
       const request = this._beginRequest('renameKey', { key: oldKey, requireSelectedKey: true })
@@ -1151,6 +1185,7 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     async updateTTL(ttlSec) {
+      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
       if (!this.selectedKey || !this.activeConnID) return
       const key = this.selectedKey
       const request = this._beginRequest('setTTL', { key, requireSelectedKey: true })
@@ -1217,6 +1252,7 @@ export const useWorkspaceStore = defineStore('workspace', {
 
     async switchDB(db) {
       if (!this.activeConnID) return
+      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
       // 切库同样不能保留其他 DB 的选中项
       this.selectionMode = false
       this.selectedKeys = []

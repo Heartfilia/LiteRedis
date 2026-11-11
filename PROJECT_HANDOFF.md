@@ -1,6 +1,13 @@
 # LiteRedis 项目交接说明
 
-最后更新：2026-07-15
+最后更新：2026-11-11
+
+## 最新补充（2026-11-11）
+
+- 安全修复、大 key 导出及 REL-001～008 可靠性改进已完成代码与自动回归，详见 `SECURITY_REVIEW.md`、`RELIABILITY_PLAN.md`。
+- 当前验证：94 项前端单测、37 项浏览器测试、lint/build、Go 竞态测试/vet/build 通过；真实 Redis 和部分原生实测结果及未完成门禁见 `ACCEPTANCE.md`，不能将下面历史 API 计划的完成状态理解为所有发布验收已完成。
+- 正常名称 macOS 本地包已备份安装，用户连接配置未改；本次更新日志补充尚未重新打包。
+- 用户授权当前全部改动提交并推送 `origin/main`，不打标签、不发布安装包。后续继续保留工作区修改，不强推或覆盖远端历史。
 
 ## 新会话先做什么
 
@@ -20,7 +27,7 @@
 LiteRedis 是一个跨平台 Redis 桌面客户端，使用 Wails 将 Go 后端能力绑定到 Vue 前端。
 
 - 桌面框架：Wails `v2.12.0`。
-- 后端：Go `1.22+`，Redis 客户端为 `go-redis/v9`。
+- 后端：Go `1.26.10+`（标准库安全修复基线），Redis 客户端为 `go-redis/v9`。
 - 前端：Vue 3、Pinia、Vite。
 - 连接能力：普通 Redis、Cluster、SSH 隧道、HTTP/SOCKS Proxy、多 DB。
 - 数据能力：Key 扫描和搜索，String/Hash/List/Set/ZSet 等类型查看与编辑，分页加载，内置 Redis Console。

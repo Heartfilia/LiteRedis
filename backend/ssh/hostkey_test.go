@@ -86,7 +86,7 @@ func TestForgetKnownHost(t *testing.T) {
 	}
 }
 
-func TestTOFUCorruptedFileResets(t *testing.T) {
+func TestTOFUCorruptedFileFailsClosed(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ssh_known_hosts.json")
 	// 写入损坏内容
 	if err := os.WriteFile(path, []byte("not json at all"), 0600); err != nil {
@@ -98,7 +98,10 @@ func TestTOFUCorruptedFileResets(t *testing.T) {
 	})
 
 	key := testPublicKey(t)
-	if err := tofuHostKeyCallback("example.com:22", nil, key); err != nil {
-		t.Fatalf("corrupted file should reset and re-record, got: %v", err)
+	if err := tofuHostKeyCallback("example.com:22", nil, key); err == nil {
+		t.Fatal("corrupted fingerprint store must not silently trust a new host key")
+	}
+	if data, err := os.ReadFile(path); err != nil || string(data) != "not json at all" {
+		t.Fatalf("corrupted fingerprint evidence was overwritten: %q %v", data, err)
 	}
 }

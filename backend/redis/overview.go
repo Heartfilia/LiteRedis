@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -191,7 +192,15 @@ func ExecuteRedisCommand(ctx context.Context, client redis.UniversalClient, comm
 	result, execErr := client.Do(ctx, args...).Result()
 	elapsedMs := time.Since(start).Milliseconds()
 	if execErr != nil {
+		code := RedisErrorCode(execErr)
+		if IsReadOnlyCommandAllowed(command) {
+			code = "read_failed"
+		}
+		if errors.Is(execErr, redis.Nil) {
+			return config.RedisConsoleResult{Success: true, Command: command, Output: "(nil)", ElapsedMs: elapsedMs}
+		}
 		return config.RedisConsoleResult{
+			Code:      code,
 			Success:   false,
 			Command:   command,
 			Error:     execErr.Error(),
@@ -227,9 +236,25 @@ func ExecuteRedisCommandWithState(ctx context.Context, client redis.UniversalCli
 	}
 
 	cmdName, ok := args[0].(string)
+	if ok {
+		switch strings.ToUpper(cmdName) {
+		case "MULTI", "EXEC", "DISCARD", "WATCH", "UNWATCH", "SUBSCRIBE", "PSUBSCRIBE", "SSUBSCRIBE", "MONITOR", "AUTH", "HELLO", "QUIT", "RESET", "READONLY", "READWRITE", "ASKING":
+			return config.RedisConsoleResult{Code: "rejected", Command: command, Error: "此 Console 使用独立的一次性连接，不支持会话状态命令；订阅请使用发布订阅面板"}
+		case "CLIENT":
+			if !IsReadOnlyCommandAllowed(command) {
+				return config.RedisConsoleResult{Code: "rejected", Command: command, Error: "此 Console 不支持改变客户端会话状态"}
+			}
+		}
+	}
 	if ok && strings.EqualFold(strings.TrimSpace(cmdName), "select") && state != nil {
 		start := time.Now()
-		if len(args) < 2 {
+		// Keep SELECT syntax identical to the frontend navigation guard. Quoted or
+		// escaped spellings must not change DB without checking editor drafts.
+		parts := strings.Fields(command)
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "SELECT") || parts[1] == "" || strings.IndexFunc(parts[1], func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
+			return config.RedisConsoleResult{Code: "invalid", Command: command, Error: "SELECT 仅支持 SELECT <非负十进制 DB 编号>"}
+		}
+		if len(args) != 2 {
 			return config.RedisConsoleResult{
 				Success:   false,
 				Command:   command,

@@ -113,7 +113,7 @@
       </span>
     </div>
 
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :save-message="msg" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
     <ExtractMenu
       :visible="extractMenu.visible"
       :x="extractMenu.x"
@@ -136,6 +136,7 @@ import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { useRowVirtualizer } from '../../utils/virtualList.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
+import { registerEditorGuard } from '../../utils/editSafety.js'
 import { zAdd, zRem, renameZSetMember, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
@@ -162,6 +163,12 @@ const showAdd = ref(false)
 const newMember = ref('')
 const newScore = ref(0)
 const editingMember = ref(null)
+const writeSaving = ref(false)
+const unregisterEditor = registerEditorGuard(Symbol('zset'), () => ({
+  dirty: editingMember.value !== null || (showAdd.value && newMember.value !== ''), saving: writeSaving.value || expandSaving.value,
+  discard: () => { editingMember.value = null; newMember.value = ''; showAdd.value = false },
+}))
+onBeforeUnmount(unregisterEditor)
 const editScore = ref(0)
 const msg = ref('')
 const ok = ref(true)
@@ -299,6 +306,10 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.keyValue, (kv) => {
+  expandShow.value = false
+  editingMember.value = null
+  showAdd.value = false
+  newMember.value = ''
   requestGuard.invalidateAll()
   persistSearchState(lastKey.value)
   valueLoading.value = false
@@ -591,28 +602,30 @@ async function saveFromModal(newMember) {
 }
 
 async function saveEdit(member) {
-  if (editingMember.value !== member) return
+  if (editingMember.value !== member || writeSaving.value) return
   const score = editScore.value
   const request = requestGuard.begin(`write:score:${member}`)
-  editingMember.value = null
+  writeSaving.value = true
   try {
     const result = await zAdd(request.context.connID, request.context.key, member, score)
     if (!requestGuard.isCurrent(request)) return
     if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) upsertLocalMember(member, score)
+    if (result.success) { upsertLocalMember(member, score); editingMember.value = null }
   } catch(e) {
     if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
   } finally {
+    writeSaving.value = false
     requestGuard.finish(request)
   }
 }
 
 async function addMember() {
-  if (!newMember.value.trim()) return
+  if (!newMember.value.trim() || writeSaving.value) return
+  writeSaving.value = true
   const member = newMember.value
   const score = newScore.value
   const request = requestGuard.begin('write:add')
@@ -634,6 +647,7 @@ async function addMember() {
       msg.value = e.message
     }
   } finally {
+    writeSaving.value = false
     requestGuard.finish(request)
   }
 }

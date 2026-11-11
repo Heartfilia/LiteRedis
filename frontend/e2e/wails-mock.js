@@ -125,11 +125,17 @@ export async function installWailsMock(page, options = {}) {
           net.up = up
         },
       }
-      // runtime 里的方法一律当空实现，避免未绑定就抛错
+      // Keep the event bridge testable; this is still a browser mock, not a native close.
+      const events = new Map()
+      window.__wailsMock.emit = (name, ...args) => { for (const callback of events.get(name) || []) callback(...args) }
       window.runtime = new Proxy(
         {},
         {
-          get: () => () => {},
+          get: (_target, method) => method === 'EventsOnMultiple' ? (name, callback) => {
+            if (!events.has(name)) events.set(name, new Set())
+            events.get(name).add(callback)
+            return () => events.get(name)?.delete(callback)
+          } : () => {},
         }
       )
     },

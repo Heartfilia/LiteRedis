@@ -857,7 +857,8 @@ async function handleConnect(conn) {
   if (connectionsStore.isConnecting(conn.id)) return
   if (connectionsStore.isConnected(conn.id)) {
     // 已连接：重新激活，恢复该连接的历史状态（如有）
-    const restored = workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
+    const restored = await workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
+    if (restored === null) return
     if (restored) {
       // 恢复历史状态时不阻塞界面，总数后台刷新
       workspaceStore.fetchTotalKeys()
@@ -874,7 +875,8 @@ async function handleConnect(conn) {
   const result = await connectionsStore.connect(conn.id)
   if (result?.message === 'connecting') return
   if (result.success) {
-    const restored = workspaceStore.setActiveConn(conn.id, conn.name, result.init_db || 0)
+    const restored = await workspaceStore.setActiveConn(conn.id, conn.name, result.init_db || 0)
+    if (restored === null) return
     workspaceStore.keyValueError = null
     workspaceStore.keyValueLoading = false
     if (restored) {
@@ -895,7 +897,7 @@ async function removeConnection(id) {
   const result = await connectionsStore.remove(id)
   if (result?.success) {
     if (activeConnID.value === id) {
-      workspaceStore.setActiveConn(null, '')
+      await workspaceStore.setActiveConn(null, '')
     }
     delete workspaceStore.connStates[id]
     workspaceStore.clearSearchHistory(id)
@@ -906,9 +908,9 @@ async function removeConnection(id) {
 
 // 断开连接
 async function disconnectConn(id) {
-  await connectionsStore.disconnect(id)
+  if (await connectionsStore.disconnect(id) === false) return
   if (activeConnID.value === id) {
-    workspaceStore.setActiveConn(null, '')
+    await workspaceStore.setActiveConn(null, '')
   }
   delete workspaceStore.connStates[id]
 }

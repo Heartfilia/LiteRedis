@@ -1,15 +1,15 @@
 module LiteRedis
 
-go 1.22.0
+go 1.26.10
 
 require (
 	github.com/alicebob/miniredis/v2 v2.37.0
 	github.com/google/uuid v1.6.0
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/wailsapp/wails/v2 v2.12.0
-	golang.org/x/crypto v0.33.0
-	golang.org/x/mod v0.23.0
-	golang.org/x/net v0.35.0
+	golang.org/x/crypto v0.57.0
+	golang.org/x/mod v0.41.0
+	golang.org/x/net v0.60.0
 )
 
 require (
@@ -40,6 +40,6 @@ require (
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )

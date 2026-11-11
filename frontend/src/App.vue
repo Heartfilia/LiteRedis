@@ -5,6 +5,16 @@
   >
     <Sidebar :theme-mode="settingsStore.themeMode || 'light'" />
     <MainContent />
+    <OperationTasks />
+    <ConfirmationDialog />
+    <aside v-if="uncertainWrites.length" class="write-warning" role="alert">
+      <div>{{ t('reliability.outcomeUnknown') }}</div>
+      <div v-for="write in uncertainWrites" :key="write.scope">
+        {{ write.method }} · {{ write.key ?? write.connID }}
+        <pre v-if="write.detail">{{ write.detail }}</pre>
+        <button @click="acknowledgeUnknown(write.scope)">{{ t('reliability.verifiedWrite') }}</button>
+      </div>
+    </aside>
     <ConnectionManager
       v-if="showConnManager"
       :initial-connection="connManagerInitialConnection"
@@ -57,11 +67,56 @@ import SettingsModal from './components/settings/SettingsModal.vue'
 import DiagnosticsModal from './components/settings/DiagnosticsModal.vue'
 import { useConnectionsStore } from './stores/connections.js'
 import { useSettingsStore } from './stores/settings.js'
-import { getAppVersion, getReleaseNotes, markVersionSeen, completeOnboarding } from './api/wails.js'
+import { useWorkspaceStore } from './stores/workspace.js'
+import { getAppVersion, getReleaseNotes, markVersionSeen, completeOnboarding, closeApp, frontendReady } from './api/wails.js'
+import { EventsOn } from '../wailsjs/runtime/runtime.js'
+import { confirmDiscardEdits, hasUnsavedEdits, hasSavingEdits } from './utils/editSafety.js'
+import OperationTasks from './components/common/OperationTasks.vue'
+import ConfirmationDialog from './components/common/ConfirmationDialog.vue'
+import { askConfirmation, confirmation } from './utils/confirm.js'
+import { uncertainWrites, acknowledgeWrite } from './utils/writeSafety.js'
+import { useI18n } from './i18n/index.js'
 import { RELEASE_NOTES } from './changelog.js'
 
 const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
+const workspaceStore = useWorkspaceStore()
+const { t } = useI18n()
+async function acknowledgeUnknown(scope) {
+  if (await askConfirmation(t('reliability.verifyWriteConfirm'))) acknowledgeWrite(scope)
+}
+let disposeCloseRequest = null
+let disposeCloseKeyRequest = null
+let closeRequested = false
+async function requestCloseApp() {
+  if (closeRequested || confirmation.value) return
+  closeRequested = true
+  try {
+    // Saved connection profiles and the active tab do not imply a live Redis.
+    // Keep in-flight saves protected even if heartbeat marked it disconnected.
+    if (connectionsStore.connectedIds.size === 0 && !hasSavingEdits()) {
+      await closeApp()
+      return
+    }
+    const dirty = hasUnsavedEdits()
+    const message = t(dirty ? 'reliability.quitDraftDescription' : 'reliability.quitDescription')
+    const dialog = {
+      title: t('reliability.quitConfirm'),
+      acceptLabel: t(dirty ? 'reliability.discardAndQuit' : 'reliability.quitAction'),
+      cancelLabel: t('reliability.keepWorking'),
+      kind: 'quit',
+      danger: dirty,
+    }
+    if (await confirmDiscardEdits({ alwaysConfirm: true, message, dialog })) await closeApp()
+  } finally { closeRequested = false }
+}
+function requestCloseKey() {
+  if (closeRequested || confirmation.value) return
+  void workspaceStore.closeCurrentKey()
+}
+function preventUnsavedUnload(event) {
+  if (hasUnsavedEdits()) { event.preventDefault(); event.returnValue = '' }
+}
 
 const showConnManager = ref(false)
 const showSettings = ref(false)
@@ -179,6 +234,12 @@ async function dismissWelcome(openCreate) {
 }
 
 onMounted(async () => {
+  disposeCloseRequest = EventsOn('app:close-request', requestCloseApp)
+  disposeCloseKeyRequest = EventsOn('app:close-key', requestCloseKey)
+  void frontendReady()
+  window.addEventListener('literedis:quit', requestCloseApp)
+  window.addEventListener('literedis:close-key', requestCloseKey)
+  window.addEventListener('beforeunload', preventUnsavedUnload)
   // Cmd/Ctrl+R 刷新当前 key，Esc 关闭最上层浮层
   installGlobalShortcuts()
   await Promise.all([connectionsStore.loadConnections(), settingsStore.load()])
@@ -200,6 +261,11 @@ function suppressContextMenu(e) {
 }
 
 onBeforeUnmount(() => {
+  if (typeof disposeCloseRequest === 'function') disposeCloseRequest()
+  if (typeof disposeCloseKeyRequest === 'function') disposeCloseKeyRequest()
+  window.removeEventListener('literedis:quit', requestCloseApp)
+  window.removeEventListener('literedis:close-key', requestCloseKey)
+  window.removeEventListener('beforeunload', preventUnsavedUnload)
   document.removeEventListener('contextmenu', suppressContextMenu)
   window.removeEventListener('literedis:command-palette', togglePalette)
   window.removeEventListener('literedis:open-diagnostics', openDiagnostics)
@@ -228,6 +294,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style>
+.write-warning { position: fixed; top: 8px; left: 28%; right: 16px; z-index: 1100; padding: 10px; max-height: 25vh; overflow: auto; overflow-wrap: anywhere; background: #fffbeb; color: #92400e; border: 1px solid #f59e0b; border-radius: 6px; font-size: 12px; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'HarmonyOS Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
 .app-layout {

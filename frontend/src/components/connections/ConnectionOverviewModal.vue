@@ -7,7 +7,7 @@
             <div class="overview-title">{{ connectionName }}</div>
             <div class="overview-subtitle">{{ overview ? `${overview.host}:${overview.port}` : '' }}</div>
           </div>
-          <button class="overview-close" @click="$emit('close')">✕</button>
+          <button class="overview-close" @click="closeConsole">✕</button>
         </div>
 
         <div class="overview-body">
@@ -144,6 +144,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { REDIS_COMMAND_HINTS, filterCommandNames, suggestArguments, tokenizeCommandLine } from '../../utils/redisCommands.js'
 import { executeRedisCommand, executeRedisCommandForce, getConnectionOverview, getCommandHistory, pushCommandHistory } from '../../api/wails.js'
+import { confirmDiscardEdits, registerEditorGuard } from '../../utils/editSafety.js'
+import { askConfirmation } from '../../utils/confirm.js'
 import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
@@ -160,7 +162,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 let disposeEscape = null
-onMounted(() => { disposeEscape = registerEscapeHandler(() => emit('close')) })
+onMounted(() => { disposeEscape = registerEscapeHandler(closeConsole) })
 onBeforeUnmount(() => { if (disposeEscape) disposeEscape() })
 
 const { t } = useI18n()
@@ -177,6 +179,10 @@ const commandHistory = ref([])
 const historyIndex = ref(-1)
 const draftCommand = ref('')
 const running = ref(false)
+const uncertainCommand = ref(false)
+const unregisterEditor = registerEditorGuard(Symbol('console'), () => ({ dirty: uncertainCommand.value && !!command.value, saving: running.value, discard: () => { command.value = ''; uncertainCommand.value = false } }))
+onBeforeUnmount(unregisterEditor)
+async function closeConsole() { if (await confirmDiscardEdits()) emit('close') }
 const consoleOutputRef = ref(null)
 const consoleInputRef = ref(null)
 let refreshTimer = null
@@ -457,8 +463,8 @@ function parseSelectTargetDB(text) {
   const trimmed = String(text || '').trim()
   if (!/^select\s+/i.test(trimmed)) return null
   const parts = trimmed.split(/\s+/)
-  if (parts.length < 2) return null
-  const db = Number.parseInt(parts[1], 10)
+  if (parts.length !== 2 || !/^\d+$/.test(parts[1])) return null
+  const db = Number(parts[1])
   return Number.isInteger(db) ? db : null
 }
 
@@ -468,13 +474,14 @@ async function runCommand() {
 
   const promptBeforeRun = consolePrompt.value
   const selectTargetDB = parseSelectTargetDB(text)
+  if (selectTargetDB !== null && !await confirmDiscardEdits()) return
   rememberCommand(text)
   running.value = true
 
   try {
     let result = await executeRedisCommand(props.connId, text)
     if (result?.blocked) {
-      const confirmed = window.confirm(t('sidebar.readOnlyCommandConfirm').replace('{cmd}', text))
+      const confirmed = await askConfirmation(t('sidebar.readOnlyCommandConfirm').replace('{cmd}', text))
       if (!confirmed) {
         consoleHistory.value.push({
           prompt: promptBeforeRun,
@@ -489,6 +496,7 @@ async function runCommand() {
       result = await executeRedisCommandForce(props.connId, text)
     }
     let connectionFailureReported = false
+    uncertainCommand.value = ['outcome_unknown', 'partial_possible'].includes(result.code)
     if (result.success) {
       connectionsStore.reportConnectionSuccess(props.connId)
     } else if (isConnectionErrorMessage(result.error)) {
@@ -506,7 +514,7 @@ async function runCommand() {
       meta: formatConsoleMeta(result),
       output: result.success ? (result.output || '(nil)') : `ERR ${result.error || t('keyEditor.failed')}`,
     })
-    command.value = ''
+    if (result.success) command.value = ''
     if (result.success && selectTargetDB !== null) {
       if (overview.value) {
         overview.value = {

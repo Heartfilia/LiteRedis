@@ -1,4 +1,4 @@
-// 全局快捷键：Cmd/Ctrl+R 刷新当前 key，Esc 关闭最上层的浮层
+// 全局快捷键：Cmd/Ctrl+R 刷新、W 关闭 key、Q 确认退出；Esc 关闭浮层。
 const escapeHandlers = []
 let installed = false
 
@@ -29,6 +29,11 @@ export function installGlobalShortcuts() {
   installed = true
   window.addEventListener('keydown', (event) => {
     const cmdOrCtrl = event.metaKey || event.ctrlKey
+    if (cmdOrCtrl && !event.shiftKey && !event.altKey && ['w', 'q'].includes(event.key.toLowerCase())) {
+      event.preventDefault()
+      if (!event.repeat) window.dispatchEvent(new CustomEvent(event.key.toLowerCase() === 'w' ? 'literedis:close-key' : 'literedis:quit'))
+      return
+    }
     if (cmdOrCtrl && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'k') {
       event.preventDefault()
       window.dispatchEvent(new CustomEvent('literedis:command-palette'))

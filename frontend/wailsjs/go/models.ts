@@ -65,6 +65,7 @@ export namespace config {
 	    }
 	}
 	export class BatchKeyResult {
+	    code?: string;
 	    success: boolean;
 	    affected: number;
 	    failed: number;
@@ -76,6 +77,7 @@ export namespace config {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
 	        this.success = source["success"];
 	        this.affected = source["affected"];
 	        this.failed = source["failed"];
@@ -224,6 +226,24 @@ export namespace config {
 	        this.score = source["score"];
 	    }
 	}
+	export class EditResult {
+	    success: boolean;
+	    code?: string;
+	    message?: string;
+	    edit_token?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new EditResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.code = source["code"];
+	        this.message = source["message"];
+	        this.edit_token = source["edit_token"];
+	    }
+	}
 	export class ImportSummary {
 	    added: number;
 	    updated: number;
@@ -290,6 +310,8 @@ export namespace config {
 	    next_stream_id?: string;
 	    total_count: number;
 	    truncated?: boolean;
+	    read_only_reason?: string;
+	    edit_token?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new KeyValue(source);
@@ -312,6 +334,8 @@ export namespace config {
 	        this.next_stream_id = source["next_stream_id"];
 	        this.total_count = source["total_count"];
 	        this.truncated = source["truncated"];
+	        this.read_only_reason = source["read_only_reason"];
+	        this.edit_token = source["edit_token"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -396,6 +420,11 @@ export namespace config {
 	    truncated: boolean;
 	    size_unavailable: boolean;
 	    size_source?: string;
+	    size_unavailable_reason?: string;
+	    memory_share_unavailable_reason?: string;
+	    redis_used_memory_bytes: number;
+	    memory_share_percent?: number;
+	    memory_share_partial: boolean;
 	    elapsed_ms: number;
 	    big_keys: MemoryKeyInfo[];
 	    prefixes: MemoryPrefixStat[];
@@ -418,6 +447,11 @@ export namespace config {
 	        this.truncated = source["truncated"];
 	        this.size_unavailable = source["size_unavailable"];
 	        this.size_source = source["size_source"];
+	        this.size_unavailable_reason = source["size_unavailable_reason"];
+	        this.memory_share_unavailable_reason = source["memory_share_unavailable_reason"];
+	        this.redis_used_memory_bytes = source["redis_used_memory_bytes"];
+	        this.memory_share_percent = source["memory_share_percent"];
+	        this.memory_share_partial = source["memory_share_partial"];
 	        this.elapsed_ms = source["elapsed_ms"];
 	        this.big_keys = this.convertValues(source["big_keys"], MemoryKeyInfo);
 	        this.prefixes = this.convertValues(source["prefixes"], MemoryPrefixStat);
@@ -444,6 +478,7 @@ export namespace config {
 	}
 	
 	export class OperationResult {
+	    code?: string;
 	    success: boolean;
 	    message?: string;
 	    disconnected?: boolean;
@@ -454,6 +489,7 @@ export namespace config {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
 	        this.success = source["success"];
 	        this.message = source["message"];
 	        this.disconnected = source["disconnected"];
@@ -512,6 +548,7 @@ export namespace config {
 	    }
 	}
 	export class RedisConsoleResult {
+	    code?: string;
 	    success: boolean;
 	    command: string;
 	    output?: string;
@@ -525,6 +562,7 @@ export namespace config {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
 	        this.success = source["success"];
 	        this.command = source["command"];
 	        this.output = source["output"];
@@ -722,6 +760,78 @@ export namespace main {
 	        this.error = source["error"];
 	    }
 	}
+	export class OperationFailure {
+	    key: string;
+	    code: string;
+	    message: string;
+
+	    static createFrom(source: any = {}) {
+	        return new OperationFailure(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.code = source["code"];
+	        this.message = source["message"];
+	    }
+	}
+	export class OperationTask {
+	    id: string;
+	    kind: string;
+	    conn_id: string;
+	    db: number;
+	    target_conn_id?: string;
+	    target_db: number;
+	    total: number;
+	    processed: number;
+	    succeeded: number;
+	    skipped: number;
+	    failed: number;
+	    state: string;
+	    message?: string;
+	    failures: OperationFailure[];
+
+	    static createFrom(source: any = {}) {
+	        return new OperationTask(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.kind = source["kind"];
+	        this.conn_id = source["conn_id"];
+	        this.db = source["db"];
+	        this.target_conn_id = source["target_conn_id"];
+	        this.target_db = source["target_db"];
+	        this.total = source["total"];
+	        this.processed = source["processed"];
+	        this.succeeded = source["succeeded"];
+	        this.skipped = source["skipped"];
+	        this.failed = source["failed"];
+	        this.state = source["state"];
+	        this.message = source["message"];
+	        this.failures = this.convertValues(source["failures"], OperationFailure);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class PubSubStatus {
 	    running: boolean;
 	    channels: string[];
@@ -808,4 +918,3 @@ export namespace main {
 	}
 
 }
-

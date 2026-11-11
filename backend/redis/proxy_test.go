@@ -5,10 +5,119 @@ import (
 	"context"
 	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"LiteRedis/backend/config"
 )
+
+func TestHTTPSProxyNeverSendsPlaintextCredentials(t *testing.T) {
+	firstByte := make(chan byte, 1)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		buf := make([]byte, 1)
+		if _, err := io.ReadFull(conn, buf); err == nil {
+			firstByte <- buf[0]
+		}
+	}()
+	dialer, err := makeProxyDialer("https://alice:secret@"+ln.Addr().String(), time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conn, err := dialer(context.Background(), "tcp", "redis.internal:6379"); err == nil {
+		conn.Close()
+		t.Fatal("plaintext proxy unexpectedly accepted")
+	}
+	select {
+	case b := <-firstByte:
+		if b != 0x16 {
+			t.Fatalf("expected TLS handshake record, got %q", b)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("proxy received no handshake")
+	}
+}
+
+func TestHTTPSProxyRejectsUntrustedCertificate(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	dialer, err := makeProxyDialer(srv.URL, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conn, err := dialer(context.Background(), "tcp", "redis.internal:6379"); err == nil {
+		conn.Close()
+		t.Fatal("untrusted HTTPS proxy certificate was accepted")
+	}
+}
+
+func TestProxyHandshakeHonorsCancellation(t *testing.T) {
+	for _, scheme := range []string{"http", "socks5"} {
+		t.Run(scheme, func(t *testing.T) {
+			ln, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer ln.Close()
+			closed := make(chan struct{})
+			go func() {
+				conn, err := ln.Accept()
+				if err != nil {
+					return
+				}
+				defer conn.Close()
+				_, _ = io.Copy(io.Discard, conn)
+				close(closed)
+			}()
+			dialer, err := makeProxyDialer(scheme+"://"+ln.Addr().String(), 10*time.Second)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			time.AfterFunc(50*time.Millisecond, cancel)
+			if conn, err := dialer(ctx, "tcp", "127.0.0.1:6379"); err == nil {
+				conn.Close()
+				t.Fatal("cancelled handshake succeeded")
+			}
+			select {
+			case <-closed:
+			case <-time.After(2 * time.Second):
+				t.Fatal("cancelled proxy connection was leaked")
+			}
+		})
+	}
+}
+
+func TestConnectionRejectsAmbiguousTransport(t *testing.T) {
+	for _, cfg := range []config.ConnectionConfig{
+		{ProxyEnabled: true},
+		{SSHEnabled: true},
+		{SSHEnabled: true, SSH: &config.SSHConfig{}, ProxyEnabled: true, ProxyURL: "http://localhost:80", IsCluster: true},
+	} {
+		if err := TestConnection(cfg); err == nil {
+			t.Fatalf("invalid transport accepted: %+v", cfg)
+		}
+		if err := NewClientManager().Connect(cfg); err == nil {
+			t.Fatal("Connect accepted invalid transport")
+		}
+	}
+}
 
 // fakeProxyStart 启动一个模拟 HTTP CONNECT 代理，respond 为对每个 CONNECT 请求的响应写法
 func fakeProxyStart(t *testing.T, respond func(conn net.Conn)) string {
@@ -113,7 +222,7 @@ func TestHTTPProxyConnectRejectsFake200Substring(t *testing.T) {
 func TestHTTPProxyConnectHangTimeout(t *testing.T) {
 	// 代理接受请求但不响应，deadline 应使拨号超时而非永久挂起
 	addr := fakeProxyStart(t, func(conn net.Conn) {
-		select {}
+		_, _ = io.Copy(io.Discard, conn)
 	})
 	start := time.Now()
 	err := dialViaProxy(t, "http://"+addr)

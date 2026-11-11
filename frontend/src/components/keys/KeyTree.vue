@@ -5,6 +5,10 @@
     </div>
     <template v-else>
       <KeySearchBar />
+      <div v-if="exporting" class="batch-bar" role="status">
+        <span class="batch-info">{{ t('keyTree.exporting') }}</span>
+        <button class="batch-btn" @click="cancelExport">{{ t('sidebar.cancel') }}</button>
+      </div>
       <!-- SearchTabs 只在单session模式显示 -->
       <SearchTabs v-if="!workspaceStore.keepPrevSearch && !showClusterEmptyHint" />
 
@@ -293,6 +297,7 @@
           </template>
           <template v-else>
             <div class="more-title">{{ t('keyTree.copyToTarget') }}</div>
+            <div class="more-subtitle">{{ t('keyTree.transferLimit') }}</div>
             <template v-if="!isCluster">
               <div class="more-subtitle">{{ t('keyTree.copyToDb') }}</div>
               <div v-if="dbGridMode === 'input'" class="db-input-row">
@@ -341,8 +346,9 @@ import SearchTabs from './SearchTabs.vue'
 import KeyTreeRow from './KeyTreeRow.vue'
 import { buildKeyTree, findKeyAncestors, flattenVisibleRows } from '../../utils/keyTree.js'
 import { useRowVirtualizer } from '../../utils/virtualList.js'
-import { exportKeysToFile, copyKeysToConnection, copyKeysToDatabase, getDatabases, getConnectionDB, importKeysFromFile } from '../../api/wails.js'
+import { exportKeysToFile, cancelKeyExport, copyKeysToConnection, copyKeysToDatabase, getDatabases, getConnectionDB, importKeysFromFile } from '../../api/wails.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
+import { askConfirmation } from '../../utils/confirm.js'
 
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
@@ -671,21 +677,37 @@ async function copyToDB(db) {
   closeMoreMenu()
   const keys = [...workspaceStore.selectedKeys]
   if (!keys.length) return
+  const connID = workspaceStore.activeConnID
+  if (!await askConfirmation(transferMessage(activeConn.value?.name || connID, db, false))) return
   try {
-    const result = await copyKeysToDatabase(workspaceStore.activeConnID, keys, db, false)
+    const result = await copyKeysToDatabase(connID, keys, db, false)
     connectionsStore.showGlobalToast(result?.message || t('keyTree.copyFailed'), !!result?.success)
   } catch (e) {
     connectionsStore.showGlobalToast(e?.message || String(e), false)
   }
 }
 
+const exporting = ref(false)
 async function exportSelected(format) {
+  if (exporting.value) return
   const keys = [...workspaceStore.selectedKeys]
   if (!keys.length) return
+  closeMoreMenu()
+  exporting.value = true
   try {
     const path = await exportKeysToFile(workspaceStore.activeConnID, keys, format)
     if (!path) return
     connectionsStore.showGlobalToast(t('keyTree.exportOk').replace('{path}', path), true)
+  } catch (e) {
+    connectionsStore.showGlobalToast(e?.message || String(e), false)
+  } finally {
+    exporting.value = false
+  }
+}
+
+async function cancelExport() {
+  try {
+    await cancelKeyExport()
   } catch (e) {
     connectionsStore.showGlobalToast(e?.message || String(e), false)
   }
@@ -695,8 +717,12 @@ async function copyTo(target) {
   closeMoreMenu()
   const keys = [...workspaceStore.selectedKeys]
   if (!keys.length) return
+  const srcID = workspaceStore.activeConnID
   try {
-    const result = await copyKeysToConnection(workspaceStore.activeConnID, target.id, keys, false)
+    const db = await getConnectionDB(target.id)
+    if (!await askConfirmation(transferMessage(target.name || target.id, db, true))) return
+    if (await getConnectionDB(target.id) !== db) throw new Error(t('keyTree.transferTargetChanged'))
+    const result = await copyKeysToConnection(srcID, target.id, keys, false)
     if (result?.success) {
       // 目标连接的缓存里没有新数据，切过去时重新加载
       workspaceStore.invalidateConnState(target.id)
@@ -721,6 +747,7 @@ watch(() => moreMenu.value.visible, (visible) => {
 })
 
 onBeforeUnmount(() => {
+  if (exporting.value) void cancelExport()
   if (disposeMenuEscape) disposeMenuEscape()
   if (dbBarObserver) {
     dbBarObserver.disconnect()
@@ -809,12 +836,16 @@ function commonKeyPrefix(keys) {
 
 async function importKeys() {
   if (readOnly.value || !workspaceStore.activeConnID) return
+  const connID = workspaceStore.activeConnID
+  const db = workspaceStore.currentDB
+  if (!await askConfirmation(transferMessage(activeConn.value?.name || connID, db, true))) return
   try {
-    const result = await importKeysFromFile(workspaceStore.activeConnID, false)
+    if (await getConnectionDB(connID) !== db) throw new Error(t('keyTree.transferTargetChanged'))
+    const result = await importKeysFromFile(connID, false)
     if (result?.message) {
       connectionsStore.showGlobalToast(result.message, !!result.success)
     }
-    if (result?.affected > 0) {
+    if (result?.affected > 0 && workspaceStore.activeConnID === connID && workspaceStore.currentDB === db) {
       // 导入完成后刷新当前列表，新 key 才会出现
       const pattern = workspaceStore.activeSession?.pattern || '*'
       await workspaceStore.search(pattern)
@@ -824,8 +855,14 @@ async function importKeys() {
   }
 }
 
+function transferMessage(name, db, staged) {
+  return t('keyTree.transferConfirm').replace('{name}', name).replace('{db}', db)
+    + '\n' + (staged ? t('keyTree.transferLimit') : t('keyTree.transferNativeCopy'))
+}
+
 async function switchDB(db) {
-  await workspaceStore.switchDB(parseInt(db))
+  const result = await workspaceStore.switchDB(parseInt(db))
+  if (result?.cancelled) return
   await workspaceStore.search('*')
 }
 

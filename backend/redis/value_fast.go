@@ -40,18 +40,7 @@ func getValueKnownType(ctx context.Context, client redis.UniversalClient, key, k
 
 	switch keyType {
 	case "string":
-		getCmd := pipe.Get(ctx, key)
-		if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
-			return kv, err
-		}
-		kv.TTL = ttlSecondsOf(ttlCmd.Val())
-		val := getCmd.Val()
-		if len(val) > maxStringValueBytes {
-			val = truncateUTF8Safe(val, maxStringValueBytes)
-			kv.Truncated = true
-		}
-		kv.StringVal = val
-		return kv, nil
+		return readStringPreview(ctx, client, key)
 
 	case "list":
 		cached, hit := peekListChunk(scope, key, int64(offset), listCount)

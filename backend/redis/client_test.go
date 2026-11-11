@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 
 	"LiteRedis/backend/config"
 	"LiteRedis/backend/ssh"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 func TestBuildActiveRedisOptionsRestoresProxy(t *testing.T) {
@@ -31,6 +33,135 @@ func TestBuildActiveRedisOptionsRestoresProxy(t *testing.T) {
 	if opts.Dialer == nil {
 		t.Fatal("proxy dialer was not restored")
 	}
+}
+
+func TestReadClientForDBDoesNotChangeWorkspaceDB(t *testing.T) {
+	ctx := context.Background()
+	client := testRedisClient(t)
+	if err := client.Set(ctx, "workspace", "db0", 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	manager := NewClientManager()
+	manager.clients["test"] = &activeConn{client: client}
+	reader, db, release, err := manager.NewReadClientForDB("test", 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if db != 6 || reader == client {
+		t.Fatal("expected independent DB 6 client")
+	}
+	if err := reader.Set(ctx, "other", "db6", 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	report, err := ScanMemory(ctx, reader, "*", 100, nil)
+	if err != nil || report.ScannedKeys != 1 || report.BigKeys[0].Key != "other" {
+		t.Fatalf("wrong DB scanned: %+v %v", report, err)
+	}
+	if exists := client.Exists(ctx, "other").Val(); exists != 0 {
+		t.Fatal("scan changed workspace DB")
+	}
+	active, err := manager.GetClient("test")
+	if err != nil || active != client {
+		t.Fatal("workspace client replaced")
+	}
+	_, current, _ := manager.GetConnectionState("test")
+	if current != 0 || client.Get(ctx, "workspace").Val() != "db0" {
+		t.Fatal("workspace DB changed")
+	}
+	release()
+	if err := client.Ping(ctx).Err(); err != nil {
+		t.Fatalf("release closed workspace client: %v", err)
+	}
+	currentReader, currentDB, closeCurrent, err := manager.NewReadClientForDB("test", -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeCurrent()
+	if currentDB != 0 || currentReader.Get(ctx, "workspace").Val() != "db0" {
+		t.Fatal("legacy current DB scan changed")
+	}
+}
+
+func TestOperationClientIsPinnedAndDoesNotRetry(t *testing.T) {
+	client := testRedisClient(t)
+	manager := NewClientManager()
+	manager.clients["test"] = &activeConn{client: client}
+	operation, release, err := manager.NewOperationClientForDB("test", 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	opts := operation.(*goredis.Client).Options()
+	if opts.DB != 6 || opts.MaxRetries != 0 || operation == client {
+		t.Fatal("write client is shared, retries enabled or wrong DB")
+	}
+	if err := operation.Set(context.Background(), "pinned", "DB6", 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if client.Exists(context.Background(), "pinned").Val() != 0 {
+		t.Fatal("write changed workspace DB")
+	}
+	cluster := goredis.NewClusterClient(&goredis.ClusterOptions{Addrs: []string{"127.0.0.1:1"}, MaxRetries: 1})
+	defer cluster.Close()
+	manager.clients["cluster"] = &activeConn{client: cluster, cfg: config.ConnectionConfig{IsCluster: true}}
+	writer, closeWriter, err := manager.NewOperationClientForDB("cluster", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeWriter()
+	clusterOpts := writer.(*goredis.ClusterClient).Options()
+	if writer == cluster || clusterOpts.MaxRetries != -1 || clusterOpts.MaxRedirects != 0 {
+		t.Fatal("cluster write replay enabled")
+	}
+}
+
+func TestReadClientForDBPreservesTransportOptions(t *testing.T) {
+	dialer := (&net.Dialer{}).DialContext
+	client := goredis.NewClient(&goredis.Options{
+		Addr: "redis.internal:6380", Username: "acl", Password: "secret", DB: 3,
+		Dialer: dialer, TLSConfig: &tls.Config{ServerName: "redis.internal", MinVersion: tls.VersionTLS12},
+	})
+	defer client.Close()
+	manager := NewClientManager()
+	manager.clients["test"] = &activeConn{client: client, currentDB: 3}
+	reader, db, release, err := manager.NewReadClientForDB("test", 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	opts := reader.(*goredis.Client).Options()
+	if db != 7 || opts.DB != 7 || opts.Addr != client.Options().Addr || opts.Dialer == nil || opts.Username != "acl" || opts.Password != "secret" {
+		t.Fatalf("lost transport options: %+v", opts)
+	}
+	if opts.TLSConfig == client.Options().TLSConfig || opts.TLSConfig.ServerName != "redis.internal" {
+		t.Fatal("TLS config not cloned")
+	}
+}
+
+func TestReadClientForDBRejectsInvalidDBAndRestrictsCluster(t *testing.T) {
+	manager := NewClientManager()
+	client := testRedisClient(t)
+	manager.clients["single"] = &activeConn{client: client}
+	for _, db := range []int{-2, 4096} {
+		if _, _, _, err := manager.NewReadClientForDB("single", db); err == nil {
+			t.Fatalf("accepted DB %d", db)
+		}
+	}
+	if _, _, _, err := manager.NewReadClientForDB("missing", 0); err == nil {
+		t.Fatal("missing connection accepted")
+	}
+	cluster := goredis.NewClusterClient(&goredis.ClusterOptions{Addrs: []string{client.Options().Addr}})
+	defer cluster.Close()
+	manager.clients["cluster"] = &activeConn{client: cluster, cfg: config.ConnectionConfig{IsCluster: true}}
+	if _, _, _, err := manager.NewReadClientForDB("cluster", 1); err == nil {
+		t.Fatal("cluster accepted DB 1")
+	}
+	reader, db, release, err := manager.NewReadClientForDB("cluster", 0)
+	if err != nil || db != 0 || reader != cluster {
+		t.Fatalf("cluster DB 0: %v", err)
+	}
+	release()
 }
 
 func TestJoinHostPortSupportsIPv6(t *testing.T) {

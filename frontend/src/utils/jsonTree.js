@@ -1,3 +1,5 @@
+import { JsonNumber } from './losslessJson.js'
+
 /**
  * 把 JSON 按展开状态压平成可见行，供窗口化渲染使用。
  * path 用 JSON Pointer 风格的转义，避免 key 里带 / 或 ~ 时撞车。
@@ -13,7 +15,7 @@ function escapeKey(key) {
 }
 
 function walk(value, label, path, depth, isExpanded, rows) {
-  const isContainer = value !== null && typeof value === 'object'
+  const isContainer = value !== null && typeof value === 'object' && !(value instanceof JsonNumber)
   rows.push({ path, label, value, depth, isContainer })
   if (!isContainer) return
   if (!isExpanded(path, depth)) return

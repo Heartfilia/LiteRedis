@@ -312,7 +312,7 @@
       </span>
     </div>
 
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :save-blocked="outcomeUnknown" :save-message="msg" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
     <ExtractMenu
       :visible="extractMenu.visible"
       :x="extractMenu.x"
@@ -335,7 +335,8 @@ import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { useRowVirtualizer } from '../../utils/virtualList.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
-import { hSet, hDel, searchValue, getValue } from '../../api/wails.js'
+import { hSetChecked, hDel, searchValue, getValue } from '../../api/wails.js'
+import { editResultMessage, registerEditorGuard } from '../../utils/editSafety.js'
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import FloatingMessage from '../common/FloatingMessage.vue'
@@ -365,6 +366,14 @@ const newField = ref('')
 const newValue = ref('')
 const editingField = ref(null)
 const editValue = ref('')
+const fieldSaving = ref(false)
+const outcomeUnknown = ref(false)
+const unregisterEditor = registerEditorGuard(Symbol('hash'), () => ({
+  dirty: (editingField.value !== null && editValue.value !== rawHashVal.value[editingField.value]) || (showAdd.value && !!(newField.value || newValue.value)),
+  saving: fieldSaving.value || expandSaving.value,
+  discard: () => { editingField.value = null; newField.value = ''; newValue.value = ''; showAdd.value = false },
+}))
+onBeforeUnmount(unregisterEditor)
 const msg = ref('')
 const ok = ref(true)
 const copiedField = ref(null)
@@ -587,12 +596,18 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.keyValue, (kv) => {
+  outcomeUnknown.value = false
   requestGuard.invalidateAll()
   persistSearchState(lastKey.value)
   valueLoading.value = false
   isSearching.value = false
   calculating.value = false
   expandSaving.value = false
+  expandShow.value = false
+  editingField.value = null
+  showAdd.value = false
+  newField.value = ''
+  newValue.value = ''
 
   rawHashVal.value = { ...(kv?.hash_val || {}) }
   hasMore.value = kv?.has_more || false
@@ -1189,26 +1204,27 @@ function openEdit(field, val, event) {
 
 async function saveFromModal(newVal) {
   const field = editModalField.value
-  if (!field) return
+  if (expandSaving.value || outcomeUnknown.value || connectionsStore.isReadOnly(workspaceStore.activeConnID)) return
   const request = requestGuard.begin(`write:modal:${field}`)
   expandSaving.value = true
   try {
-    const result = await hSet(request.context.connID, request.context.key, field, newVal)
+    const result = await hSetChecked(request.context.connID, request.context.db, request.context.key, field, newVal, expandContent.value, true)
     if (!requestGuard.isCurrent(request)) return
-    if (!result.success && await handleConnectionFailure(result.message, request)) return
+    outcomeUnknown.value = ['outcome_unknown', 'partial_possible'].includes(result.code)
     ok.value = result.success
-    msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
+    msg.value = result.success ? t('keyEditor.updated') : editResultMessage(result)
     if (result.success) {
       rawHashVal.value = { ...rawHashVal.value, [field]: newVal }
       if (searchResults.value !== null) {
         searchResults.value = searchResults.value.map(([f, v]) => f === field ? [field, newVal] : [f, v])
       }
-      expandShow.value = false
+      expandContent.value = newVal
     }
   } catch (e) {
-    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
+    if (requestGuard.isCurrent(request)) {
+      outcomeUnknown.value = true
       ok.value = false
-      msg.value = e.message
+      msg.value = t('reliability.outcomeUnknown')
     }
   } finally {
     if (requestGuard.isCurrent(request)) expandSaving.value = false
@@ -1223,28 +1239,31 @@ async function copyVal(val, field) {
 }
 
 async function saveEdit(field) {
-  if (editingField.value !== field) return
+  if (editingField.value !== field || fieldSaving.value || outcomeUnknown.value || connectionsStore.isReadOnly(workspaceStore.activeConnID)) return
   const nextValue = editValue.value
   const request = requestGuard.begin(`write:field:${field}`)
-  editingField.value = null
+  fieldSaving.value = true
   try {
-    const result = await hSet(request.context.connID, request.context.key, field, nextValue)
+    const result = await hSetChecked(request.context.connID, request.context.db, request.context.key, field, nextValue, rawHashVal.value[field], true)
     if (!requestGuard.isCurrent(request)) return
-    if (!result.success && await handleConnectionFailure(result.message, request)) return
+    outcomeUnknown.value = ['outcome_unknown', 'partial_possible'].includes(result.code)
     ok.value = result.success
-    msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
+    msg.value = result.success ? t('keyEditor.updated') : editResultMessage(result)
     if (result.success) {
+      editingField.value = null
       rawHashVal.value = { ...rawHashVal.value, [field]: nextValue }
       if (searchResults.value !== null) {
         searchResults.value = searchResults.value.map(([f, v]) => f === field ? [field, nextValue] : [f, v])
       }
     }
   } catch(e) {
-    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
+    if (requestGuard.isCurrent(request)) {
+      outcomeUnknown.value = true
       ok.value = false
-      msg.value = e.message
+      msg.value = t('reliability.outcomeUnknown')
     }
   } finally {
+    fieldSaving.value = false
     requestGuard.finish(request)
   }
 }
@@ -1277,17 +1296,18 @@ async function deleteField(field) {
 }
 
 async function addField() {
-  if (!newField.value.trim()) return
+  if (!newField.value.trim() || fieldSaving.value || outcomeUnknown.value || connectionsStore.isReadOnly(workspaceStore.activeConnID)) return
   const field = newField.value.trim()
   const value = newValue.value
   const request = requestGuard.begin(`write:add:${field}`)
+  fieldSaving.value = true
   try {
     const existed = Object.prototype.hasOwnProperty.call(rawHashVal.value, field)
-    const result = await hSet(request.context.connID, request.context.key, field, value)
+    const result = await hSetChecked(request.context.connID, request.context.db, request.context.key, field, value, '', false)
     if (!requestGuard.isCurrent(request)) return
-    if (!result.success && await handleConnectionFailure(result.message, request)) return
+    outcomeUnknown.value = ['outcome_unknown', 'partial_possible'].includes(result.code)
     ok.value = result.success
-    msg.value = result.success ? t('keyEditor.added') : (result.message || t('keyEditor.saveFailed'))
+    msg.value = result.success ? t('keyEditor.added') : editResultMessage(result)
     if (result.success) {
       rawHashVal.value = { ...rawHashVal.value, [field]: value }
       if (!existed) {
@@ -1297,11 +1317,13 @@ async function addField() {
       triggerAddFlash()
     }
   } catch(e) {
-    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
+    if (requestGuard.isCurrent(request)) {
+      outcomeUnknown.value = true
       ok.value = false
-      msg.value = e.message
+      msg.value = t('reliability.outcomeUnknown')
     }
   } finally {
+    fieldSaving.value = false
     requestGuard.finish(request)
   }
 }

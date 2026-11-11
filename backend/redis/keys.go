@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -469,7 +470,7 @@ func isUnknownCommandError(err error) bool {
 // 目标 key 已存在时跳过，避免静默覆盖别处数据。返回实际改名数量。
 func RenameKeysPrefix(ctx context.Context, client redis.UniversalClient, keys []string, oldPrefix, newPrefix string) (int, error) {
 	if oldPrefix == "" {
-		return 0, errors.New("旧前缀不能为空")
+		return 0, &InvalidExportError{Err: errors.New("旧前缀不能为空")}
 	}
 	type renamePair struct {
 		from string
@@ -494,35 +495,31 @@ func RenameKeysPrefix(ctx context.Context, client redis.UniversalClient, keys []
 		}
 		chunk := pending[start:end]
 
-		check := client.Pipeline()
-		existsCmds := make([]*redis.IntCmd, len(chunk))
-		for i, pair := range chunk {
-			existsCmds[i] = check.Exists(ctx, pair.to)
-		}
-		if _, err := check.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
-			return renamed, err
-		}
-
 		rename := client.Pipeline()
-		renameCmds := make([]*redis.StatusCmd, len(chunk))
+		renameCmds := make([]*redis.BoolCmd, len(chunk))
 		targets := 0
 		for i, pair := range chunk {
-			if exists, err := existsCmds[i].Result(); err == nil && exists > 0 {
+			if pair.from == pair.to {
 				continue
 			}
-			renameCmds[i] = rename.Rename(ctx, pair.from, pair.to)
+			// 检查和改名必须是同一条原子命令，不能用 EXISTS + RENAME。
+			renameCmds[i] = rename.RenameNX(ctx, pair.from, pair.to)
 			targets++
 		}
 		if targets == 0 {
 			continue
 		}
-		if _, err := rename.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
-			return renamed, err
-		}
+		_, execErr := rename.Exec(ctx)
 		for _, cmd := range renameCmds {
-			if cmd != nil && cmd.Err() == nil {
+			if cmd != nil && cmd.Err() == nil && cmd.Val() {
 				renamed++
 			}
+			if cmd != nil && cmd.Err() != nil && RedisErrorCode(cmd.Err()) == "outcome_unknown" {
+				execErr = cmd.Err()
+			}
+		}
+		if execErr != nil && !errors.Is(execErr, redis.Nil) {
+			return renamed, execErr
 		}
 	}
 	return renamed, nil
@@ -530,6 +527,9 @@ func RenameKeysPrefix(ctx context.Context, client redis.UniversalClient, keys []
 
 // SetKeysTTL 批量设置过期时间；ttlSec < 0 表示移除过期时间（PERSIST）
 func SetKeysTTL(ctx context.Context, client redis.UniversalClient, keys []string, ttlSec int64) (int, error) {
+	if ttlSec > math.MaxInt64/int64(time.Second) {
+		return 0, &InvalidExportError{Err: errors.New("TTL exceeds supported duration")}
+	}
 	applied := 0
 	ttl := time.Duration(ttlSec) * time.Second
 	for start := 0; start < len(keys); start += batchKeyChunk {
@@ -547,13 +547,17 @@ func SetKeysTTL(ctx context.Context, client redis.UniversalClient, keys []string
 				cmds[i] = pipe.Expire(ctx, key, ttl)
 			}
 		}
-		if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
-			return applied, err
-		}
+		_, execErr := pipe.Exec(ctx)
 		for _, cmd := range cmds {
 			if ok, err := cmd.Result(); err == nil && ok {
 				applied++
 			}
+			if cmd.Err() != nil && RedisErrorCode(cmd.Err()) == "outcome_unknown" {
+				execErr = cmd.Err()
+			}
+		}
+		if execErr != nil && !errors.Is(execErr, redis.Nil) {
+			return applied, execErr
 		}
 	}
 	return applied, nil
@@ -566,6 +570,9 @@ func RenameKey(ctx context.Context, client redis.UniversalClient, oldKey, newKey
 
 // SetTTL 设置 key TTL（-1 表示永久，即 PERSIST）
 func SetTTL(ctx context.Context, client redis.UniversalClient, key string, ttlSec int64) error {
+	if ttlSec > math.MaxInt64/int64(time.Second) {
+		return &InvalidExportError{Err: errors.New("TTL exceeds supported duration")}
+	}
 	if ttlSec < 0 {
 		return client.Persist(ctx, key).Err()
 	}
@@ -577,10 +584,10 @@ func CreateKey(ctx context.Context, client redis.UniversalClient, req config.Cre
 	key := strings.TrimSpace(req.Key)
 	keyType := strings.ToLower(strings.TrimSpace(req.Type))
 	if key == "" {
-		return fmt.Errorf("key is required")
+		return &InvalidExportError{Err: errors.New("key is required")}
 	}
 	if keyType == "" {
-		return fmt.Errorf("type is required")
+		return &InvalidExportError{Err: errors.New("type is required")}
 	}
 
 	var value1, value2 string
@@ -590,7 +597,7 @@ func CreateKey(ctx context.Context, client redis.UniversalClient, req config.Cre
 	case "hash":
 		value1 = strings.TrimSpace(req.Field)
 		if value1 == "" {
-			return fmt.Errorf("field is required for hash")
+			return &InvalidExportError{Err: errors.New("field is required for hash")}
 		}
 		value2 = req.Value
 	case "list":
@@ -598,21 +605,24 @@ func CreateKey(ctx context.Context, client redis.UniversalClient, req config.Cre
 	case "set":
 		value1 = strings.TrimSpace(req.Member)
 		if value1 == "" {
-			return fmt.Errorf("member is required for set")
+			return &InvalidExportError{Err: errors.New("member is required for set")}
 		}
 	case "zset":
 		value1 = strings.TrimSpace(req.Member)
 		if value1 == "" {
-			return fmt.Errorf("member is required for zset")
+			return &InvalidExportError{Err: errors.New("member is required for zset")}
 		}
 	case "stream":
 		value1 = strings.TrimSpace(req.Field)
 		if value1 == "" {
-			return fmt.Errorf("field is required for stream")
+			return &InvalidExportError{Err: errors.New("field is required for stream")}
 		}
 		value2 = req.Value
 	default:
-		return fmt.Errorf("unsupported type: %s", keyType)
+		return &InvalidExportError{Err: fmt.Errorf("unsupported type: %s", keyType)}
+	}
+	if req.TTL > math.MaxInt64/int64(time.Second) || (keyType == "zset" && (math.IsNaN(req.Score) || math.IsInf(req.Score, 0))) {
+		return &InvalidExportError{Err: errors.New("invalid TTL or score")}
 	}
 
 	created, err := createKeyScript.Run(

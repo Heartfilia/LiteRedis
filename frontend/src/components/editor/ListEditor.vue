@@ -112,7 +112,7 @@
       </span>
     </div>
 
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :save-message="msg" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
     <ExtractMenu
       :visible="extractMenu.visible"
       :x="extractMenu.x"
@@ -135,6 +135,7 @@ import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { useRowVirtualizer } from '../../utils/virtualList.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
+import { registerEditorGuard } from '../../utils/editSafety.js'
 import { lPush, rPush, lSet, lRem, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
@@ -168,6 +169,13 @@ const showAdd = ref(false)
 const pushDir = ref('rpush')
 const newValue = ref('')
 const editingIdx = ref(-1)
+const writeSaving = ref(false)
+const unregisterEditor = registerEditorGuard(Symbol('list'), () => ({
+  dirty: editingIdx.value !== -1 || (showAdd.value && newValue.value !== ''),
+  saving: writeSaving.value || expandSaving.value,
+  discard: () => { editingIdx.value = -1; newValue.value = ''; showAdd.value = false },
+}))
+onBeforeUnmount(unregisterEditor)
 const editValue = ref('')
 const msg = ref('')
 const ok = ref(true)
@@ -273,6 +281,9 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.keyValue, (kv) => {
+  expandShow.value = false
+  showAdd.value = false
+  newValue.value = ''
   requestGuard.invalidateAll()
   persistSearchState(lastKey.value)
   valueLoading.value = false
@@ -512,22 +523,23 @@ async function copyItem(item, idx) {
 }
 
 async function saveEdit(idx) {
-  if (editingIdx.value !== idx || idx === -1) return
+  if (editingIdx.value !== idx || idx === -1 || writeSaving.value) return
   const nextValue = editValue.value
   const request = requestGuard.begin(`write:item:${idx}`)
-  editingIdx.value = -1
+  writeSaving.value = true
   try {
     const result = await lSet(request.context.connID, request.context.key, idx, nextValue)
     if (!requestGuard.isCurrent(request)) return
     if (!result.success && await handleConnectionFailure(result.message, request)) return
     ok.value = result.success; msg.value = result.success ? t('keyEditor.updated') : (result.message || t('keyEditor.saveFailed'))
-    if (result.success) replaceLocalItem(idx, nextValue)
+    if (result.success) { replaceLocalItem(idx, nextValue); editingIdx.value = -1 }
   } catch(e) {
     if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
       ok.value = false
       msg.value = e.message
     }
   } finally {
+    writeSaving.value = false
     requestGuard.finish(request)
   }
 }
@@ -551,7 +563,8 @@ async function removeItem(val, origIdx) {
 }
 
 async function addItem() {
-  if (!newValue.value.trim()) return
+  if (!newValue.value.trim() || writeSaving.value) return
+  writeSaving.value = true
   const value = newValue.value
   const direction = pushDir.value
   const request = requestGuard.begin('write:add')
@@ -573,6 +586,7 @@ async function addItem() {
       msg.value = e.message
     }
   } finally {
+    writeSaving.value = false
     requestGuard.finish(request)
   }
 }

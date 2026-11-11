@@ -2,11 +2,15 @@ package main
 
 import (
 	"embed"
+	"runtime"
 
 	"LiteRedis/backend/config"
 	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
@@ -35,6 +39,20 @@ func main() {
 	}
 
 	// Create application with options
+	var appMenu *menu.Menu
+	if runtime.GOOS == "darwin" {
+		// Keep native Quit (Cmd+Q) routed through OnBeforeClose. Cmd+W closes
+		// the selected key instead of allowing the WebView to close its window.
+		appMenu = menu.NewMenuFromItems(menu.AppMenu())
+		fileMenu := appMenu.AddSubmenu("File")
+		fileMenu.AddText("Close Key", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
+			if app.ctx != nil {
+				wailsruntime.EventsEmit(app.ctx, "app:close-key")
+			}
+		})
+		appMenu.Append(menu.EditMenu())
+		appMenu.Append(menu.WindowMenu())
+	}
 	err := wails.Run(&options.App{
 		Title:     "LiteRedis",
 		Width:     ws.Width,
@@ -47,6 +65,8 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 1},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
+		OnBeforeClose:    app.beforeClose,
+		Menu:             appMenu,
 		Bind: []interface{}{
 			app,
 		},

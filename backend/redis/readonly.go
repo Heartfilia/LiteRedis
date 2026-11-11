@@ -29,7 +29,7 @@ var readonlyAllowedSubcommands = map[string]map[string]struct{}{
 	"MEMORY":  {"USAGE": {}, "STATS": {}, "DOCTOR": {}},
 	"OBJECT":  {"ENCODING": {}, "REFCOUNT": {}, "IDLETIME": {}, "FREQ": {}},
 	"XINFO":   {"STREAM": {}, "GROUPS": {}, "CONSUMERS": {}},
-	"LATENCY": {"LATEST": {}, "HISTORY": {}, "DOCTOR": {}, "RESET": {}},
+	"LATENCY": {"LATEST": {}, "HISTORY": {}, "DOCTOR": {}},
 	"SLOWLOG": {"GET": {}, "LEN": {}},
 	"COMMAND": {"COUNT": {}, "INFO": {}, "DOCS": {}, "GETKEYS": {}},
 	"CLUSTER": {"INFO": {}, "NODES": {}, "SLOTS": {}, "COUNTKEYSINSLOT": {}, "KEYSLOT": {}},
@@ -38,7 +38,14 @@ var readonlyAllowedSubcommands = map[string]map[string]struct{}{
 // IsReadOnlyCommandAllowed 判断命令在保护模式下是否可以直接执行。
 // 只认白名单：没列出来的命令一律需要用户确认，避免漏掉新的写命令。
 func IsReadOnlyCommandAllowed(command string) bool {
-	fields := strings.Fields(command)
+	args, err := splitCommand(command)
+	if err != nil {
+		return false
+	}
+	fields := make([]string, len(args))
+	for i, arg := range args {
+		fields[i] = arg.(string)
+	}
 	if len(fields) == 0 {
 		return true
 	}

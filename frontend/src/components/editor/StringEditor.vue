@@ -2,8 +2,9 @@
   <div class="string-editor" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <FloatingMessage :message="msg" :success="ok" />
     <div v-if="props.keyValue?.truncated" class="truncated-hint">⚠️ {{ t('keyEditor.stringTruncated') }}</div>
+    <div v-if="readOnlyPreview" class="truncated-hint">{{ t('reliability.previewReadOnly') }}</div>
     <JsonViewer v-if="treeMode" :data="treeData" />
-    <textarea v-else v-model="localVal" rows="10" :disabled="saving" />
+    <textarea v-else v-model="localVal" rows="10" :disabled="saving" :readonly="readOnlyPreview || readOnlyConnection" />
     <div class="editor-actions">
       <button
         class="btn-action btn-json"
@@ -23,7 +24,7 @@
       <button
         :class="[isDirty ? 'btn-primary' : 'btn-action', { 'success-flash': saveFlashing, 'error-flash': errorFlashing }]"
         @click="save"
-        :disabled="saving || !isDirty"
+        :disabled="saving || !isDirty || readOnlyPreview || readOnlyConnection || outcomeUnknown"
       >
         {{ saving ? t('keyEditor.saving') : t('keyEditor.save') }}
       </button>
@@ -48,10 +49,11 @@ import { useI18n } from '../../i18n/index.js'
 import { openBrowserExtract } from '../../services/browserExtract.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
-import { setString } from '../../api/wails.js'
+import { setStringChecked } from '../../api/wails.js'
+import { formatJsonLossless, parseJsonLossless } from '../../utils/losslessJson.js'
+import { registerEditorGuard, editResultMessage } from '../../utils/editSafety.js'
 import FloatingMessage from '../common/FloatingMessage.vue'
 import JsonViewer from '../common/JsonViewer.vue'
-import { isConnectionErrorMessage, formatConnectionLostMessage } from '../../utils/connection.js'
 import './editorShared.css'
 
 const props = defineProps({ keyValue: Object })
@@ -78,6 +80,12 @@ const formatApplied = ref(false)
 const treeMode = ref(false)
 const treeData = ref(null)
 const isDirty = computed(() => localVal.value !== originalVal.value)
+const readOnlyPreview = computed(() => !!(props.keyValue?.truncated || props.keyValue?.read_only_reason))
+const readOnlyConnection = computed(() => connectionsStore.isReadOnly(workspaceStore.activeConnID))
+const editToken = ref(props.keyValue?.edit_token || '')
+const outcomeUnknown = ref(false)
+const unregisterEditor = registerEditorGuard(Symbol('string'), () => ({ dirty: isDirty.value && !readOnlyPreview.value, saving: saving.value, discard: () => { localVal.value = originalVal.value } }))
+onBeforeUnmount(unregisterEditor)
 let saveFlashTimer = null
 let errorFlashTimer = null
 
@@ -109,22 +117,13 @@ function triggerErrorFlash() {
   }, 1300)
 }
 
-async function handleConnectionFailure(error, request = null) {
-  if (request && !requestGuard.isCurrent(request)) return true
-  if (!isConnectionErrorMessage(error)) return false
-  await connectionsStore.handleConnectionFailure(request?.context.connID || workspaceStore.activeConnID, error)
-  if (request && !requestGuard.isCurrent(request)) return true
-  ok.value = false
-  msg.value = formatConnectionLostMessage(error)
-  triggerErrorFlash()
-  return true
-}
-
 watch(() => props.keyValue, (kv) => {
   requestGuard.invalidateAll()
   saving.value = false
   localVal.value = kv?.string_val || ''
   originalVal.value = kv?.string_val || ''
+  editToken.value = kv?.edit_token || ''
+  outcomeUnknown.value = false
   formatApplied.value = false
   treeMode.value = false
   treeData.value = null
@@ -147,8 +146,7 @@ function formatJson() {
     return
   }
   try {
-    const parsed = JSON.parse(localVal.value)
-    localVal.value = JSON.stringify(parsed, null, 2)
+    localVal.value = formatJsonLossless(localVal.value)
     formatApplied.value = true
     ok.value = true
     msg.value = t('keyEditor.jsonFormatted')
@@ -166,7 +164,8 @@ function toggleTreeView() {
     return
   }
   try {
-    treeData.value = JSON.parse(localVal.value)
+    if (localVal.value.length > JSON_FORMAT_LIMIT) throw new Error('preview too large')
+    treeData.value = parseJsonLossless(localVal.value)
     treeMode.value = true
   } catch (e) {
     ok.value = false
@@ -221,18 +220,20 @@ async function handleBrowserExtract() {
 }
 
 async function save() {
+  if (saving.value || readOnlyPreview.value || readOnlyConnection.value || outcomeUnknown.value) return
   const request = requestGuard.begin('save')
   const value = localVal.value
   saving.value = true
   msg.value = ''
   try {
-    const result = await setString(request.context.connID, request.context.key, value)
+    const result = await setStringChecked(request.context.connID, request.context.db, request.context.key, value, editToken.value)
     if (!requestGuard.isCurrent(request)) return
-    if (!result.success && await handleConnectionFailure(result.message, request)) return
+    outcomeUnknown.value = ['outcome_unknown', 'partial_possible'].includes(result.code)
     ok.value = result.success
-    msg.value = result.success ? t('keyEditor.saveSuccess') : (result.message || t('keyEditor.saveFailed'))
+    msg.value = result.success ? t('keyEditor.saveSuccess') : editResultMessage(result)
     if (result.success) {
       originalVal.value = value
+      editToken.value = result.edit_token || ''
       // 保存后格式化内容已成为“原始值”，按钮回到「格式化」
       formatApplied.value = false
       triggerSaveFlash()
@@ -240,9 +241,10 @@ async function save() {
       triggerErrorFlash()
     }
   } catch(e) {
-    if (!(await handleConnectionFailure(e, request)) && requestGuard.isCurrent(request)) {
+    if (requestGuard.isCurrent(request)) {
+      outcomeUnknown.value = true
       ok.value = false
-      msg.value = e.message || String(e)
+      msg.value = t('reliability.outcomeUnknown') + ' ' + (e.message || String(e))
       triggerErrorFlash()
     }
   } finally {

@@ -117,9 +117,8 @@ func loadKnownHostsLocked() (knownHostStore, error) {
 		return store, err
 	}
 	if err := json.Unmarshal(data, &store); err != nil {
-		// 指纹文件损坏时视为空存储，重新开始 TOFU 学习
-		config.AppendDebugLog("[ssh] known hosts file corrupted, resetting: %v", err)
-		return knownHostStore{Hosts: make(map[string]knownHostEntry)}, nil
+		// 不能把损坏的信任记录当作首次连接，否则会静默信任被替换的主机密钥。
+		return store, fmt.Errorf("SSH host fingerprint file is corrupted; restore it from a trusted backup: %w", err)
 	}
 	if store.Hosts == nil {
 		store.Hosts = make(map[string]knownHostEntry)

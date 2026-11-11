@@ -51,6 +51,7 @@ import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { flattenJsonRows } from '../../utils/jsonTree.js'
 import { useVariableVirtualizer } from '../../utils/virtualList.js'
+import { JsonNumber, stringifyJsonLossless, formatJsonLossless } from '../../utils/losslessJson.js'
 
 const props = defineProps({
   data: { type: null, default: null },
@@ -123,6 +124,7 @@ function summary(row) {
 }
 
 function valueClass(value) {
+  if (value instanceof JsonNumber) return 'number'
   if (value === null) return 'null'
   if (typeof value === 'string') return 'string'
   if (typeof value === 'number') return 'number'
@@ -144,11 +146,12 @@ const tipY = ref(0)
 let tipTimer = null
 
 function valueText(value) {
+  if (value instanceof JsonNumber) return value.raw
   if (value === undefined) return ''
   if (value === null) return 'null'
   if (typeof value === 'object') {
     try {
-      return JSON.stringify(value, null, 2)
+      return formatJsonLossless(stringifyJsonLossless(value))
     } catch (e) {
       return String(value)
     }

@@ -25,6 +25,7 @@
             <button
               v-if="editable && !saving"
               class="btn-save-modal"
+              :disabled="saveBlocked"
               :class="{ 'success-flash': saveFlashing, 'error-flash': errorFlashing }"
               :title="t('keyEditor.save')"
               @click="onSave"
@@ -51,6 +52,7 @@
           </div>
         </div>
         <div class="expand-body">
+          <div v-if="saveMessage" role="status">{{ saveMessage }}</div>
           <JsonViewer v-if="treeMode" :data="treeData" />
           <textarea
             v-else-if="editable"
@@ -72,6 +74,8 @@ import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import JsonViewer from '../common/JsonViewer.vue'
+import { formatJsonLossless, parseJsonLossless } from '../../utils/losslessJson.js'
+import { registerEditorGuard, confirmDiscardEdits } from '../../utils/editSafety.js'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
@@ -82,6 +86,8 @@ const props = defineProps({
   content: { type: String,  default: '' },
   editable:{ type: Boolean, default: false },
   saving:  { type: Boolean, default: false },
+  saveBlocked: { type: Boolean, default: false },
+  saveMessage: { type: String, default: '' },
   // 触发编辑的那个按钮的位置，用于从按钮位置放大 / 收回
   anchor:  { type: Object,  default: null },
 })
@@ -92,6 +98,8 @@ onMounted(() => { disposeEscape = registerEscapeHandler(() => onClose()) })
 onBeforeUnmount(() => { if (disposeEscape) disposeEscape() })
 
 const localContent = ref(props.content)
+const unregisterEditor = registerEditorGuard(Symbol('modal'), () => ({ dirty: props.show && props.editable && localContent.value !== props.content, saving: props.show && props.saving, discard: () => { localContent.value = props.content } }))
+onBeforeUnmount(unregisterEditor)
 const copied = ref(false)
 const saveFlashing = ref(false)
 const errorFlashing = ref(false)
@@ -309,7 +317,7 @@ function toggleJson() {
     return
   }
   try {
-    localContent.value = JSON.stringify(JSON.parse(localContent.value), null, 2)
+    localContent.value = formatJsonLossless(localContent.value)
     formatApplied.value = true
     if (treeMode.value) refreshTree(true)
     showTip(t('keyEditor.jsonFormatted'))
@@ -320,7 +328,8 @@ function toggleJson() {
 
 function refreshTree(silent = false) {
   try {
-    treeData.value = JSON.parse(localContent.value)
+    if (localContent.value.length > JSON_FORMAT_LIMIT) throw new Error('preview too large')
+    treeData.value = parseJsonLossless(localContent.value)
     return true
   } catch (e) {
     if (!silent) flashJsonError(t('keyEditor.jsonInvalid'))
@@ -337,12 +346,14 @@ function toggleTreeView() {
   if (refreshTree()) treeMode.value = true
 }
 
-function onClose() {
+async function onClose() {
   if (closing.value) return
+  if (props.saving || (props.editable && localContent.value !== props.content && !await confirmDiscardEdits())) return
   emit('close')
 }
 
 function onSave() {
+  if (props.saving || props.saveBlocked) return
   emit('save', localContent.value)
 }
 

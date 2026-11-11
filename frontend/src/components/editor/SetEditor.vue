@@ -104,7 +104,7 @@
       </span>
     </div>
 
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :save-message="msg" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
     <ExtractMenu
       :visible="extractMenu.visible"
       :x="extractMenu.x"
@@ -127,6 +127,7 @@ import { useI18n } from '../../i18n/index.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { useRowVirtualizer } from '../../utils/virtualList.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
+import { registerEditorGuard } from '../../utils/editSafety.js'
 import { sAdd, sRem, renameSetMember, searchValue, getValue } from '../../api/wails.js'
 import ExpandModal from './ExpandModal.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
@@ -199,6 +200,12 @@ function cycleSortOrder() {
 
 // expand modal
 const expandShow = ref(false)
+const writeSaving = ref(false)
+const unregisterEditor = registerEditorGuard(Symbol('set'), () => ({
+  dirty: showAdd.value && newMember.value !== '', saving: writeSaving.value || expandSaving.value,
+  discard: () => { newMember.value = ''; showAdd.value = false },
+}))
+onBeforeUnmount(unregisterEditor)
 const expandTitle = ref('')
 const expandContent = ref('')
 const expandEditable = ref(false)
@@ -277,6 +284,9 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.keyValue, (kv) => {
+  expandShow.value = false
+  showAdd.value = false
+  newMember.value = ''
   requestGuard.invalidateAll()
   persistSearchState(lastKey.value)
   valueLoading.value = false
@@ -577,7 +587,8 @@ async function copyMember(m, idx) {
 }
 
 async function addMember() {
-  if (!newMember.value.trim()) return
+  if (!newMember.value.trim() || writeSaving.value) return
+  writeSaving.value = true
   const member = newMember.value
   const request = requestGuard.begin('write:add')
   try {
@@ -597,6 +608,7 @@ async function addMember() {
       msg.value = e.message
     }
   } finally {
+    writeSaving.value = false
     requestGuard.finish(request)
   }
 }

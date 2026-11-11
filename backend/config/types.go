@@ -186,21 +186,23 @@ type KeyNode struct {
 
 // KeyValue Value（按类型按需填充）
 type KeyValue struct {
-	Key          string            `json:"key"`
-	Type         string            `json:"type"`
-	TTL          int64             `json:"ttl"`
-	StringVal    string            `json:"string_val,omitempty"`
-	HashVal      map[string]string `json:"hash_val,omitempty"`
-	ListVal      []string          `json:"list_val,omitempty"`
-	SetVal       []string          `json:"set_val,omitempty"`
-	ZSetVal      []ZSetMember      `json:"zset_val,omitempty"`
-	StreamVal    []StreamEntry     `json:"stream_val,omitempty"`
-	HasMore      bool              `json:"has_more"`                 // 是否还有更多数据
-	NextCursor   uint64            `json:"next_cursor"`              // Hash/Set 下一页 cursor
-	NextOffset   int               `json:"next_offset"`              // List/ZSet 下一页 offset
-	NextStreamID string            `json:"next_stream_id,omitempty"` // Stream 下一页的排他起始 ID
-	TotalCount   int64             `json:"total_count"`              // 总元素数（-1 表示未知）
-	Truncated    bool              `json:"truncated,omitempty"`      // string 值超限被截断
+	Key            string            `json:"key"`
+	Type           string            `json:"type"`
+	TTL            int64             `json:"ttl"`
+	StringVal      string            `json:"string_val,omitempty"`
+	HashVal        map[string]string `json:"hash_val,omitempty"`
+	ListVal        []string          `json:"list_val,omitempty"`
+	SetVal         []string          `json:"set_val,omitempty"`
+	ZSetVal        []ZSetMember      `json:"zset_val,omitempty"`
+	StreamVal      []StreamEntry     `json:"stream_val,omitempty"`
+	HasMore        bool              `json:"has_more"`                   // 是否还有更多数据
+	NextCursor     uint64            `json:"next_cursor"`                // Hash/Set 下一页 cursor
+	NextOffset     int               `json:"next_offset"`                // List/ZSet 下一页 offset
+	NextStreamID   string            `json:"next_stream_id,omitempty"`   // Stream 下一页的排他起始 ID
+	TotalCount     int64             `json:"total_count"`                // 总元素数（-1 表示未知）
+	Truncated      bool              `json:"truncated,omitempty"`        // string 值超限被截断
+	ReadOnlyReason string            `json:"read_only_reason,omitempty"` // truncated / binary / changed
+	EditToken      string            `json:"edit_token,omitempty"`       // 完整 String 的内容摘要，用于乐观锁
 }
 
 // CreateKeyRequest 新建 key 请求
@@ -237,9 +239,17 @@ type StreamEntry struct {
 
 // OperationResult 通用操作结果
 type OperationResult struct {
+	Code         string `json:"code,omitempty"`
 	Success      bool   `json:"success"`
 	Message      string `json:"message,omitempty"`
 	Disconnected bool   `json:"disconnected,omitempty"`
+}
+
+type EditResult struct {
+	Success   bool   `json:"success"`
+	Code      string `json:"code,omitempty"`
+	Message   string `json:"message,omitempty"`
+	EditToken string `json:"edit_token,omitempty"`
 }
 
 // RedisConnectionOverview 当前连接概览信息
@@ -313,11 +323,17 @@ type MemoryReport struct {
 	Truncated       bool   `json:"truncated"`
 	SizeUnavailable bool   `json:"size_unavailable"`
 	// SizeSource 大小来源：memory（MEMORY USAGE）/ debug（DEBUG OBJECT）/ length（元素数量）
-	SizeSource string             `json:"size_source,omitempty"`
-	ElapsedMs  int64              `json:"elapsed_ms"`
-	BigKeys    []MemoryKeyInfo    `json:"big_keys"`
-	Prefixes   []MemoryPrefixStat `json:"prefixes"`
-	Types      []MemoryTypeStat   `json:"types"`
+	SizeSource                   string `json:"size_source,omitempty"`
+	SizeUnavailableReason        string `json:"size_unavailable_reason,omitempty"`
+	MemoryShareUnavailableReason string `json:"memory_share_unavailable_reason,omitempty"`
+	RedisUsedMemoryBytes         int64  `json:"redis_used_memory_bytes"`
+	// nil 表示 INFO / MEMORY USAGE 不可用；百分比范围为 0~100，不是 0~1。
+	MemorySharePercent *float64           `json:"memory_share_percent"`
+	MemorySharePartial bool               `json:"memory_share_partial"`
+	ElapsedMs          int64              `json:"elapsed_ms"`
+	BigKeys            []MemoryKeyInfo    `json:"big_keys"`
+	Prefixes           []MemoryPrefixStat `json:"prefixes"`
+	Types              []MemoryTypeStat   `json:"types"`
 }
 
 // ExportedKey 导出的单个 key（结构化，可用于导出文件或跨实例复制）
@@ -346,6 +362,7 @@ type SlowLogEntry struct {
 
 // BatchKeyResult 批量操作结果
 type BatchKeyResult struct {
+	Code     string `json:"code,omitempty"`
 	Success  bool   `json:"success"`
 	Affected int    `json:"affected"`
 	Failed   int    `json:"failed"`
@@ -354,6 +371,7 @@ type BatchKeyResult struct {
 
 // RedisConsoleResult Redis Console 执行结果
 type RedisConsoleResult struct {
+	Code      string `json:"code,omitempty"`
 	Success   bool   `json:"success"`
 	Command   string `json:"command"`
 	Output    string `json:"output,omitempty"`

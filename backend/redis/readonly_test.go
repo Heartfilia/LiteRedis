@@ -10,6 +10,9 @@ func TestIsReadOnlyCommandAllowed(t *testing.T) {
 		"scan 0 match * count 10",
 		"INFO memory",
 		"CONFIG GET maxmemory",
+		`CONFIG "GET" maxmemory`,
+		`"GET" user:1`,
+		`G\ET user:1`,
 		"ACL WHOAMI",
 		"CLIENT LIST",
 		"MEMORY USAGE user:1",
@@ -35,6 +38,8 @@ func TestIsReadOnlyCommandAllowed(t *testing.T) {
 		"EXPIRE user:1 100",
 		"CLUSTER RESET",
 		"CONFIG",
+		"LATENCY RESET",
+		`GET "unterminated`,
 	}
 	for _, command := range blocked {
 		if IsReadOnlyCommandAllowed(command) {

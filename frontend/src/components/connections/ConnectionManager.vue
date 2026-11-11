@@ -388,7 +388,7 @@ async function deleteConn(conn) {
   const result = await connectionsStore.remove(conn.id)
   if (result?.success) {
     if (workspaceStore.activeConnID === conn.id) {
-      workspaceStore.setActiveConn(null, '')
+      await workspaceStore.setActiveConn(null, '')
     }
     if (selectedConn.value?.id === conn.id) {
       selectedConn.value = null

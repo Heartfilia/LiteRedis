@@ -12,6 +12,111 @@ async function expandAll(page) {
   await expect.poll(async () => page.locator('.tree-scroll [data-vrow]').count()).toBeGreaterThan(5)
 }
 
+async function mockMemoryDoctor(page, overrides = {}) {
+  await page.evaluate((overrides) => {
+    const original = window.go.main.App
+    window.__memoryCalls = []
+    window.__workspaceDBChanges = []
+    window.go.main.App = new Proxy(original, {
+      get(target, method) {
+        if (method === 'SelectDB') return async (...args) => { window.__workspaceDBChanges.push(args); return { success: true } }
+        if (method === 'ScanMemoryReportForDB') return async (conn, db, pattern, maxKeys) => {
+          window.__memoryCalls.push({ conn, db, pattern, maxKeys })
+          return {
+            db, pattern, scanned_keys: 2, total_keys: 2, total_bytes: 2500, avg_key_bytes: 1250,
+            no_ttl_keys: 1, elapsed_ms: 12, size_source: 'memory', redis_used_memory_bytes: 10000,
+            memory_share_percent: 25, memory_share_partial: pattern !== '*', prefixes: [], types: [], big_keys: [],
+            ...overrides,
+          }
+        }
+        return target[method]
+      },
+    })
+    window.dispatchEvent(new Event('literedis:open-memory'))
+  }, overrides)
+  await expect(page.locator('.doctor-field-db select')).toBeVisible()
+}
+
+test('memory doctor selects an independent DB and clears stale reports', async ({ page }) => {
+  await installWailsMock(page)
+  await page.goto('/')
+  await connectFirst(page)
+  await mockMemoryDoctor(page)
+  const database = page.locator('.doctor-field-db select')
+  await expect(database).toHaveValue('0')
+  await expect(database.locator('option')).toHaveCount(16)
+  await database.selectOption('6')
+  await page.getByRole('button', { name: '开始扫描', exact: true }).click()
+  await expect(page.locator('.doctor-subtitle')).toContainText('db=6')
+  await expect(page.locator('.doctor-metric-share')).toContainText('DB 内存占比（估算）')
+  await expect(page.locator('.doctor-metric-share')).toContainText('25.00%')
+  await expect(page.locator('.doctor-metrics')).toContainText('Redis 整体已用内存')
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: async (text) => { window.__memoryMarkdown = text } },
+  }))
+  await page.getByRole('button', { name: '导出 Markdown', exact: true }).click()
+  expect(await page.evaluate(() => window.__memoryMarkdown)).toContain('DB 内存占比（估算）: 25.00%')
+  expect(await page.evaluate(() => window.__memoryMarkdown)).toContain('- DB: 6')
+  expect(await page.evaluate(() => window.__memoryCalls[0])).toMatchObject({ db: 6, pattern: '*' })
+  expect(await page.evaluate(() => window.__workspaceDBChanges)).toEqual([])
+  await database.selectOption('7')
+  await expect(page.locator('.doctor-metrics')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '导出 Markdown', exact: true })).toBeDisabled()
+  await page.locator('.doctor-field input').fill('user:*')
+  await page.getByRole('button', { name: '开始扫描', exact: true }).click()
+  await expect(page.locator('.doctor-metric-share')).toContainText('已扫描 Key 占比（估算）')
+  await expect(page.locator('.doctor-body')).toContainText('占比不代表整个 DB')
+})
+
+test('memory doctor distinguishes unavailable share from empty DB zero share', async ({ page }) => {
+  await installWailsMock(page)
+  await page.goto('/')
+  await connectFirst(page)
+  await mockMemoryDoctor(page, { memory_share_percent: null, redis_used_memory_bytes: 0, memory_share_unavailable_reason: 'memory_usage_unsupported_or_renamed' })
+  await page.getByRole('button', { name: '开始扫描', exact: true }).click()
+  await expect(page.locator('.doctor-metric-share .metric-value')).toHaveText('—')
+  await expect(page.locator('.doctor-body')).toContainText('占比不可用')
+  await expect(page.locator('.doctor-body')).toContainText('3.0.7')
+  await page.locator('.doctor-close').click()
+  await mockMemoryDoctor(page, { memory_share_percent: 0, total_bytes: 0, scanned_keys: 0, total_keys: 0 })
+  await page.getByRole('button', { name: '开始扫描', exact: true }).click()
+  await expect(page.locator('.doctor-metric-share .metric-value')).toHaveText('0.00%')
+})
+
+test('memory doctor locks DB selection during scanning and recovers after cancellation', async ({ page }) => {
+  await installWailsMock(page)
+  await page.goto('/')
+  await connectFirst(page)
+  await mockMemoryDoctor(page)
+  await page.evaluate(() => {
+    const original = window.go.main.App
+    let rejectScan
+    window.go.main.App = new Proxy(original, {
+      get(target, method) {
+        if (method === 'ScanMemoryReportForDB') return () => new Promise((_resolve, reject) => { rejectScan = reject })
+        if (method === 'CancelMemoryScan') return async () => { rejectScan(new Error('体检已取消')); return { success: true } }
+        return target[method]
+      },
+    })
+  })
+  await page.getByRole('button', { name: '开始扫描', exact: true }).click()
+  await expect(page.locator('.doctor-field-db select')).toBeDisabled()
+  await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+  await expect(page.locator('.doctor-field-db select')).toBeEnabled()
+  await expect(page.locator('.doctor-state.error')).toContainText('体检已取消')
+})
+
+test('memory doctor limits cluster scans to DB zero', async ({ page }) => {
+  await installWailsMock(page, { connections: [{ id: 'conn-dev', name: 'cluster', is_cluster: true, allow_cluster_scan: true, db: 0 }] })
+  await page.goto('/')
+  await page.locator('.conn-item .conn-main').first().click()
+  await mockMemoryDoctor(page)
+  await expect(page.locator('.doctor-field-db select')).toBeDisabled()
+  await expect(page.locator('.doctor-field-db select option')).toHaveCount(1)
+  await expect(page.locator('.doctor-db-hint')).toContainText('所有主节点（不含副本）')
+})
+
 test('connects and renders a windowed key tree', async ({ page }) => {
   await installWailsMock(page, { keyCount: 3000 })
   await page.goto('/')
@@ -34,6 +139,43 @@ test('connects and renders a windowed key tree', async ({ page }) => {
     el.scrollTop = Math.floor(el.scrollHeight / 2)
   })
   await expect.poll(firstIndex).not.toBe(before)
+})
+
+test('key export shows cancellation and recovers after cancelling', async ({ page }) => {
+  await installWailsMock(page, { keyCount: 200 })
+  await page.goto('/')
+  await connectFirst(page)
+  await page.evaluate(() => {
+    const original = window.go.main.App
+    let rejectExport
+    window.__exportCalls = 0
+    window.go.main.App = new Proxy(original, {
+      get(target, method) {
+        if (method === 'ExportKeysToFile') {
+          return () => {
+            window.__exportCalls++
+            return new Promise((_resolve, reject) => { rejectExport = reject })
+          }
+        }
+        if (method === 'CancelKeyExport') {
+          return async () => {
+            rejectExport(new Error('context canceled'))
+            return { success: true }
+          }
+        }
+        return target[method]
+      },
+    })
+  })
+  await page.locator('.tree-bulk-btn[title="多选模式"]').click()
+  await page.locator('.tree-scroll input[type="checkbox"]').first().check()
+  await page.locator('.batch-btn').filter({ hasText: '⋯' }).click()
+  await page.getByRole('button', { name: '导出 JSON 文件', exact: true }).click()
+  const status = page.locator('.key-tree [role="status"]')
+  await expect(status).toContainText('导出中')
+  await status.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(status).toHaveCount(0)
+  expect(await page.evaluate(() => window.__exportCalls)).toBe(1)
 })
 
 test('keyboard navigation keeps working inside the window', async ({ page }) => {

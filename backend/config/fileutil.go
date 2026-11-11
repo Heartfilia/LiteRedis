@@ -1,6 +1,7 @@
 package config
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -11,6 +12,14 @@ import (
 // "旧文件先挪到 .bak → 再挪入新文件 → 失败则回滚 .bak" 的顺序，
 // 任何一步失败都不会出现"旧配置已删、新配置未落盘"的丢失窗口。
 func AtomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	return AtomicWriteStream(path, perm, func(w io.Writer) error {
+		_, err := w.Write(data)
+		return err
+	})
+}
+
+// AtomicWriteStream 直接流式写入同目录临时文件；回调失败不替换目标文件。
+func AtomicWriteStream(path string, perm os.FileMode, write func(io.Writer) error) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -27,7 +36,7 @@ func AtomicWriteFile(path string, data []byte, perm os.FileMode) error {
 		_ = os.Remove(tmpPath)
 	}
 
-	if _, err := tmp.Write(data); err != nil {
+	if err := write(tmp); err != nil {
 		cleanup()
 		return err
 	}

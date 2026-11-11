@@ -14,8 +14,16 @@ export function BatchSetKeysTTL(arg1, arg2, arg3) {
   return window['go']['main']['App']['BatchSetKeysTTL'](arg1, arg2, arg3);
 }
 
+export function CancelKeyExport() {
+  return window['go']['main']['App']['CancelKeyExport']();
+}
+
 export function CancelMemoryScan() {
   return window['go']['main']['App']['CancelMemoryScan']();
+}
+
+export function CancelOperationTask(arg1) {
+  return window['go']['main']['App']['CancelOperationTask'](arg1);
 }
 
 export function CheckLatestRelease() {
@@ -24,6 +32,10 @@ export function CheckLatestRelease() {
 
 export function ClearCommandHistory() {
   return window['go']['main']['App']['ClearCommandHistory']();
+}
+
+export function CloseApp() {
+  return window['go']['main']['App']['CloseApp']();
 }
 
 export function CompleteOnboarding() {
@@ -86,6 +98,10 @@ export function ForgetSSHHostFingerprint(arg1, arg2) {
   return window['go']['main']['App']['ForgetSSHHostFingerprint'](arg1, arg2);
 }
 
+export function FrontendReady() {
+  return window['go']['main']['App']['FrontendReady']();
+}
+
 export function GetAppVersion() {
   return window['go']['main']['App']['GetAppVersion']();
 }
@@ -146,6 +162,10 @@ export function HSet(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['HSet'](arg1, arg2, arg3, arg4);
 }
 
+export function HSetChecked(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['HSetChecked'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
 export function ImportConnectionsFromFile() {
   return window['go']['main']['App']['ImportConnectionsFromFile']();
 }
@@ -172,6 +192,10 @@ export function LSet(arg1, arg2, arg3, arg4) {
 
 export function ListConnections() {
   return window['go']['main']['App']['ListConnections']();
+}
+
+export function ListOperationTasks() {
+  return window['go']['main']['App']['ListOperationTasks']();
 }
 
 export function MarkVersionSeen(arg1) {
@@ -242,6 +266,10 @@ export function ScanMemoryReport(arg1, arg2, arg3) {
   return window['go']['main']['App']['ScanMemoryReport'](arg1, arg2, arg3);
 }
 
+export function ScanMemoryReportForDB(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ScanMemoryReportForDB'](arg1, arg2, arg3, arg4);
+}
+
 export function SearchValue(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['SearchValue'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
@@ -252,6 +280,10 @@ export function SelectDB(arg1, arg2) {
 
 export function SetString(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetString'](arg1, arg2, arg3);
+}
+
+export function SetStringChecked(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SetStringChecked'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SetTTL(arg1, arg2, arg3) {

@@ -24,10 +24,8 @@ local ttl = redis.call('PTTL', KEYS[1])
 if ttl == -2 then
   return 0
 end
-redis.call('SET', KEYS[1], ARGV[1])
-if ttl > 0 then
-  redis.call('PEXPIRE', KEYS[1], ttl)
-end
+if ttl >= 0 then redis.call('SET', KEYS[1], ARGV[1], 'PX', math.max(1, ttl))
+else redis.call('SET', KEYS[1], ARGV[1]) end
 return 1
 `)
 
@@ -40,8 +38,8 @@ end
 if source == destination then
   return 1
 end
-redis.call('SREM', KEYS[1], source)
 redis.call('SADD', KEYS[1], destination)
+redis.call('SREM', KEYS[1], source)
 return 1
 `)
 
@@ -55,8 +53,8 @@ end
 if source == destination then
   return 1
 end
-redis.call('ZREM', KEYS[1], source)
 redis.call('ZADD', KEYS[1], score, destination)
+redis.call('ZREM', KEYS[1], source)
 return 1
 `)
 )
@@ -104,6 +102,18 @@ func InvalidateListChunks(scope, key string) {
 	listChunkCache.Lock()
 	delete(listChunkCache.entries, scope+"\x00"+key)
 	listChunkCache.Unlock()
+}
+
+// A write may finish after the workspace changes DB. Invalidate by connection,
+// not by the workspace DB observed after the write.
+func InvalidateConnectionListChunks(connID string) {
+	listChunkCache.Lock()
+	defer listChunkCache.Unlock()
+	for key := range listChunkCache.entries {
+		if strings.HasPrefix(key, connID+"|") {
+			delete(listChunkCache.entries, key)
+		}
+	}
 }
 
 // peekListChunk 命中未过期的缓存块时直接返回切片
@@ -223,17 +233,7 @@ func getValueWithProbe(ctx context.Context, client redis.UniversalClient, key st
 
 	switch keyInfo.Type {
 	case "string":
-		val, err := client.Get(ctx, key).Result()
-		if err != nil && err != redis.Nil {
-			return kv, err
-		}
-		if len(val) > maxStringValueBytes {
-			val = truncateUTF8Safe(val, maxStringValueBytes)
-			kv.Truncated = true
-			config.AppendDebugLog("[value] string key truncated to %d bytes: %s", maxStringValueBytes, key)
-		}
-		kv.StringVal = val
-		kv.HasMore = false
+		return readStringPreview(ctx, client, key)
 
 	case "hash":
 		result := make(map[string]string)

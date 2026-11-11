@@ -35,6 +35,7 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
+import { confirmDiscardEdits } from '../../utils/editSafety.js'
 
 const connectionsStore = useConnectionsStore()
 const workspaceStore = useWorkspaceStore()
@@ -129,15 +130,16 @@ async function activate(tab) {
   const conn = (connectionsStore.connections || []).find((item) => item.id === tab.id)
   if (!conn) return
   if (tab.connected) {
-    workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
+    await workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
     return
   }
   const result = await connectionsStore.connect(conn.id)
   if (result && result.success === false && result.message !== 'connecting') return
-  workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
+  await workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
 }
 
-function closeTab(id) {
+async function closeTab(id) {
+  if (workspaceStore.activeConnID === id && !await confirmDiscardEdits()) return
   const list = [...(workspaceStore.openTabs || [])]
   const index = list.indexOf(id)
   if (index === -1) return
@@ -147,11 +149,10 @@ function closeTab(id) {
   const nextId = list[Math.min(index, list.length - 1)]
   const nextConn = (connectionsStore.connections || []).find((item) => item.id === nextId)
   if (!nextConn) {
-    workspaceStore.activeConnID = null
-    workspaceStore.activeConnName = ''
+    await workspaceStore.setActiveConn(null, '')
     return
   }
-  workspaceStore.setActiveConn(nextConn.id, nextConn.name, nextConn.db || 0)
+  await workspaceStore.setActiveConn(nextConn.id, nextConn.name, nextConn.db || 0)
 }
 
 function openManager() {

@@ -10,7 +10,47 @@ import (
 	"time"
 
 	"LiteRedis/backend/config"
+	"github.com/redis/go-redis/v9"
 )
+
+// pipelineHook 在命令发送前模拟另一个客户端写入，稳定复现检查/执行竞态。
+type pipelineHook struct {
+	before func([]redis.Cmder)
+}
+
+func (h pipelineHook) DialHook(next redis.DialHook) redis.DialHook          { return next }
+func (h pipelineHook) ProcessHook(next redis.ProcessHook) redis.ProcessHook { return next }
+func (h pipelineHook) ProcessPipelineHook(next redis.ProcessPipelineHook) redis.ProcessPipelineHook {
+	return func(ctx context.Context, cmds []redis.Cmder) error {
+		h.before(cmds)
+		return next(ctx, cmds)
+	}
+}
+
+func TestRenameKeysPrefixDoesNotOverwriteConcurrentWriter(t *testing.T) {
+	ctx := context.Background()
+	client := testRedisClient(t)
+	writer := redis.NewClient(&redis.Options{Addr: client.Options().Addr})
+	defer writer.Close()
+	if err := client.Set(ctx, "old:k", "source", 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	client.AddHook(pipelineHook{before: func(cmds []redis.Cmder) {
+		for _, cmd := range cmds {
+			if cmd.Name() == "rename" || cmd.Name() == "renamenx" {
+				if err := writer.Set(ctx, "new:k", "concurrent", 0).Err(); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}})
+	if n, err := RenameKeysPrefix(ctx, client, []string{"old:k"}, "old:", "new:"); err != nil || n != 0 {
+		t.Fatalf("rename = %d, %v", n, err)
+	}
+	if value := writer.Get(ctx, "new:k").Val(); value != "concurrent" {
+		t.Fatalf("concurrent target overwritten: %q", value)
+	}
+}
 
 func TestCreateKeyAtomicallyInitializesValueAndTTL(t *testing.T) {
 	ctx := context.Background()

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"LiteRedis/backend/localapi"
 	redisbackend "LiteRedis/backend/redis"
 	sshbackend "LiteRedis/backend/ssh"
+	"github.com/redis/go-redis/v9"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -32,6 +34,41 @@ type App struct {
 
 	memoryScanMu     sync.Mutex
 	memoryScanCancel context.CancelFunc
+	exportMu         sync.Mutex
+	exportCancel     context.CancelFunc
+	closeMu          sync.Mutex
+	closeApproved    bool
+	closeGuardReady  bool
+	tasksMu          sync.Mutex
+	tasks            []*operationRun
+}
+
+func (a *App) beforeClose(ctx context.Context) bool {
+	a.closeMu.Lock()
+	approved := a.closeApproved || !a.closeGuardReady
+	a.closeMu.Unlock()
+	if approved {
+		return false
+	}
+	wailsruntime.EventsEmit(ctx, "app:close-request")
+	return true
+}
+
+// FrontendReady leaves native close available if the frontend failed to load.
+func (a *App) FrontendReady() {
+	a.closeMu.Lock()
+	a.closeGuardReady = true
+	a.closeMu.Unlock()
+}
+
+// CloseApp 由前端在未保存编辑确认通过后调用；退出仍执行 shutdown。
+func (a *App) CloseApp() {
+	a.closeMu.Lock()
+	a.closeApproved = true
+	a.closeMu.Unlock()
+	if a.ctx != nil {
+		wailsruntime.Quit(a.ctx)
+	}
 }
 
 // MemoryScanProgress 内存体检进度，通过 memory:progress 事件推送
@@ -89,6 +126,12 @@ func (a *App) shutdown(ctx context.Context) {
 	_ = config.SaveWindowState(config.WindowState{X: x, Y: y, Width: w, Height: h})
 
 	a.stopAllPubSub()
+	a.CancelKeyExport()
+	a.tasksMu.Lock()
+	for _, task := range a.tasks {
+		task.cancel()
+	}
+	a.tasksMu.Unlock()
 	a.manager.DisconnectAll()
 	a.apiServer.Stop()
 }
@@ -253,49 +296,31 @@ func (a *App) GetKeyInfo(connID string, key string) (config.RedisKey, error) {
 
 // DeleteKey 删除 key
 func (a *App) DeleteKey(connID string, key string) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
+	result := a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.DeleteKey(ctx, client, key)
+	})
+	if result.Success {
+		a.registry.Unpublish(connID, key)
 	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.DeleteKey(a.ctx, client, key); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	a.registry.Unpublish(connID, key)
-	return config.OperationResult{Success: true}
+	return result
 }
 
 // RenameKey 重命名 key
 func (a *App) RenameKey(connID, oldKey, newKey string) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
+	result := a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.RenameKey(ctx, client, oldKey, newKey)
+	})
+	if result.Success {
+		a.registry.Unpublish(connID, oldKey)
 	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.RenameKey(a.ctx, client, oldKey, newKey); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	a.registry.Unpublish(connID, oldKey)
-	return config.OperationResult{Success: true}
+	return result
 }
 
 // SetTTL 设置 key TTL
 func (a *App) SetTTL(connID, key string, ttlSec int64) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.SetTTL(a.ctx, client, key, ttlSec); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.SetTTL(ctx, client, key, ttlSec)
+	})
 }
 
 // DBSize 获取当前 DB 的 key 总数
@@ -359,62 +384,47 @@ func (a *App) ensureWritable(connID string) error {
 
 // BatchDeleteKeys 批量删除 key
 func (a *App) BatchDeleteKeys(connID string, keys []string) config.BatchKeyResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.BatchKeyResult{Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
+	ctx, client, done, err := a.writeClient(connID)
 	if err != nil {
 		return config.BatchKeyResult{Message: err.Error()}
 	}
+	defer done()
 	if len(keys) == 0 {
 		return config.BatchKeyResult{Success: true}
 	}
-	affected, err := redisbackend.DeleteKeys(a.ctx, client, keys)
+	affected, err := redisbackend.DeleteKeys(ctx, client, keys)
 	for _, key := range keys {
 		a.registry.Unpublish(connID, key)
 	}
-	if err != nil {
-		return config.BatchKeyResult{Message: err.Error(), Affected: affected, Failed: len(keys) - affected}
-	}
-	return config.BatchKeyResult{Success: true, Affected: affected, Failed: len(keys) - affected}
+	return batchWriteResult(affected, len(keys), err)
 }
 
 // BatchSetKeysTTL 批量设置 TTL，ttlSec < 0 表示永久
 func (a *App) BatchSetKeysTTL(connID string, keys []string, ttlSec int64) config.BatchKeyResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.BatchKeyResult{Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
+	ctx, client, done, err := a.writeClient(connID)
 	if err != nil {
 		return config.BatchKeyResult{Message: err.Error()}
 	}
+	defer done()
 	if len(keys) == 0 {
 		return config.BatchKeyResult{Success: true}
 	}
-	affected, err := redisbackend.SetKeysTTL(a.ctx, client, keys, ttlSec)
-	if err != nil {
-		return config.BatchKeyResult{Message: err.Error(), Affected: affected, Failed: len(keys) - affected}
-	}
-	return config.BatchKeyResult{Success: true, Affected: affected, Failed: len(keys) - affected}
+	affected, err := redisbackend.SetKeysTTL(ctx, client, keys, ttlSec)
+	return batchWriteResult(affected, len(keys), err)
 }
 
 // BatchRenamePrefix 批量替换选中 key 的前缀
 func (a *App) BatchRenamePrefix(connID string, keys []string, oldPrefix, newPrefix string) config.BatchKeyResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.BatchKeyResult{Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
+	ctx, client, done, err := a.writeClient(connID)
 	if err != nil {
 		return config.BatchKeyResult{Message: err.Error()}
 	}
+	defer done()
 	if len(keys) == 0 || strings.TrimSpace(oldPrefix) == "" {
 		return config.BatchKeyResult{Success: true}
 	}
-	renamed, err := redisbackend.RenameKeysPrefix(a.ctx, client, keys, oldPrefix, newPrefix)
-	if err != nil {
-		return config.BatchKeyResult{Message: err.Error(), Affected: renamed, Failed: len(keys) - renamed}
-	}
-	return config.BatchKeyResult{Success: true, Affected: renamed, Failed: len(keys) - renamed}
+	renamed, err := redisbackend.RenameKeysPrefix(ctx, client, keys, oldPrefix, newPrefix)
+	return batchWriteResult(renamed, len(keys), err)
 }
 
 // GetDatabases 返回连接的 DB 数量（集群为 1，读取失败回退 16）
@@ -434,8 +444,8 @@ func (a *App) GetDatabases(connID string) int {
 }
 
 // ExportKeysToFile 把选中的 key 导出到文件，返回实际写入路径（用户取消时为空）
-func (a *App) ExportKeysToFile(connID string, keys []string, format string) (string, error) {
-	client, err := a.manager.GetClient(connID)
+func (a *App) ExportKeysToFile(connID string, keys []string, format string) (resultPath string, resultErr error) {
+	_, db, err := a.manager.GetConnectionState(connID)
 	if err != nil {
 		return "", err
 	}
@@ -446,29 +456,20 @@ func (a *App) ExportKeysToFile(connID string, keys []string, format string) (str
 		return "", fmt.Errorf("单次最多导出 %d 个 key", redisbackend.ExportMaxKeys)
 	}
 
-	entries := make([]config.ExportedKey, 0, len(keys))
-	for _, key := range keys {
-		entry, err := redisbackend.ReadKeyForExport(a.ctx, client, key)
-		if err != nil {
-			return "", fmt.Errorf("%s: %w", key, err)
-		}
-		entries = append(entries, entry)
+	ctx, done, err := a.beginKeyExport()
+	if err != nil {
+		return "", err
 	}
+	defer done()
 
 	// 文件名带时间戳，连续导出两次不会互相覆盖
 	stamp := time.Now().Format("20060102-150405")
-	var content []byte
 	filters := []wailsruntime.FileFilter{}
 	defaultName := "literedis-export-" + stamp + ".json"
 	if strings.EqualFold(format, "commands") {
-		content = []byte(redisbackend.FormatExportCommands(entries))
 		defaultName = "literedis-commands-" + stamp + ".txt"
 		filters = append(filters, wailsruntime.FileFilter{DisplayName: "Redis commands", Pattern: "*.txt"})
 	} else {
-		content, err = redisbackend.FormatExportJSON(entries)
-		if err != nil {
-			return "", err
-		}
 		filters = append(filters, wailsruntime.FileFilter{DisplayName: "JSON", Pattern: "*.json"})
 	}
 
@@ -483,10 +484,60 @@ func (a *App) ExportKeysToFile(connID string, keys []string, format string) (str
 	if path == "" {
 		return "", nil
 	}
-	if err := os.WriteFile(path, content, 0644); err != nil {
+	run, err := a.beginOperation("export", connID, db, "", db, len(keys))
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		var keyErr *redisbackend.ExportKeyError
+		if errors.As(resultErr, &keyErr) {
+			run.step(keyErr.Key, false, keyErr.Err, false)
+		}
+		run.finish(resultErr)
+	}()
+	stop := context.AfterFunc(ctx, run.cancel)
+	defer stop()
+	client, release, err := a.manager.NewOperationClientForDB(connID, db)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	if err := config.AtomicWriteStream(path, 0600, func(w io.Writer) error {
+		return redisbackend.ExportKeysToWriterProgress(run.ctx, client, keys, format, w, 0, func(key string) { run.step(key, true, nil, false) })
+	}); err != nil {
 		return "", err
 	}
 	return path, nil
+}
+
+// 同时仅允许一次导出，防止多个大任务叠加内存占用。
+func (a *App) beginKeyExport() (context.Context, func(), error) {
+	a.exportMu.Lock()
+	defer a.exportMu.Unlock()
+	if a.exportCancel != nil {
+		return nil, nil, errors.New("已有导出任务正在进行，请等待或取消")
+	}
+	parent := a.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, 10*time.Minute)
+	a.exportCancel = cancel
+	return ctx, func() {
+		cancel()
+		a.exportMu.Lock()
+		a.exportCancel = nil
+		a.exportMu.Unlock()
+	}, nil
+}
+
+func (a *App) CancelKeyExport() config.OperationResult {
+	a.exportMu.Lock()
+	defer a.exportMu.Unlock()
+	if a.exportCancel != nil {
+		a.exportCancel()
+	}
+	return config.OperationResult{Success: true}
 }
 
 // ImportKeysFromFile 从导出的 JSON 文件导入 key（写入当前 DB）
@@ -494,7 +545,7 @@ func (a *App) ImportKeysFromFile(connID string, overwrite bool) (config.BatchKey
 	if err := a.ensureWritable(connID); err != nil {
 		return config.BatchKeyResult{Message: err.Error()}, nil
 	}
-	client, err := a.manager.GetClient(connID)
+	_, db, err := a.manager.GetConnectionState(connID)
 	if err != nil {
 		return config.BatchKeyResult{Message: err.Error()}, nil
 	}
@@ -535,29 +586,27 @@ func (a *App) ImportKeysFromFile(connID string, overwrite bool) (config.BatchKey
 		return config.BatchKeyResult{Message: fmt.Sprintf("单次最多导入 %d 个 key", redisbackend.ExportMaxKeys)}, nil
 	}
 
-	imported, skipped, failed := 0, 0, 0
-	var firstErr error
-	for _, entry := range entries {
-		written, err := redisbackend.WriteExportedKey(a.ctx, client, entry, overwrite)
-		if err != nil {
-			failed++
-			if firstErr == nil {
-				firstErr = fmt.Errorf("%s: %w", entry.Key, err)
-			}
-			continue
-		}
-		if written {
-			imported++
-		} else {
-			skipped++
-		}
+	run, err := a.beginOperation("import", connID, db, connID, db, len(entries))
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error()}, nil
 	}
-
-	message := fmt.Sprintf("已导入 %d 个，跳过 %d 个，失败 %d 个", imported, skipped, failed)
-	if firstErr != nil {
-		message += "（首个错误: " + firstErr.Error() + "）"
+	client, release, err := a.manager.NewOperationClientForDB(connID, db)
+	if err != nil {
+		run.finish(err)
+		return config.BatchKeyResult{Message: err.Error()}, nil
 	}
-	return config.BatchKeyResult{Success: failed == 0, Affected: imported, Failed: failed, Message: message}, nil
+	defer release()
+	keys := make([]string, len(entries))
+	for i := range entries {
+		keys[i] = entries[i].Key
+	}
+	index := 0
+	return run.batch(keys, func(string) (bool, error, bool) {
+		entry := entries[index]
+		index++
+		written, err := redisbackend.WriteExportedKey(run.ctx, client, entry, overwrite)
+		return written, err, true
+	}), nil
 }
 
 // CopyKeysToDatabase 把 key 复制到同一实例的另一个 DB（Redis 6.2+）
@@ -565,7 +614,7 @@ func (a *App) CopyKeysToDatabase(connID string, keys []string, dstDB int, overwr
 	if err := a.ensureWritable(connID); err != nil {
 		return config.BatchKeyResult{Message: err.Error()}
 	}
-	client, err := a.manager.GetClient(connID)
+	cfg, db, err := a.manager.GetConnectionState(connID)
 	if err != nil {
 		return config.BatchKeyResult{Message: err.Error()}
 	}
@@ -575,16 +624,30 @@ func (a *App) CopyKeysToDatabase(connID string, keys []string, dstDB int, overwr
 	if len(keys) > redisbackend.ExportMaxKeys {
 		return config.BatchKeyResult{Message: fmt.Sprintf("单次最多复制 %d 个 key", redisbackend.ExportMaxKeys)}
 	}
-	copied, skipped, failed, err := redisbackend.CopyKeysToDB(a.ctx, client, keys, dstDB, overwrite)
-	message := fmt.Sprintf("DB %d：已复制 %d 个，跳过 %d 个，失败 %d 个", dstDB, copied, skipped, failed)
-	if err != nil {
-		message += "（" + err.Error() + "）"
+	if cfg.IsCluster || dstDB < 0 || dstDB == db {
+		return config.BatchKeyResult{Message: "请选择不同的有效目标 DB；集群不支持跨 DB 复制"}
 	}
-	return config.BatchKeyResult{Success: err == nil && failed == 0, Affected: copied, Failed: failed, Message: message}
+	run, err := a.beginOperation("copy", connID, db, connID, dstDB, len(keys))
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error()}
+	}
+	client, release, err := a.manager.NewOperationClientForDB(connID, db)
+	if err != nil {
+		run.finish(err)
+		return config.BatchKeyResult{Message: err.Error()}
+	}
+	defer release()
+	return run.batch(keys, func(key string) (bool, error, bool) {
+		copied, _, _, err := redisbackend.CopyKeysToDB(run.ctx, client, []string{key}, dstDB, overwrite)
+		return copied > 0, err, true
+	})
 }
 
 // CopyKeysToConnection 把 key 复制到另一个已连接的实例，保留 TTL
 func (a *App) CopyKeysToConnection(srcConnID, dstConnID string, keys []string, overwrite bool) (config.BatchKeyResult, error) {
+	if err := a.ensureWritable(dstConnID); err != nil {
+		return config.BatchKeyResult{Message: err.Error()}, nil
+	}
 	if srcConnID == dstConnID {
 		return config.BatchKeyResult{Message: "源连接和目标连接相同"}, nil
 	}
@@ -594,46 +657,39 @@ func (a *App) CopyKeysToConnection(srcConnID, dstConnID string, keys []string, o
 	if len(keys) > redisbackend.ExportMaxKeys {
 		return config.BatchKeyResult{Message: fmt.Sprintf("单次最多复制 %d 个 key", redisbackend.ExportMaxKeys)}, nil
 	}
-	src, err := a.manager.GetClient(srcConnID)
+	_, srcDB, err := a.manager.GetConnectionState(srcConnID)
 	if err != nil {
 		return config.BatchKeyResult{Message: "源连接不可用: " + err.Error()}, nil
 	}
-	dst, err := a.manager.GetClient(dstConnID)
+	_, dstDB, err := a.manager.GetConnectionState(dstConnID)
 	if err != nil {
 		return config.BatchKeyResult{Message: "目标连接未连接，请先连上再复制"}, nil
 	}
 
-	copied, skipped, failed := 0, 0, 0
-	var firstErr error
-	for _, key := range keys {
-		entry, err := redisbackend.ReadKeyForExport(a.ctx, src, key)
-		if err != nil {
-			failed++
-			if firstErr == nil {
-				firstErr = fmt.Errorf("%s: %w", key, err)
-			}
-			continue
-		}
-		written, err := redisbackend.WriteExportedKey(a.ctx, dst, entry, overwrite)
-		if err != nil {
-			failed++
-			if firstErr == nil {
-				firstErr = fmt.Errorf("%s: %w", key, err)
-			}
-			continue
-		}
-		if written {
-			copied++
-		} else {
-			skipped++
-		}
+	run, err := a.beginOperation("copy", srcConnID, srcDB, dstConnID, dstDB, len(keys))
+	if err != nil {
+		return config.BatchKeyResult{Message: err.Error()}, nil
 	}
-
-	message := fmt.Sprintf("已复制 %d 个，跳过 %d 个，失败 %d 个", copied, skipped, failed)
-	if firstErr != nil {
-		message += "（首个错误: " + firstErr.Error() + "）"
+	src, releaseSrc, err := a.manager.NewOperationClientForDB(srcConnID, srcDB)
+	if err != nil {
+		run.finish(err)
+		return config.BatchKeyResult{Message: err.Error()}, nil
 	}
-	return config.BatchKeyResult{Success: failed == 0, Affected: copied, Failed: failed, Message: message}, nil
+	defer releaseSrc()
+	dst, releaseDst, err := a.manager.NewOperationClientForDB(dstConnID, dstDB)
+	if err != nil {
+		run.finish(err)
+		return config.BatchKeyResult{Message: err.Error()}, nil
+	}
+	defer releaseDst()
+	return run.batch(keys, func(key string) (bool, error, bool) {
+		entry, err := redisbackend.ReadKeyForExport(run.ctx, src, key)
+		if err != nil {
+			return false, err, false
+		}
+		written, err := redisbackend.WriteExportedKey(run.ctx, dst, entry, overwrite)
+		return written, err, true
+	}), nil
 }
 
 // GetSlowLog 读取当前连接的慢查询记录
@@ -647,6 +703,18 @@ func (a *App) GetSlowLog(connID string, count int) ([]config.SlowLogEntry, error
 
 // ScanMemoryReport 对流式扫描 key 并生成内存体检报告
 func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (report config.MemoryReport, err error) {
+	return a.scanMemoryReport(connID, -1, pattern, maxKeys)
+}
+
+// ScanMemoryReportForDB 体检独立选择的 DB，不切换主界面的数据库。
+func (a *App) ScanMemoryReportForDB(connID string, db int, pattern string, maxKeys int64) (config.MemoryReport, error) {
+	if db < 0 {
+		return config.MemoryReport{}, errors.New("无效的 DB")
+	}
+	return a.scanMemoryReport(connID, db, pattern, maxKeys)
+}
+
+func (a *App) scanMemoryReport(connID string, targetDB int, pattern string, maxKeys int64) (report config.MemoryReport, err error) {
 	// 集群体检涉及多节点并发扫描，兜底 recover：任何 panic 都转成错误
 	// 并写进连接诊断日志，而不是让整个应用闪退
 	defer func() {
@@ -656,11 +724,7 @@ func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (re
 			err = fmt.Errorf("内存体检发生内部错误，已记录到诊断日志: %v", r)
 		}
 	}()
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.MemoryReport{}, err
-	}
-	cfg, db, err := a.manager.GetConnectionState(connID)
+	cfg, _, err := a.manager.GetConnectionState(connID)
 	if err != nil {
 		return config.MemoryReport{}, err
 	}
@@ -676,7 +740,11 @@ func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (re
 		a.memoryScanMu.Unlock()
 		return config.MemoryReport{}, errors.New("已有体检任务在执行，请先取消")
 	}
-	ctx, cancel := context.WithCancel(a.ctx)
+	parent := a.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
 	a.memoryScanCancel = cancel
 	a.memoryScanMu.Unlock()
 	defer func() {
@@ -685,6 +753,11 @@ func (a *App) ScanMemoryReport(connID string, pattern string, maxKeys int64) (re
 		a.memoryScanCancel = nil
 		a.memoryScanMu.Unlock()
 	}()
+	client, db, release, err := a.manager.NewReadClientForDB(connID, targetDB)
+	if err != nil {
+		return config.MemoryReport{}, err
+	}
+	defer release()
 
 	// 集群体检时进度回调会从多个 goroutine 并发进入，lastEmit 需要锁保护
 	var progressMu sync.Mutex
@@ -767,12 +840,11 @@ func (a *App) ExecuteRedisCommandForce(connID, command string) (config.RedisCons
 }
 
 func (a *App) executeRedisCommand(connID, command string) (config.RedisConsoleResult, error) {
-	client, err := a.manager.GetClient(connID)
+	ctx, client, done, err := a.operationClient(connID, 15*time.Second)
 	if err != nil {
-		return config.RedisConsoleResult{}, err
+		return config.RedisConsoleResult{Code: "rejected", Command: command, Error: err.Error()}, nil
 	}
-	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
-	defer cancel()
+	defer done()
 	return redisbackend.ExecuteRedisCommandWithState(ctx, client, command, connID, a.manager), nil
 }
 
@@ -817,222 +889,104 @@ func (a *App) SearchValue(connID, key, keyType, pattern string, exact bool, curs
 
 // SetString 设置 string
 func (a *App) SetString(connID, key, value string) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.SetStringPreserveTTL(a.ctx, client, key, value); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.SetStringPreserveTTL(ctx, client, key, value)
+	})
 }
 
 // CreateKey 创建一个新 key。
 func (a *App) CreateKey(connID string, req config.CreateKeyRequest) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
-	defer cancel()
-	if err := redisbackend.CreateKey(ctx, client, req); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.CreateKey(ctx, client, req)
+	})
 }
 
 // HSet 设置 hash field
 func (a *App) HSet(connID, key, field, value string) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.HSet(a.ctx, client, key, field, value); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.HSet(ctx, client, key, field, value)
+	})
 }
 
 // HDel 删除 hash field
 func (a *App) HDel(connID, key, field string) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.HDel(a.ctx, client, key, field); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.HDel(ctx, client, key, field)
+	})
 }
 
 // LPush 向 list 头部插入
 func (a *App) LPush(connID, key, value string) config.OperationResult {
 	defer a.invalidateListCache(connID, key)
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.LPush(a.ctx, client, key, value); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.LPush(ctx, client, key, value)
+	})
 }
 
 // RPush 向 list 尾部插入
 func (a *App) RPush(connID, key, value string) config.OperationResult {
 	defer a.invalidateListCache(connID, key)
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.RPush(a.ctx, client, key, value); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.RPush(ctx, client, key, value)
+	})
 }
 
 // LSet 设置 list 指定索引的值
 func (a *App) LSet(connID, key string, index int64, value string) config.OperationResult {
 	defer a.invalidateListCache(connID, key)
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.LSet(a.ctx, client, key, index, value); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.LSet(ctx, client, key, index, value)
+	})
 }
 
 // LRem 删除 list 中匹配的元素
 func (a *App) LRem(connID, key string, count int64, value string) config.OperationResult {
 	defer a.invalidateListCache(connID, key)
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.LRem(a.ctx, client, key, count, value); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.LRem(ctx, client, key, count, value)
+	})
 }
 
 // SAdd 向 set 添加成员
 func (a *App) SAdd(connID, key, member string) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.SAdd(a.ctx, client, key, member); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.SAdd(ctx, client, key, member)
+	})
 }
 
 // SRem 从 set 删除成员
 func (a *App) SRem(connID, key, member string) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.SRem(a.ctx, client, key, member); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.SRem(ctx, client, key, member)
+	})
 }
 
 // RenameSetMember 原子重命名 set 成员
 func (a *App) RenameSetMember(connID, key, source, destination string) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
-	defer cancel()
-	if err := redisbackend.RenameSetMember(ctx, client, key, source, destination); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.RenameSetMember(ctx, client, key, source, destination)
+	})
 }
 
 // ZAdd 向 zset 添加成员
 func (a *App) ZAdd(connID, key, member string, score float64) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.ZAdd(a.ctx, client, key, member, score); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.ZAdd(ctx, client, key, member, score)
+	})
 }
 
 // ZRem 从 zset 删除成员
 func (a *App) ZRem(connID, key, member string) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	if err := redisbackend.ZRem(a.ctx, client, key, member); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.ZRem(ctx, client, key, member)
+	})
 }
 
 // RenameZSetMember 原子重命名 zset 成员并保留当前 score
 func (a *App) RenameZSetMember(connID, key, source, destination string) config.OperationResult {
-	if err := a.ensureWritable(connID); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	client, err := a.manager.GetClient(connID)
-	if err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
-	defer cancel()
-	if err := redisbackend.RenameZSetMember(ctx, client, key, source, destination); err != nil {
-		return config.OperationResult{Success: false, Message: err.Error()}
-	}
-	return config.OperationResult{Success: true}
+	return a.runWrite(connID, func(ctx context.Context, client redis.UniversalClient) error {
+		return redisbackend.RenameZSetMember(ctx, client, key, source, destination)
+	})
 }
 
 // ============================================================
@@ -1096,7 +1050,7 @@ func (a *App) ExportConnectionsToFile() (string, error) {
 	if path == "" {
 		return "", nil
 	}
-	if err := os.WriteFile(path, data, 0600); err != nil {
+	if err := config.AtomicWriteFile(path, data, 0600); err != nil {
 		return "", err
 	}
 	return path, nil

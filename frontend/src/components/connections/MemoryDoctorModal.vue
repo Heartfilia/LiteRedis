@@ -13,6 +13,13 @@
         </header>
 
         <div class="doctor-toolbar">
+          <label class="doctor-field doctor-field-db">
+            <span>{{ t('memoryDoctor.database') }}</span>
+            <select v-model.number="selectedDB" :disabled="scanning || loadingDB || isCluster" @change="resetReport">
+              <option v-if="selectedDB === null" :value="null">—</option>
+              <option v-for="db in databaseOptions" :key="db" :value="db">DB {{ db }}</option>
+            </select>
+          </label>
           <label class="doctor-field">
             <span>{{ t('memoryDoctor.pattern') }}</span>
             <input v-model="pattern" :disabled="scanning" placeholder="*" spellcheck="false" @keydown.enter="startScan" />
@@ -25,11 +32,12 @@
               <option :value="200000">200,000</option>
             </select>
           </label>
-          <button v-if="!scanning" class="doctor-run" @click="startScan">
+          <button v-if="!scanning" class="doctor-run" :disabled="loadingDB || selectedDB === null" @click="startScan">
             {{ report ? t('memoryDoctor.rescan') : t('memoryDoctor.start') }}
           </button>
           <button v-else class="doctor-run doctor-stop" @click="cancelScan">{{ t('memoryDoctor.cancel') }}</button>
         </div>
+        <div class="doctor-db-hint">{{ t(isCluster ? 'memoryDoctor.clusterDBHint' : 'memoryDoctor.databaseHint') }}</div>
 
         <div v-if="scanning" class="doctor-progress">
           <div class="doctor-progress-track">
@@ -66,8 +74,20 @@
                 <span class="metric-label">{{ t('memoryDoctor.noTTL') }}</span>
                 <span class="metric-value">{{ formatCount(report.no_ttl_keys) }}</span>
               </div>
+              <div class="doctor-metric">
+                <span class="metric-label">{{ t('memoryDoctor.redisMemory') }}</span>
+                <span class="metric-value">{{ redisMemoryText }}</span>
+              </div>
+              <div class="doctor-metric doctor-metric-share">
+                <span class="metric-label">{{ memoryShareLabel }}</span>
+                <span class="metric-value">{{ memoryShareText }}</span>
+              </div>
             </div>
 
+            <div class="doctor-note info">ℹ {{ t('memoryDoctor.memoryShareHint') }}</div>
+            <div v-if="report.memory_share_partial" class="doctor-note">⚠ {{ t('memoryDoctor.memorySharePartial') }}</div>
+            <div v-if="!hasMemoryShare" class="doctor-note">{{ t('memoryDoctor.memoryShareUnavailable') }}</div>
+            <div v-if="!hasMemoryShare && report.memory_share_unavailable_reason" class="doctor-note">{{ memoryShareReason }}</div>
             <div v-if="report.truncated" class="doctor-note">⚠ {{ t('memoryDoctor.truncated') }}</div>
             <div v-if="sizeSource === 'debug'" class="doctor-note info">ℹ {{ t('memoryDoctor.sizeApprox') }}</div>
             <div v-else-if="sizeSource === 'length'" class="doctor-note">⚠ {{ t('memoryDoctor.sizeUnavailable') }}</div>
@@ -151,8 +171,9 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
+import { useConnectionsStore } from '../../stores/connections.js'
 import { useI18n } from '../../i18n/index.js'
-import { cancelMemoryScan, getConnectionDB, scanMemoryReport } from '../../api/wails.js'
+import { cancelMemoryScan, getConnectionDB, getDatabases, scanMemoryReportForDB } from '../../api/wails.js'
 import { EventsOff, EventsOn } from '../../../wailsjs/runtime/runtime.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { formatBytes, formatCount } from '../../utils/format.js'
@@ -167,6 +188,7 @@ const emit = defineEmits(['close'])
 let disposeEscape = null
 
 const settingsStore = useSettingsStore()
+const connectionsStore = useConnectionsStore()
 const { t } = useI18n()
 
 const themeMode = computed(() => settingsStore.themeMode || 'light')
@@ -174,7 +196,11 @@ const pattern = ref('*')
 const maxKeys = ref(200000)
 const scanning = ref(false)
 const report = ref(null)
-const currentDB = ref(null)
+const selectedDB = ref(null)
+const databaseCount = ref(0)
+const loadingDB = ref(true)
+const isCluster = computed(() => !!connectionsStore.connections.find((conn) => conn.id === props.connId)?.is_cluster)
+const databaseOptions = computed(() => Array.from({ length: databaseCount.value }, (_, db) => db))
 const error = ref('')
 const progress = ref({ scanned: 0, total: 0 })
 const toast = ref('')
@@ -182,7 +208,22 @@ const toastOk = ref(true)
 let toastTimer = null
 
 const sizeSource = computed(() => report.value?.size_source || 'memory')
+const memoryShareReason = computed(() => {
+  const reason = report.value?.memory_share_unavailable_reason || ''
+  if (reason.includes('unsupported_or_renamed')) return t('reliability.memoryUnsupported')
+  if (reason.includes('permission_denied')) return t('reliability.memoryPermission')
+  if (reason.includes('command_disabled')) return t('reliability.memoryDisabled')
+  return t('reliability.memoryReadFailed')
+})
 const lengthMode = computed(() => sizeSource.value === 'length')
+const hasMemoryShare = computed(() => typeof report.value?.memory_share_percent === 'number' && Number.isFinite(report.value.memory_share_percent))
+const memoryShareLabel = computed(() => t(report.value?.memory_share_partial ? 'memoryDoctor.scannedMemoryShare' : 'memoryDoctor.dbMemoryShare'))
+const memoryShareText = computed(() => {
+  if (!hasMemoryShare.value) return '—'
+  const value = report.value.memory_share_percent
+  return value > 0 && value < 0.01 ? '<0.01%' : value.toFixed(2) + '%'
+})
+const redisMemoryText = computed(() => report.value?.redis_used_memory_bytes > 0 ? formatBytes(report.value.redis_used_memory_bytes) : '—')
 
 const progressPercent = computed(() => {
   const total = Number(progress.value.total) || 0
@@ -191,7 +232,7 @@ const progressPercent = computed(() => {
 })
 
 const displayDB = computed(() => {
-  const db = report.value?.db ?? currentDB.value
+  const db = report.value?.db ?? selectedDB.value
   return db === null || db === undefined ? '-' : db
 })
 
@@ -199,9 +240,14 @@ onMounted(async () => {
   disposeEscape = registerEscapeHandler(handleClose)
   EventsOn('memory:progress', handleProgress)
   try {
-    currentDB.value = await getConnectionDB(props.connId)
+    const [current, count] = await Promise.all([getConnectionDB(props.connId), getDatabases(props.connId)])
+    if (!Number.isInteger(current) || current < 0 || current > 4095) throw new Error(t('memoryDoctor.databaseLoadFailed'))
+    selectedDB.value = isCluster.value ? 0 : current
+    databaseCount.value = isCluster.value ? 1 : Math.min(4096, Math.max(current + 1, Number.isInteger(count) && count > 0 ? count : 16))
   } catch (e) {
-    currentDB.value = null
+    error.value = e?.message || String(e)
+  } finally {
+    loadingDB.value = false
   }
 })
 
@@ -228,18 +274,25 @@ function showToast(message, success = true) {
 }
 
 async function startScan() {
-  if (scanning.value) return
+  if (scanning.value || loadingDB.value || selectedDB.value === null) return
   scanning.value = true
+  report.value = null
   error.value = ''
   progress.value = { scanned: 0, total: 0 }
   try {
-    report.value = await scanMemoryReport(props.connId, pattern.value.trim() || '*', maxKeys.value)
+    report.value = await scanMemoryReportForDB(props.connId, selectedDB.value, pattern.value.trim() || '*', maxKeys.value)
   } catch (e) {
     error.value = e?.message || String(e)
     report.value = null
   } finally {
     scanning.value = false
   }
+}
+
+function resetReport() {
+  report.value = null
+  error.value = ''
+  progress.value = { scanned: 0, total: 0 }
 }
 
 async function cancelScan() {
@@ -304,6 +357,13 @@ async function exportMarkdown() {
   lines.push('- ' + t('memoryDoctor.scanned') + ': ' + report.value.scanned_keys + ' / ' + report.value.total_keys)
   lines.push('- ' + t('memoryDoctor.memory') + ': ' + formatBytes(report.value.total_bytes) + ' (' + t('memoryDoctor.avgSize') + ' ' + formatBytes(report.value.avg_key_bytes) + ')')
   lines.push('- ' + t('memoryDoctor.noTTL') + ': ' + report.value.no_ttl_keys)
+  lines.push('- ' + t('memoryDoctor.redisMemory') + ': ' + redisMemoryText.value)
+  lines.push('- ' + memoryShareLabel.value + ': ' + memoryShareText.value)
+  lines.push('')
+  lines.push('> ' + t('memoryDoctor.memoryShareHint'))
+  if (report.value.memory_share_partial) lines.push('> ' + t('memoryDoctor.memorySharePartial'))
+  if (!hasMemoryShare.value && report.value.memory_share_unavailable_reason) lines.push('> ' + memoryShareReason.value)
+  if (!hasMemoryShare.value) lines.push('> ' + t('memoryDoctor.memoryShareUnavailable'))
   lines.push('')
   lines.push('## ' + t('memoryDoctor.prefixes'))
   lines.push('')
@@ -395,6 +455,7 @@ async function exportMarkdown() {
 
 .doctor-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 12px;
   padding: 14px 18px 10px;
@@ -410,6 +471,21 @@ async function exportMarkdown() {
 
 .doctor-field-narrow {
   flex: 0 0 150px;
+}
+
+.doctor-field-db {
+  flex: 0 0 110px;
+}
+
+.doctor-db-hint {
+  padding: 0 18px 10px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.doctor-run:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .doctor-field span {
@@ -504,7 +580,7 @@ async function exportMarkdown() {
 
 .doctor-metrics {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   margin-bottom: 14px;
 }

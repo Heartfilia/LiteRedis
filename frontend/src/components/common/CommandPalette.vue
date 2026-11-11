@@ -233,9 +233,9 @@ const connectionItems = computed(() =>
     id: 'conn:' + conn.id,
     label: conn.name || conn.id,
     hint: connectionsStore.isConnected(conn.id) ? t('cmdk.connected') : t('cmdk.disconnected'),
-    run: () => {
+    run: async () => {
       if (connectionsStore.isConnected(conn.id)) {
-        workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
+        await workspaceStore.setActiveConn(conn.id, conn.name, conn.db || 0)
       } else {
         connectionsStore.connect(conn.id)
       }
