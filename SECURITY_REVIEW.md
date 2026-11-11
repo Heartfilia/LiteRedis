@@ -20,7 +20,7 @@
 | 保护模式放行会修改诊断状态的 LATENCY RESET，解析器与执行逻辑不一致 | 删除 RESET 白名单；与执行共用参数解析器 | `backend/redis/readonly.go`、`readonly_test.go` |
 | SSH 密码及私钥口令被 TrimSpace 改写 | 保留凭据原始字节；添加含首尾空格的加密私钥测试 | `backend/ssh/tunnel.go`、`tunnel_test.go` |
 | SSH 指纹文件损坏时静默重新信任主机 | 改为拒绝连接，保留损坏文件供恢复；更新回归测试 | `backend/ssh/hostkey.go`、`hostkey_test.go` |
-| 已知依赖及 Go 标准库安全问题 | 更新 Vue/Vite/插件、Go 网络和加密依赖；Go 基线提升为 1.26.10；发布流水线读取 go.mod 并增加安全审计 | `go.mod`、`frontend/package*.json`、`.github/workflows/release.yml` |
+| 已知依赖及 Go 标准库安全问题 | 更新 Vue/Vite/插件、Go 网络和加密依赖；Go 基线提升为 1.26.11（包含 GO-2026-6859 修复）；发布流水线读取 go.mod 并增加安全审计 | `go.mod`、`frontend/package*.json`、`.github/workflows/release.yml` |
 
 ## 验证结果
 
@@ -33,6 +33,13 @@
 - 前端测试仍有 Wails 自动生成 runtime 的 ESM 元数据警告，不影响本次测试结果。
 
 Go 工具链会按项目要求自动下载（未替换全局 Go 安装）。因 `main.go` 嵌入 `frontend/dist`，应先构建前端，再运行 Go 检查，不能同时重建 dist 和编译 Go。
+
+### 2026-11-11 CI 标准库漏洞修复
+
+- CI 的 `govulncheck@v1.9.0` 检出 `net/http@go1.26.10` 的 GO-2026-6859；修复版本为 Go 1.26.11。
+- 将 `go.mod` 最低版本升级至 1.26.11；全部 CI 构建任务已通过 `go-version-file: go.mod` 读取版本，无需关闭扫描或忽略漏洞。
+- Go 1.26.11 下本机扫描与 Linux/amd64（CGO 禁用）目标扫描均通过：0 个可达漏洞、0 个已导入包漏洞；仍有 4 个未调用路径的模块级漏洞提示。
+- Go 竞态测试、vet/build、前端 lint/build 通过。本次不移动旧 tag、不发布安装包；已有 tag 工作流重跑不会自动包含 main 上的修复。
 
 ## 后续优化与边界
 

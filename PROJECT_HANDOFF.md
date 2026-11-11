@@ -27,7 +27,7 @@
 LiteRedis 是一个跨平台 Redis 桌面客户端，使用 Wails 将 Go 后端能力绑定到 Vue 前端。
 
 - 桌面框架：Wails `v2.12.0`。
-- 后端：Go `1.26.10+`（标准库安全修复基线），Redis 客户端为 `go-redis/v9`。
+- 后端：Go `1.26.11+`（标准库安全修复基线，包含 GO-2026-6859 修复），Redis 客户端为 `go-redis/v9`。
 - 前端：Vue 3、Pinia、Vite。
 - 连接能力：普通 Redis、Cluster、SSH 隧道、HTTP/SOCKS Proxy、多 DB。
 - 数据能力：Key 扫描和搜索，String/Hash/List/Set/ZSet 等类型查看与编辑，分页加载，内置 Redis Console。
