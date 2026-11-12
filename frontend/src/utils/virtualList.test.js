@@ -34,6 +34,13 @@ test('computeWindow: 滚到底部时不越界', () => {
   assert.ok(w.start <= total)
 })
 
+test('computeWindow: a stale scroll offset after replacing results cannot render a blank window', () => {
+  const w = computeWindow(200, 100000, 600, 32, 8)
+  assert.ok(w.start < w.end)
+  assert.ok(w.end <= 200)
+  assert.equal(w.topPad + (w.end - w.start) * 32 + w.bottomPad, 200 * 32)
+})
+
 test('computeWindow: 数据不足一屏或行高未知时全量渲染', () => {
   assert.deepEqual(computeWindow(5, 0, 600, 32, 8), { start: 0, end: 5, topPad: 0, bottomPad: 0 })
   assert.deepEqual(computeWindow(0, 0, 600, 32, 8), { start: 0, end: 0, topPad: 0, bottomPad: 0 })

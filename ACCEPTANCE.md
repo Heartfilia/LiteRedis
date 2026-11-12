@@ -6,7 +6,7 @@
 
 | 层次 | 结果与范围 |
 | --- | --- |
-| 前端 | 94 项单测；37 项 Playwright 浏览器测试（23 项可靠性专项）；lint / build |
+| 前端 | 95 项单测；43 项 Playwright 浏览器测试（23 项可靠性专项、6 项 key 分页及加载样式回归）；lint / build |
 | Go | `go test -race ./...`、`go vet ./...`、`go build` |
 | Redis 7.2.6 / 3.0.7 | String/Hash/List/Set/ZSet 导入、默认跳过和显式覆盖、完整内容与 TTL 读回；String/Hash CAS、普通集合编辑、批量 TTL/删除；7 支持 COPY，3 明确不支持；Stream 仅在 7 测试 |
 | Redis 7.2.6 ACL | EVAL / 临时 key 权限拒绝、脚本内部 HMSET/PEXPIRE/PERSIST/RENAME 拒绝保留目标值和 TTL；DEL 清理失败返回临时 key 且保留过期时间 |
@@ -101,6 +101,22 @@ open -n "$PWD/build/bin/LiteRedisAcceptance.app" --env HOME=/path/to/isolated-ho
 | Cmd+W 关闭已打开、无草稿的 key | 只关闭 key，连接及工作区仍在，`native-draft-open.png` / `native-key-closed.png` |
 
 这只是部分原生验收通过，不代表下面所有门禁完成。WebView DOM 未可靠暴露，模拟鼠标和部分键盘输入效果不稳定，草稿编辑、无 key 再次 Cmd+W、文件面板和任务取消没有可靠证据，不勾为通过。
+
+## Key 模糊搜索分页修复（2026-11-11）
+
+- 按用户授权仅连接本地已保存的 `kgj` 配置，通过原有 SSH 和 Cluster 路径只读查询；隔离 HOME 复用已信任 SSH 指纹，不修改连接配置，不读取 value、不写入 Redis。
+- `EXISTS hermes:thor:aweme_ios_2280_did` 返回 1。应用后端 `ScanKeys` 以 `hermes:thor:aweme_ios*` / 每页 200 读取，实测三页 200 / 200 / 195，共 595 个不重复 key，目标在第三页；此次数据状态下后端无漏页或错误。这不是静态快照，后续数量可能变化。
+- 前端加载更多会卸载已显示列表，虚拟列表保留旧滚动偏移且绑定新容器时未同步，是可复现的显示缺陷。现改为追加加载保留原列表和滚动位置，虚拟窗口限制在有效范围内，解绑旧容器监听并同步新容器滚动位置。
+- 单搜索及保留多搜索模式均展示分页错误，失败保留已有结果，重试清除旧错误；追加结果按 key 名去重，空后续页不清空列表。
+- 新增 4 项浏览器回归（修复前可复现列表被卸载），以及 1 项虚拟窗口边界单测；当前 95 项单测、41 项浏览器测试、lint/build 通过。完整浏览器回归曾发现新增 count watcher 过早触发 List 编辑器未初始化的 computed，已移除该 watcher 并重新全量通过。
+- 真实 Redis 后端只读测试与浏览器 Wails mock 测试分别执行；尚未将本次前端修复安装到正常运行的 macOS 应用，不宣称原生联动已验收。发布 CI 仍按用户要求不运行 Playwright，本地测试保留。
+- 已于 18:34 将当前修复打包至工程 `build/bin/LiteRedis.app`（darwin/arm64，Go 1.26.11），构建标识 `0.7.3-local.pagination.20261111.183432`，通过本地 ad-hoc 签名校验。可执行文件 SHA256：`4344747b91127c9cc3d28b9488c69083175eeed47920a60fbc51b614e59b8311`。旧工程包保留在临时材料 `literedis-pagination-build-20261111-183432/backup-project/LiteRedis.app`；未替换 `/Applications/LiteRedis.app`、未结束用户正在运行的应用，待用户手动退出旧版并打开工程新包测试。
+
+### 加载动画修复补充（2026-11-12）
+
+- 原 `.loading, .loading::before` 同时给提示容器与伪元素添加尺寸、边框及旋转，并误伤加载更多按钮的 `.loading` 状态；现使用独立 `.key-scan-loading` 容器，仅其伪元素旋转，文字居中且保持静止。
+- 新增深浅色首次加载样式回归，以及加载更多按钮不整体旋转/不产生额外圆圈的断言；43 项浏览器测试、lint/build 通过，原生视觉待用户复测。
+- 工程包 `build/bin/LiteRedis.app` 已更新，构建标识 `0.7.3-local.loading.20261112.091340`，可执行文件 SHA256 `99ae54d67645537a38469729a9cd906e0f63c8f5b1a498752f2c1e400670266d`，本地签名校验通过。上一版分页测试包保留在临时材料 `literedis-loading-build-20261112-091340/backup-project/LiteRedis.app`；未替换 `/Applications`、未结束正在运行的旧版。
 
 ## 发布前人工门禁（未完成，不能勾为通过）
 

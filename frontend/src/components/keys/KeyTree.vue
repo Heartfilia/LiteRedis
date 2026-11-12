@@ -78,6 +78,7 @@
       </div>
 
       <div class="tree-content">
+        <div v-if="!workspaceStore.keepPrevSearch && session?.error" class="scan-error" role="alert">{{ session.error }}</div>
         <div v-if="showClusterEmptyHint" class="empty-state cluster-empty-state">
           <div class="cluster-empty-title">{{ t('keyTree.clusterEmptyTitle') }}</div>
           <div class="cluster-empty-text">{{ t('keyTree.clusterEmptyHint') }}</div>
@@ -93,7 +94,8 @@
                 <span v-else class="section-status">{{ sess.keys?.length ?? 0 }}</span>
                 <button class="section-close" @click="workspaceStore.removeSession(sess.id)">✕</button>
               </div>
-              <div v-if="sess.loading" class="section-tip">{{ t('keyTree.loading') }}</div>
+              <div v-if="sess.error" class="scan-error" role="alert">{{ sess.error }}</div>
+              <div v-if="sess.loading && !sess.keys?.length" class="section-tip">{{ t('keyTree.loading') }}</div>
               <div v-else-if="!sess.treeData?.length" class="section-tip">{{ t('keyTree.noKeys') }}</div>
               <div v-else>
                 <KeyTreeRow
@@ -126,7 +128,7 @@
 
         <!-- 单session模式：keepPrevSearch = false -->
         <template v-else>
-          <div v-if="session?.loading" class="loading">{{ t('keyTree.loading') }}</div>
+          <div v-if="session?.loading && !session.keys?.length" class="key-scan-loading" role="status">{{ t('keyTree.loading') }}</div>
           <div v-else-if="!session" class="empty-state">{{ t('keyTree.searchHint') }}</div>
           <div v-else-if="session.treeData?.length === 0" class="empty-state">{{ t('keyTree.noKeys') }}</div>
           <div v-else ref="treeScrollRef" class="tree-scroll" tabindex="0" data-kb-container @keydown="onTreeKeydown">
@@ -926,18 +928,32 @@ function collapseVisibleTree() {
   flex-direction: column;
   min-height: 0;
 }
+.scan-error { flex-shrink: 0; padding: 8px 12px; color: #b91c1c; background: #fef2f2; font-size: 12px; overflow-wrap: anywhere; }
+.theme-dark .scan-error { color: #fca5a5; background: rgba(127, 29, 29, 0.25); }
 .tree-scroll,
 .merged-scroll {
   flex: 1;
   overflow-y: auto;
   padding: 8px 8px 10px;
 }
-.loading,
-.loading::before {
+.key-scan-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+.key-scan-loading::before {
   content: '';
+  display: block;
+  flex-shrink: 0;
   width: 16px;
   height: 16px;
-  margin-bottom: 8px;
   border-radius: 50%;
   border: 2px solid rgba(148, 163, 184, 0.35);
   border-top-color: #60a5fa;
@@ -957,7 +973,7 @@ function collapseVisibleTree() {
   padding: 40px;
   text-align: center;
 }
-.key-tree.theme-dark .loading,
+.key-tree.theme-dark .key-scan-loading,
 .key-tree.theme-dark .empty-state {
   color: #94a3b8;
 }

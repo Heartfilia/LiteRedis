@@ -674,7 +674,7 @@ export const useWorkspaceStore = defineStore('workspace', {
 
       const idx = this.searchSessions.findIndex(s => s.id === sessionId)
       if (idx !== -1) {
-        this.searchSessions[idx] = { ...this.searchSessions[idx], loading: true }
+        this.searchSessions[idx] = { ...this.searchSessions[idx], loading: true, error: null }
       }
       const request = this._beginRequest(`keys:${sessionId}`)
 
@@ -683,7 +683,11 @@ export const useWorkspaceStore = defineStore('workspace', {
         if (!this._isRequestCurrent(request)) return
         const currentIdx = this.searchSessions.findIndex(s => s.id === sessionId)
         if (currentIdx !== -1) {
-          const mergedKeys = [...this.searchSessions[currentIdx].keys, ...(result.keys || [])]
+          // SCAN may repeat keys across pages; keep one row per Redis key.
+          const mergedKeys = [...new Map([
+            ...this.searchSessions[currentIdx].keys,
+            ...(result.keys || []),
+          ].map(key => [key.name, key])).values()]
           this.searchSessions[currentIdx] = {
             ...this.searchSessions[currentIdx],
             keys: mergedKeys,

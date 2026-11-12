@@ -6,8 +6,9 @@ export function computeWindow(count, scrollTop, viewport, rowHeight, overscan = 
   if (!rowHeight || rowHeight <= 0 || total === 0) {
     return { start: 0, end: total, topPad: 0, bottomPad: 0 }
   }
-  const safeScroll = Math.max(0, Number(scrollTop) || 0)
   const safeViewport = Math.max(0, Number(viewport) || 0)
+  // A smaller/new data set must not leave the visible window past its end.
+  const safeScroll = Math.min(Math.max(0, Number(scrollTop) || 0), Math.max(0, total * rowHeight - safeViewport))
   const start = Math.max(0, Math.floor(safeScroll / rowHeight) - overscan)
   const end = Math.min(total, Math.ceil((safeScroll + safeViewport) / rowHeight) + overscan)
   return {
@@ -35,6 +36,7 @@ export function useRowVirtualizer(options) {
   function measure() {
     const el = containerRef.value
     if (!el) return
+    scrollTop.value = el.scrollTop
     viewport.value = el.clientHeight || 0
     const row = el.querySelector('[data-vrow]')
     if (row) {
@@ -65,6 +67,7 @@ export function useRowVirtualizer(options) {
   function bind() {
     const el = containerRef.value
     if (!el) return
+    scrollTop.value = el.scrollTop
     el.addEventListener('scroll', onScroll, { passive: true })
     if (typeof ResizeObserver !== 'undefined') {
       observer = new ResizeObserver(measure)
@@ -73,8 +76,7 @@ export function useRowVirtualizer(options) {
     measure()
   }
 
-  function unbind() {
-    const el = containerRef.value
+  function unbind(el = containerRef.value) {
     if (el) el.removeEventListener('scroll', onScroll)
     if (observer) {
       observer.disconnect()
@@ -87,9 +89,9 @@ export function useRowVirtualizer(options) {
   }
 
   onMounted(bind)
-  onBeforeUnmount(unbind)
+  onBeforeUnmount(() => unbind())
   watch(containerRef, (el, old) => {
-    if (old) unbind()
+    if (old) unbind(old)
     if (el) bind()
   })
 
