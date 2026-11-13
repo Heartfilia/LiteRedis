@@ -312,7 +312,7 @@
       </span>
     </div>
 
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :save-blocked="outcomeUnknown" :save-message="msg" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :save-blocked="outcomeUnknown" :save-message="expandSaveMessage" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
     <ExtractMenu
       :visible="extractMenu.visible"
       :x="extractMenu.x"
@@ -461,6 +461,7 @@ const expandTitle = ref('')
 const expandContent = ref('')
 const expandEditable = ref(false)
 const expandSaving = ref(false)
+const expandSaveMessage = ref('')
 const expandAnchor = ref(null)
 const editModalField = ref('')
 
@@ -1194,6 +1195,7 @@ function cancelEdit() {
 }
 
 function openEdit(field, val, event) {
+  expandSaveMessage.value = outcomeUnknown.value ? t('reliability.outcomeUnknown') : ''
   expandAnchor.value = anchorRect(event)
   expandTitle.value = field
   expandContent.value = val
@@ -1206,25 +1208,29 @@ async function saveFromModal(newVal) {
   const field = editModalField.value
   if (expandSaving.value || outcomeUnknown.value || connectionsStore.isReadOnly(workspaceStore.activeConnID)) return
   const request = requestGuard.begin(`write:modal:${field}`)
+  expandSaveMessage.value = ''
   expandSaving.value = true
   try {
     const result = await hSetChecked(request.context.connID, request.context.db, request.context.key, field, newVal, expandContent.value, true)
     if (!requestGuard.isCurrent(request)) return
     outcomeUnknown.value = ['outcome_unknown', 'partial_possible'].includes(result.code)
     ok.value = result.success
-    msg.value = result.success ? t('keyEditor.updated') : editResultMessage(result)
+    msg.value = result.success ? '' : editResultMessage(result)
+    expandSaveMessage.value = msg.value
     if (result.success) {
       rawHashVal.value = { ...rawHashVal.value, [field]: newVal }
       if (searchResults.value !== null) {
         searchResults.value = searchResults.value.map(([f, v]) => f === field ? [field, newVal] : [f, v])
       }
       expandContent.value = newVal
+      expandShow.value = false
     }
   } catch (e) {
     if (requestGuard.isCurrent(request)) {
       outcomeUnknown.value = true
       ok.value = false
       msg.value = t('reliability.outcomeUnknown')
+      expandSaveMessage.value = msg.value
     }
   } finally {
     if (requestGuard.isCurrent(request)) expandSaving.value = false

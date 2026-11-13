@@ -73,6 +73,70 @@ test('connection navigation can be declined without losing a String draft', asyn
   await expect(page.locator('.string-editor')).toHaveCount(0)
 })
 
+for (const theme of ['light', 'dark']) test(`Hash modal saves silently, closes and reopens with the saved value (${theme})`, async ({ page }) => {
+  await openValue(page, { type: 'hash', hash_val: { field: 'original' }, total_count: 1 })
+  await page.evaluate(async theme => {
+    const { useSettingsStore } = await import('/src/stores/settings.js')
+    useSettingsStore().setTheme(theme)
+  }, theme)
+  const edit = page.locator('.hash-editor .btn-tiny').filter({ hasText: '编辑' }).first()
+  await edit.click()
+  await page.locator('.expand-textarea').fill('saved hash value')
+  await page.locator('.btn-save-modal').click()
+  await expect(page.locator('.expand-modal')).toHaveCount(0)
+  await expect(page.getByText('已更新', { exact: true })).toHaveCount(0)
+  expect(await page.evaluate(() => window.__writes.length)).toBe(1)
+  const write = await page.evaluate(() => window.__writes[0])
+  expect(write.slice(3)).toEqual(['field', 'saved hash value', 'original', true])
+  await expect(page.locator('.hash-editor')).toContainText('saved hash value')
+  await edit.click()
+  await expect(page.locator('.expand-textarea')).toHaveValue('saved hash value')
+  await expect(page.locator('.expand-modal [role="status"]')).toHaveCount(0)
+})
+
+test('Hash modal closes silently after retrying a failed save successfully', async ({ page }) => {
+  await openValue(page, { type: 'hash', hash_val: { field: 'original' }, total_count: 1 })
+  const edit = page.locator('.hash-editor .btn-tiny').filter({ hasText: '编辑' }).first()
+  await edit.click()
+  await page.locator('.expand-textarea').fill('retry draft')
+  await page.evaluate(() => { window.__editResult = { success: false, code: 'conflict' } })
+  await page.locator('.btn-save-modal').click()
+  await expect(page.locator('.expand-modal [role="status"]')).toContainText('本次没有保存')
+  await expect(page.locator('.expand-textarea')).toHaveValue('retry draft')
+  await page.evaluate(() => { window.__editResult = { success: true } })
+  await page.locator('.btn-save-modal').click()
+  await expect(page.locator('.expand-modal')).toHaveCount(0)
+  await expect(page.getByText('已更新', { exact: true })).toHaveCount(0)
+  await edit.click()
+  await expect(page.locator('.expand-textarea')).toHaveValue('retry draft')
+  await expect(page.locator('.expand-modal [role="status"]')).toHaveCount(0)
+})
+
+test('Hash modal waits for save confirmation before closing and submits only once', async ({ page }) => {
+  await openValue(page, { type: 'hash', hash_val: { field: 'original' }, total_count: 1 })
+  await page.evaluate(() => {
+    const original = window.go.main.App
+    window.go.main.App = new Proxy(original, { get(target, method) {
+      if (method === 'HSetChecked') return (...args) => {
+        window.__writes.push(args)
+        return new Promise(resolve => { window.__finishHashSave = resolve })
+      }
+      return target[method]
+    } })
+  })
+  await page.locator('.hash-editor .btn-tiny').filter({ hasText: '编辑' }).first().click()
+  await page.locator('.expand-textarea').fill('pending draft')
+  await page.locator('.btn-save-modal').click()
+  await expect(page.locator('.expand-textarea')).toBeDisabled()
+  await expect(page.locator('.expand-textarea')).toHaveValue('pending draft')
+  await expect(page.locator('.expand-modal')).toBeVisible()
+  await expect(page.locator('.expand-modal [role="status"]')).toHaveCount(0)
+  expect(await page.evaluate(() => window.__writes.length)).toBe(1)
+  await page.evaluate(() => window.__finishHashSave({ success: true }))
+  await expect(page.locator('.expand-modal')).toHaveCount(0)
+  await expect(page.getByText('已更新', { exact: true })).toHaveCount(0)
+})
+
 test('Hash modal keeps conflicts visible and blocks repeat unknown writes', async ({ page }) => {
   await openValue(page, { type: 'hash', hash_val: { field: 'original' }, total_count: 1 })
   await page.locator('.hash-editor .btn-tiny').filter({ hasText: '编辑' }).first().click()

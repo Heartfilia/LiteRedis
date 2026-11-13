@@ -305,68 +305,6 @@
         </div>
       </div>
 
-      <div class="setting-item local-api-item" v-if="settingsStore.debugMode">
-        <label>
-          <span class="label-text">{{ t('settings.localApi') }}</span>
-          <span class="label-hint">{{ t('settings.localApiHint') }}</span>
-        </label>
-        <div class="local-api-block">
-          <div class="local-api-row">
-            <span class="local-api-name">{{ t('settings.localApiEnabled') }}</span>
-            <input v-model="form.localApiEnabled" type="checkbox" class="check-input" />
-          </div>
-          <div class="local-api-row" v-if="form.localApiEnabled">
-            <span class="local-api-name">{{ t('settings.localApiPort') }}</span>
-            <input
-              v-model.number="form.localApiPort"
-              class="local-api-port"
-              type="number"
-              min="1024"
-              max="65535"
-            />
-          </div>
-          <div class="local-api-row" v-if="form.localApiEnabled && appVersion === 'dev'">
-            <span class="local-api-name">{{ t('settings.localApiDevPortHint') }}</span>
-          </div>
-          <div class="local-api-row" v-if="form.localApiEnabled">
-            <span class="local-api-name">{{ t('settings.localApiRedisRead') }}</span>
-            <input v-model="form.localApiRedisEnabled" type="checkbox" class="check-input" />
-          </div>
-          <div class="local-api-row" v-if="form.localApiEnabled && form.localApiRedisEnabled">
-            <span class="local-api-name">{{ t('settings.localApiAuthDisabled') }}</span>
-            <input v-model="form.localApiAuthDisabled" type="checkbox" class="check-input" />
-          </div>
-          <div class="local-api-row" v-if="form.localApiEnabled">
-            <span class="local-api-name">{{ t('settings.localApiStatus') }}</span>
-            <span :class="['local-api-status', localApiInfo.running ? 'running' : 'stopped']">
-              {{ localApiInfo.running ? t('settings.localApiRunning') : t('settings.localApiStopped') }}
-              <template v-if="localApiInfo.running">· 127.0.0.1:{{ localApiInfo.port }}</template>
-              <template v-else-if="localApiInfo.error">· {{ t('settings.localApiError') }}: {{ localApiInfo.error }}</template>
-            </span>
-          </div>
-          <div class="local-api-row" v-if="form.localApiEnabled && localApiInfo.running && form.localApiRedisEnabled">
-            <span class="local-api-name">{{ t('settings.localApiDebugPage') }}</span>
-            <button type="button" class="local-api-btn" @click="openApiDocs">{{ t('settings.localApiOpenDebug') }}</button>
-          </div>
-          <div class="local-api-row" v-if="form.localApiEnabled && localApiInfo.token && !form.localApiAuthDisabled">
-            <span class="local-api-name">{{ t('settings.localApiToken') }}</span>
-            <span class="local-api-token-box">
-              <code class="local-api-token">{{ localApiInfo.token }}</code>
-              <button type="button" class="local-api-btn" @click="copyToken">
-                {{ tokenCopied ? t('settings.localApiCopied') : t('settings.localApiCopyToken') }}
-              </button>
-              <button type="button" class="local-api-btn" :class="{ danger: regenConfirming }" @click="regenerateToken">
-                {{ regenConfirming ? t('settings.localApiRegenConfirmShort') : t('settings.localApiRegenerate') }}
-              </button>
-            </span>
-          </div>
-          <div class="local-api-example" v-if="form.localApiEnabled && localApiInfo.running">
-            <span class="local-api-name">{{ t('settings.localApiDocs') }}</span>
-            <code class="local-api-curl">curl -H "Authorization: Bearer {{ localApiInfo.token }}" "http://127.0.0.1:{{ localApiInfo.port }}/api/&lt;connID&gt;/&lt;key&gt;?selector=&lt;field&gt;"</code>
-          </div>
-        </div>
-      </div>
-
       <div class="section-title mt">{{ t('settings.configTransfer') }}</div>
       <div class="setting-item">
         <label>
@@ -396,6 +334,38 @@
         </div>
       </div>
 
+      <div class="section-title mt">{{ t('diagnostics.title') }}</div>
+      <div class="setting-item">
+        <label>
+          <span class="label-text">{{ t('diagnostics.title') }}</span>
+          <span class="label-hint">{{ t('diagnostics.subtitle') }}</span>
+        </label>
+        <div class="input-unit">
+          <button type="button" class="local-api-btn" @click="openDiagnostics">
+            {{ t('diagnostics.open') }}
+          </button>
+        </div>
+      </div>
+
+      <section class="shortcuts-section" aria-labelledby="settings-shortcuts-title">
+        <div id="settings-shortcuts-title" class="section-title mt">{{ t('settings.shortcuts') }}</div>
+        <p class="shortcuts-hint label-hint">{{ t('settings.shortcutsHint') }}</p>
+        <div v-for="group in shortcutGroups" :key="group.title" class="shortcut-group">
+          <h3 class="shortcut-group-title label-text">{{ t(`settings.${group.title}`) }}</h3>
+          <dl class="shortcut-list">
+            <div v-for="shortcut in group.items" :key="shortcut.description" class="shortcut-row">
+              <dt class="shortcut-keys">
+                <template v-for="(key, index) in shortcut.keys" :key="index">
+                  <span v-if="index" class="shortcut-separator" aria-hidden="true">+</span>
+                  <kbd>{{ key }}</kbd>
+                </template>
+              </dt>
+              <dd>{{ t(`settings.${shortcut.description}`) }}</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
       <div class="section-title mt">{{ t('settings.installGuide') }}</div>
       <div class="setting-item">
         <label>
@@ -409,18 +379,70 @@
         </div>
       </div>
 
-      <div class="section-title mt">{{ t('diagnostics.title') }}</div>
-      <div class="setting-item">
-        <label>
-          <span class="label-text">{{ t('diagnostics.title') }}</span>
-          <span class="label-hint">{{ t('diagnostics.subtitle') }}</span>
-        </label>
-        <div class="input-unit">
-          <button type="button" class="local-api-btn" @click="openDiagnostics">
-            {{ t('diagnostics.open') }}
-          </button>
+      <template v-if="settingsStore.debugMode">
+        <div class="section-title mt">{{ t('settings.developer') }}</div>
+        <div class="setting-item local-api-item">
+          <label>
+            <span class="label-text">{{ t('settings.localApi') }}</span>
+            <span class="label-hint">{{ t('settings.localApiHint') }}</span>
+          </label>
+          <div class="local-api-block">
+            <div class="local-api-row">
+              <span class="local-api-name">{{ t('settings.localApiEnabled') }}</span>
+              <input v-model="form.localApiEnabled" type="checkbox" class="check-input" />
+            </div>
+            <div class="local-api-row" v-if="form.localApiEnabled">
+              <span class="local-api-name">{{ t('settings.localApiPort') }}</span>
+              <input
+                v-model.number="form.localApiPort"
+                class="local-api-port"
+                type="number"
+                min="1024"
+                max="65535"
+              />
+            </div>
+            <div class="local-api-row" v-if="form.localApiEnabled && appVersion === 'dev'">
+              <span class="local-api-name">{{ t('settings.localApiDevPortHint') }}</span>
+            </div>
+            <div class="local-api-row" v-if="form.localApiEnabled">
+              <span class="local-api-name">{{ t('settings.localApiRedisRead') }}</span>
+              <input v-model="form.localApiRedisEnabled" type="checkbox" class="check-input" />
+            </div>
+            <div class="local-api-row" v-if="form.localApiEnabled && form.localApiRedisEnabled">
+              <span class="local-api-name">{{ t('settings.localApiAuthDisabled') }}</span>
+              <input v-model="form.localApiAuthDisabled" type="checkbox" class="check-input" />
+            </div>
+            <div class="local-api-row" v-if="form.localApiEnabled">
+              <span class="local-api-name">{{ t('settings.localApiStatus') }}</span>
+              <span :class="['local-api-status', localApiInfo.running ? 'running' : 'stopped']">
+                {{ localApiInfo.running ? t('settings.localApiRunning') : t('settings.localApiStopped') }}
+                <template v-if="localApiInfo.running">· 127.0.0.1:{{ localApiInfo.port }}</template>
+                <template v-else-if="localApiInfo.error">· {{ t('settings.localApiError') }}: {{ localApiInfo.error }}</template>
+              </span>
+            </div>
+            <div class="local-api-row" v-if="form.localApiEnabled && localApiInfo.running && form.localApiRedisEnabled">
+              <span class="local-api-name">{{ t('settings.localApiDebugPage') }}</span>
+              <button type="button" class="local-api-btn" @click="openApiDocs">{{ t('settings.localApiOpenDebug') }}</button>
+            </div>
+            <div class="local-api-row" v-if="form.localApiEnabled && localApiInfo.token && !form.localApiAuthDisabled">
+              <span class="local-api-name">{{ t('settings.localApiToken') }}</span>
+              <span class="local-api-token-box">
+                <code class="local-api-token">{{ localApiInfo.token }}</code>
+                <button type="button" class="local-api-btn" @click="copyToken">
+                  {{ tokenCopied ? t('settings.localApiCopied') : t('settings.localApiCopyToken') }}
+                </button>
+                <button type="button" class="local-api-btn" :class="{ danger: regenConfirming }" @click="regenerateToken">
+                  {{ regenConfirming ? t('settings.localApiRegenConfirmShort') : t('settings.localApiRegenerate') }}
+                </button>
+              </span>
+            </div>
+            <div class="local-api-example" v-if="form.localApiEnabled && localApiInfo.running">
+              <span class="local-api-name">{{ t('settings.localApiDocs') }}</span>
+              <code class="local-api-curl">curl -H "Authorization: Bearer {{ localApiInfo.token }}" "http://127.0.0.1:{{ localApiInfo.port }}/api/&lt;connID&gt;/&lt;key&gt;?selector=&lt;field&gt;"</code>
+            </div>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
 
     <InstallGuideModal v-if="showGuide" @close="showGuide = false" />
@@ -481,6 +503,25 @@ import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 const { t, setLanguage } = useI18n()
 
 const settingsStore = useSettingsStore()
+
+const shortcutGroups = [
+  { title: 'shortcutsGlobal', items: [
+    { keys: ['Cmd / Ctrl', 'K'], description: 'shortcutPalette' },
+    { keys: ['Cmd / Ctrl', 'R'], description: 'shortcutRefresh' },
+    { keys: ['Cmd / Ctrl', 'W'], description: 'shortcutCloseKey' },
+    { keys: ['Cmd / Ctrl', 'Q'], description: 'shortcutQuit' },
+    { keys: ['Esc'], description: 'shortcutEscape' },
+  ] },
+  { title: 'shortcutsPalette', items: [
+    { keys: ['↑ / ↓'], description: 'shortcutPaletteMove' },
+    { keys: ['Enter'], description: 'shortcutPaletteRun' },
+  ] },
+  { title: 'shortcutsConsole', items: [
+    { keys: ['Tab'], description: 'shortcutConsoleComplete' },
+    { keys: ['Enter'], description: 'shortcutConsoleRun' },
+    { keys: ['↑ / ↓'], description: 'shortcutConsoleHistory' },
+  ] },
+]
 
 const form = reactive({
   keyScanCount: 200,
@@ -954,6 +995,37 @@ function openGitHub() {
   box-shadow: 0 4px 12px rgba(148, 163, 184, 0.06);
 }
 .section-title.mt { margin-top: 24px; }
+.shortcuts-hint { margin: 0 0 12px; }
+.shortcut-group { margin-bottom: 14px; }
+.shortcut-group-title { margin: 0 0 6px; }
+.shortcut-list { margin: 0; }
+.shortcut-row {
+  display: grid;
+  grid-template-columns: 152px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.88);
+}
+.shortcut-keys { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.shortcut-keys kbd {
+  padding: 3px 6px;
+  border: 1px solid #cbd5e1;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #f8fafc;
+  color: #334155;
+  font: 11px/1.4 ui-monospace, monospace;
+  white-space: nowrap;
+}
+.shortcut-separator { color: #94a3b8; font-size: 11px; }
+.shortcut-row dd { margin: 0; color: #475569; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .shortcut-row { grid-template-columns: 1fr; gap: 6px; }
+}
+.settings-panel.theme-dark .shortcut-row { border-bottom-color: rgba(51, 65, 85, 0.88); }
+.settings-panel.theme-dark .shortcut-keys kbd { background: #1e293b; color: #e2e8f0; border-color: #475569; }
+.settings-panel.theme-dark .shortcut-row dd { color: #cbd5e1; }
 .proxy-url-wrap { width: 320px; max-width: 58%; }
 .input-unit input.proxy-url-input {
   width: 100%;
