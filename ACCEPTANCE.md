@@ -6,7 +6,7 @@
 
 | 层次 | 结果与范围 |
 | --- | --- |
-| 前端 | 97 项单测；75 项 Playwright 浏览器测试（含 12 项 SSH 账号管理、6 项连接复制、6 项设置页、4 项第三方平台导入、27 项可靠性、6 项分页/加载回归）；lint / build |
+| 前端 | 104 项单测；80 项 Playwright 浏览器测试（含 12 项 SSH 账号管理、6 项连接复制、8 项设置页、4 项第三方平台导入、3 项连接图标、27 项可靠性、6 项分页/加载回归）；lint / build |
 | Go | `go test -race ./...`、`go vet ./...`、`go build` |
 | Redis 7.2.6 / 3.0.7 | String/Hash/List/Set/ZSet 导入、默认跳过和显式覆盖、完整内容与 TTL 读回；String/Hash CAS、普通集合编辑、批量 TTL/删除；7 支持 COPY，3 明确不支持；Stream 仅在 7 测试 |
 | Redis 7.2.6 ACL | EVAL / 临时 key 权限拒绝、脚本内部 HMSET/PEXPIRE/PERSIST/RENAME 拒绝保留目标值和 TTL；DEL 清理失败返回临时 key 且保留过期时间 |
@@ -19,6 +19,21 @@
 本轮真实 ACL 暴露 `ERR ACL failure in script` 格式，已保守归类 `partial_possible`。macOS WebView 未实现浏览器 confirm/alert 回调，因此改为应用内异步确认；默认取消、Esc、焦点循环、重复请求和保存中关闭已有浏览器回归。最新退出策略：有已连接 Redis 才弹确认（无草稿也确认，有草稿合并一次提示）；无连接直接退出，不提醒断线草稿，但保存中仍阻止。Cmd+W 仅关闭 key 并保护草稿；macOS File / Close Key 使用原生快捷键桥接。**所有浏览器测试使用 Wails mock，不等同原生窗口或文件对话框测试。**
 
 ## 可复现命令
+
+### 应用包更新代理默认地址（2026-11-18）
+
+- 设置页「应用包更新代理」在地址为空时默认填入 `http://127.0.0.1:1081`：首次打开、点击重置、以及启用代理后输入框里都直接有默认值，不需要手动输入一次；已经保存过的地址保持不变。
+- 默认值只影响表单回填，不改变后端配置读取逻辑；用户启用代理并保存后才写入 `proxy_url`，原有 http / socks5 地址格式校验不变。
+- 验证：新增 2 项前端单测和 2 项浏览器回归（首次默认值并保存、已有地址不被覆盖）；`go test -race ./...`、`go vet ./...`、104 项前端单测、80 项 Playwright、lint/build、`git diff --check` 通过。
+- 已打包工程测试包到 `build/bin/LiteRedis.app`，构建标识 `0.7.5-local.proxy-default.20261118.104614`，macOS arm64，本地 ad-hoc 签名校验通过，可执行文件 SHA256 `f787b8a9f812983edc40a378eb071b28e73c3f9ab73026524a83c5f5fd9fef6c`。快照与旧包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-proxy-default-build-20261118-104614`。未替换或启动 `/Applications` 中的应用，未提交或推送。
+
+### 连接图标自定义字符（2026-11-18）
+
+- 连接配置新增 `icon_text`：最多 4 个字符，后端保存和配置导入都会清理换行/制表符并按字符（rune）截断，前端输入同样即时限制；留空时仍显示名称首字。
+- 图标底图尺寸不变（侧栏 20px、折叠栏 28px、编辑弹窗预览 34px）。自定义多字符按每行 2 个拆行，2 个字符一行、3-4 个字符两行；字号随字符数缩小，中文四字两行已通过边界回归确认不超出底图。
+- 复制连接会沿用图标字符；配置导出/导入和第三方平台导入可正常保留或留空该字段。
+- 验证：新增 5 项前端单测和 3 项浏览器回归（自定义/中文两行显示、折叠栏显示、编辑弹窗保存）；`go test -race ./...`、`go vet ./...`、102 项前端单测、78 项 Playwright、lint/build、`git diff --check` 通过。
+- 已打包工程测试包到 `build/bin/LiteRedis.app`，构建标识 `0.7.5-local.icon-text.20261118.102902`，macOS arm64，本地 ad-hoc 签名校验通过，可执行文件 SHA256 `8ac9d9f4bc3b47da451dd373277f44fe23a0da4c3a6d612fd4d5efa0ececc924`。快照与旧包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-icon-text-build-20261118-102902`。未替换或启动 `/Applications` 中的应用，未提交或推送。
 
 ### 第三方平台导入实现（2026-11-17）
 

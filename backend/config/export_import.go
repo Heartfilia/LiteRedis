@@ -147,6 +147,7 @@ func ImportConfiguration(in []ConnectionConfig, profiles []SSHProfile) (ImportSu
 		}
 		cfg.Name = strings.TrimSpace(cfg.Name)
 		cfg.Group = strings.TrimSpace(cfg.Group)
+		cfg.IconText = normalizeIconText(cfg.IconText)
 		if cfg.Name == "" {
 			summary.Skipped++
 			summary.Messages = append(summary.Messages, "跳过一条没有名称的连接")

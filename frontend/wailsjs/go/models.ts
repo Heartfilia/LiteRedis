@@ -126,6 +126,7 @@ export namespace config {
 	    proxy_enabled: boolean;
 	    proxy_url?: string;
 	    icon_color?: string;
+	    icon_text?: string;
 	    ssh_enabled: boolean;
 	    ssh_profile_id?: string;
 	    ssh?: SSHConfig;
@@ -159,6 +160,7 @@ export namespace config {
 	        this.proxy_enabled = source["proxy_enabled"];
 	        this.proxy_url = source["proxy_url"];
 	        this.icon_color = source["icon_color"];
+	        this.icon_text = source["icon_text"];
 	        this.ssh_enabled = source["ssh_enabled"];
 	        this.ssh_profile_id = source["ssh_profile_id"];
 	        this.ssh = this.convertValues(source["ssh"], SSHConfig);

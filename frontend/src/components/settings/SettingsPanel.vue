@@ -218,7 +218,7 @@
               type="text"
               class="proxy-url-input"
               spellcheck="false"
-              placeholder="http://127.0.0.1:7890"
+              placeholder="http://127.0.0.1:1081"
             />
           </div>
         </div>
@@ -534,6 +534,7 @@ import { refreshLocalAPIRuntime } from '../../services/browserExtract.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
 import { askConfirmation } from '../../utils/confirm.js'
+import { appProxyUrlOrDefault, DEFAULT_UPDATE_PROXY_URL } from '../../utils/appProxy.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 
 const { t, setLanguage } = useI18n()
@@ -582,7 +583,7 @@ const form = reactive({
   localApiAuthDisabled: false,
   localApiPort: 64201,
   proxyEnabled: false,
-  proxyUrl: '',
+  proxyUrl: DEFAULT_UPDATE_PROXY_URL,
 })
 
 const saving = ref(false)
@@ -666,7 +667,7 @@ function syncFromStore() {
   form.localApiRedisEnabled = settingsStore.localApiRedisEnabled
   form.localApiAuthDisabled = settingsStore.localApiAuthDisabled
   form.proxyEnabled = settingsStore.proxyEnabled
-  form.proxyUrl = settingsStore.proxyUrl
+  form.proxyUrl = appProxyUrlOrDefault(settingsStore.proxyUrl)
 }
 
 function reset() {
@@ -690,7 +691,7 @@ function reset() {
   form.localApiEnabled = false
   form.localApiPort = 64201
   form.proxyEnabled = false
-  form.proxyUrl = ''
+  form.proxyUrl = DEFAULT_UPDATE_PROXY_URL
   resetCountFieldTouched()
 }
 

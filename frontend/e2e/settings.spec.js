@@ -1,23 +1,58 @@
 import { expect, test } from '@playwright/test'
 import { installWailsMock } from './wails-mock.js'
 
-async function openSettings(page, { language = 'zh', theme = 'light', apiEnabled = false } = {}) {
+async function openSettings(page, { language = 'zh', theme = 'light', apiEnabled = false, settings = {} } = {}) {
   await installWailsMock(page)
   await page.goto('/')
-  await page.evaluate(async ({ language, theme, apiEnabled }) => {
+  await page.evaluate(async ({ language, theme, apiEnabled, settings }) => {
     const { useSettingsStore } = await import('/src/stores/settings.js')
-    const settings = useSettingsStore()
-    settings.setTheme(theme)
+    const settingsStore = useSettingsStore()
+    settingsStore.setTheme(theme)
     const original = window.go.main.App
     window.go.main.App = new Proxy(original, { get(target, method) {
-      if (method === 'GetSettings') return async () => ({ ...await target.GetSettings(), language, local_api_enabled: apiEnabled })
+      if (method === 'GetSettings') return async () => ({ ...await target.GetSettings(), language, local_api_enabled: apiEnabled, ...settings })
       if (method === 'GetAppVersion') return async () => 'dev'
       return target[method]
     } })
-  }, { language, theme, apiEnabled })
+  }, { language, theme, apiEnabled, settings })
   await page.locator('.btn-settings').click()
   await expect(page.locator('.settings-panel')).toBeVisible()
 }
+
+test('update proxy address defaults to the local 1081 port on first use', async ({ page }) => {
+  await openSettings(page)
+  const panel = page.locator('.settings-panel')
+  const proxyToggle = panel.locator('.setting-item').filter({ hasText: '启用代理' }).locator('input[type=checkbox]')
+  await proxyToggle.check()
+
+  const proxyInput = panel.locator('.proxy-url-input')
+  await expect(proxyInput).toHaveValue('http://127.0.0.1:1081')
+
+  await page.evaluate(() => {
+    window.__savedUpdateSettings = []
+    const original = window.go.main.App
+    window.go.main.App = new Proxy(original, { get(target, method) {
+      if (method === 'SaveSettings') {
+        return async (values) => {
+          window.__savedUpdateSettings.push(structuredClone(values))
+          return { success: true }
+        }
+      }
+      return target[method]
+    } })
+  })
+  await panel.locator('.btn-save').click()
+
+  await expect.poll(() => page.evaluate(() => window.__savedUpdateSettings.length)).toBe(1)
+  const saved = await page.evaluate(() => window.__savedUpdateSettings[0])
+  expect(saved.proxy_enabled).toBe(true)
+  expect(saved.proxy_url).toBe('http://127.0.0.1:1081')
+})
+
+test('saved update proxy addresses are not replaced by the default', async ({ page }) => {
+  await openSettings(page, { settings: { proxy_enabled: true, proxy_url: 'socks5://127.0.0.1:1080' } })
+  await expect(page.locator('.settings-panel .proxy-url-input')).toHaveValue('socks5://127.0.0.1:1080')
+})
 
 for (const language of ['zh', 'en']) {
   for (const theme of ['light', 'dark']) {

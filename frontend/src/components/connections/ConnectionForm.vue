@@ -152,8 +152,10 @@
           <label>Icon Color</label>
           <div class="icon-color-card">
             <div class="icon-color-preview">
-              <span class="icon-preview-badge" :style="{ background: previewIconColor }">
-                {{ previewInitial }}
+              <span class="icon-preview-badge" :class="{ 'icon-preview-badge-text': previewIconCompact }" :style="{ background: previewIconColor }">
+                <span class="icon-lines">
+                  <span v-for="(line, index) in previewIconLines" :key="index">{{ line }}</span>
+                </span>
               </span>
               <div class="icon-preview-text">
                 <div class="icon-preview-title">Connection Icon</div>
@@ -174,6 +176,20 @@
                 Default
               </button>
             </div>
+            <div class="icon-text-row">
+              <input
+                class="icon-text-input"
+                type="text"
+                :value="form.iconText"
+                maxlength="4"
+                placeholder="AB"
+                @input="form.iconText = normalizeIconText($event.target.value)"
+              />
+              <button type="button" class="btn-secondary btn-color-reset" @click="form.iconText = ''">
+                Auto
+              </button>
+            </div>
+            <div class="field-hint">Icon text: up to 4 characters, two per line. Leave empty to use the name initial.</div>
             <div class="icon-color-swatches">
               <button
                 v-for="color in ICON_COLOR_PRESETS"
@@ -214,6 +230,7 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { formatDebugMessage } from '../../utils/debug.js'
+import { connectionIconCompact, connectionIconLines, normalizeIconText } from '../../utils/iconText.js'
 import { useSSHProfilesStore } from '../../stores/sshProfiles.js'
 const props = defineProps({
   connection: { type: Object, default: null },
@@ -258,6 +275,7 @@ const defaultForm = () => ({
   proxyEnabled: false,
   proxyUrl: '',
   iconColor: '',
+  iconText: '',
   sshEnabled: false,
   sshProfileId: '',
 })
@@ -270,10 +288,8 @@ let hideGroupTimer = null
 
 const normalizedIconColor = computed(() => normalizeIconColor(form.iconColor))
 const previewIconColor = computed(() => normalizedIconColor.value || '#5c7f9e')
-const previewInitial = computed(() => {
-  const value = (form.name || form.host || '?').trim()
-  return value ? value[0].toUpperCase() : '?'
-})
+const previewIconLines = computed(() => connectionIconLines({ name: form.name, host: form.host, iconText: form.iconText }))
+const previewIconCompact = computed(() => connectionIconCompact({ name: form.name, host: form.host, iconText: form.iconText }))
 
 function clearHideGroupTimer() {
   if (hideGroupTimer) {
@@ -318,6 +334,7 @@ function snapshotValue() {
     proxyEnabled: !!form.proxyEnabled,
     proxyUrl: form.proxyUrl || '',
     iconColor: form.iconColor || '',
+    iconText: normalizeIconText(form.iconText),
     sshEnabled: !!form.sshEnabled,
     sshProfileId: form.sshProfileId,
   })
@@ -357,6 +374,7 @@ watch(() => props.connection, (conn) => {
       proxyEnabled: conn.proxyEnabled ?? conn.proxy_enabled,
       proxyUrl: conn.proxyUrl ?? conn.proxy_url ?? '',
       iconColor: conn.iconColor ?? conn.icon_color ?? '',
+      iconText: conn.iconText ?? conn.icon_text ?? '',
       sshEnabled: conn.sshEnabled ?? conn.ssh_enabled ?? false,
       sshProfileId: conn.ssh_profile_id || '',
     })
@@ -443,6 +461,7 @@ function buildCfg() {
     proxy_enabled: form.proxyEnabled,
     proxy_url: form.proxyEnabled ? form.proxyUrl.trim() : '',
     icon_color: normalizeIconColor(form.iconColor),
+    icon_text: normalizeIconText(form.iconText),
     ssh_enabled: form.sshEnabled,
     ssh_profile_id: form.sshEnabled ? form.sshProfileId : '',
     ssh: null,
@@ -639,6 +658,23 @@ textarea { resize: vertical; font-family: monospace; }
   cursor: pointer;
 }
 .icon-color-text { flex: 1; min-width: 0; text-transform: uppercase; }
+.icon-text-row { display: flex; gap: 8px; align-items: center; }
+.icon-text-input {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.icon-preview-badge .icon-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  white-space: nowrap;
+}
+.icon-preview-badge-text { font-size: 12px; line-height: 0.95; letter-spacing: -0.3px; }
 .btn-color-reset { flex-shrink: 0; }
 .icon-color-swatches {
   display: flex;

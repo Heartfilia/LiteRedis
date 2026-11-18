@@ -273,6 +273,7 @@ function selectConn(conn) {
     proxyEnabled: conn.proxyEnabled ?? conn.proxy_enabled,
     proxyUrl: conn.proxyUrl ?? conn.proxy_url ?? '',
     iconColor: conn.iconColor ?? conn.icon_color ?? '',
+    iconText: conn.iconText ?? conn.icon_text ?? '',
     sshEnabled: conn.ssh_enabled,
   }
 }

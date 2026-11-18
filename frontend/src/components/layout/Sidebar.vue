@@ -16,12 +16,14 @@
               v-for="conn in connectedConnections"
               :key="conn.id"
               class="collapsed-conn-icon"
-              :class="{ active: activeConnID === conn.id }"
+              :class="{ active: activeConnID === conn.id, 'collapsed-conn-icon-text': connectionIconCompact(conn) }"
               :style="{ background: connColor(conn) }"
               :title="conn.name || conn.host"
               @click="handleConnect(conn)"
             >
-              {{ connInitial(conn) }}
+              <span class="icon-lines">
+                <span v-for="(line, index) in connectionIconLines(conn)" :key="index">{{ line }}</span>
+              </span>
             </div>
           </div>
           <button class="btn-expand-bottom" :title="t('sidebar.expand')" @click="sidebarCollapsed = false">
@@ -77,7 +79,11 @@
           <div v-if="isItemDropPreview(conn.id, 'before')" class="drop-indicator before" />
           <div v-if="isItemDropPreview(conn.id, 'after')" class="drop-indicator after" />
           <div class="conn-main" @click="handleConnect(conn)">
-            <span class="conn-avatar" :style="{ background: connColor(conn) }">{{ connInitial(conn) }}</span>
+            <span class="conn-avatar" :class="{ 'conn-avatar-text': connectionIconCompact(conn) }" :style="{ background: connColor(conn) }">
+              <span class="icon-lines">
+                <span v-for="(line, index) in connectionIconLines(conn)" :key="index">{{ line }}</span>
+              </span>
+            </span>
             <span :class="['conn-dot', connectionStateClass(conn.id)]" />
               <span class="conn-name">
                 <svg
@@ -185,7 +191,11 @@
               <div v-if="isItemDropPreview(conn.id, 'before')" class="drop-indicator before" />
               <div v-if="isItemDropPreview(conn.id, 'after')" class="drop-indicator after" />
               <div class="conn-main" @click="handleConnect(conn)">
-                <span class="conn-avatar" :style="{ background: connColor(conn) }">{{ connInitial(conn) }}</span>
+                <span class="conn-avatar" :class="{ 'conn-avatar-text': connectionIconCompact(conn) }" :style="{ background: connColor(conn) }">
+              <span class="icon-lines">
+                <span v-for="(line, index) in connectionIconLines(conn)" :key="index">{{ line }}</span>
+              </span>
+            </span>
                 <span :class="['conn-dot', connectionStateClass(conn.id)]" />
                 <span class="conn-name">
                   <svg
@@ -453,6 +463,7 @@ import MemoryDoctorModal from '../connections/MemoryDoctorModal.vue'
 import RealtimeMonitorModal from '../connections/RealtimeMonitorModal.vue'
 import PubSubModal from '../connections/PubSubModal.vue'
 import { formatDebugMessage } from '../../utils/debug.js'
+import { connectionIconCompact, connectionIconLines } from '../../utils/iconText.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import ThemeIcon from '../common/ThemeIcon.vue'
 
@@ -555,10 +566,7 @@ function connColor(conn) {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length]
 }
 
-function connInitial(conn) {
-  const s = conn.name || conn.host || '?'
-  return s[0].toUpperCase()
-}
+// 图标字符：默认取名称首字，自定义字符由 connectionIconLines 按每行 2 个拆分。
 
 // 折叠状态
 const sidebarCollapsed = ref(false)
@@ -1012,6 +1020,7 @@ async function disconnectConn(id) {
   user-select: none;
 }
 .collapsed-conn-icon:hover { opacity: 1; }
+.collapsed-conn-icon-text { font-size: 11px; line-height: 0.95; letter-spacing: -0.2px; }
 .collapsed-conn-icon.active {
   opacity: 1;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.96), 0 0 0 4px rgba(96, 165, 250, 0.32);
@@ -1468,6 +1477,25 @@ async function disconnectConn(id) {
   flex-shrink: 0;
   letter-spacing: 0;
   user-select: none;
+}
+/* 自定义 2-4 个字符时缩小字号，按每行 2 个排两行；底图尺寸保持不变。 */
+.conn-avatar-text {
+  font-size: 9px;
+  line-height: 0.95;
+  letter-spacing: -0.2px;
+  overflow: hidden;
+}
+.icon-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  white-space: nowrap;
+}
+.conn-avatar-text .icon-lines,
+.collapsed-conn-icon-text .icon-lines {
+  line-height: 0.95;
 }
 .conn-item.connecting .conn-avatar {
   animation: avatarFloat 0.9s ease-in-out infinite alternate;

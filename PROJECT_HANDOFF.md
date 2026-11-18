@@ -1,6 +1,21 @@
 # LiteRedis 项目交接说明
 
-最后更新：2026-11-17
+最后更新：2026-11-18
+
+## 最新补充（2026-11-18，应用包更新代理默认地址）
+
+- 设置页「应用包更新代理」的地址为空时默认填入 `http://127.0.0.1:1081`：首次打开、点击重置、启用代理后都直接带默认值，不需要手动输入；已经保存过的地址不会被覆盖。
+- 默认值仅用于表单回填，仍由用户保存后才写入 `proxy_url`；原有 http / socks5 地址格式校验不变。
+- 验证：`go test -race ./...`、`go vet ./...`、104 项前端单测、80 项 Playwright 浏览器测试（新增 2 项设置页默认值回归）、lint/build、`git diff --check` 通过。尚未提交或推送。
+- 已打包工程测试包 `build/bin/LiteRedis.app`（`0.7.5-local.proxy-default.20261118.104614`，SHA256 `f787b8a9f812983edc40a378eb071b28e73c3f9ab73026524a83c5f5fd9fef6c`），快照与旧包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-proxy-default-build-20261118-104614`；未启动、未替换 `/Applications`。
+
+## 最新补充（2026-11-18，连接图标自定义字符）
+
+- 连接图标内字符可自定义，最多 4 个字符；按每行 2 个显示，2 个字符一行、3-4 个字符两行。留空仍使用连接名称首字。
+- 图标底图尺寸不变：侧栏 20px、折叠栏 28px、编辑弹窗预览 34px；自定义多字符自动缩小字号，中文四字两行不会溢出。
+- 新增后端 `icon_text` 字段，保存和配置导入时统一清理并截断到 4 个字符；复制连接、配置导出/导入会自动带上该字段。
+- 验证：`go test -race ./...`、`go vet ./...`、102 项前端单测、78 项 Playwright 浏览器测试（新增 3 项连接图标）、lint/build、`git diff --check` 通过。尚未提交或推送。
+- 已打包工程测试包 `build/bin/LiteRedis.app`（`0.7.5-local.icon-text.20261118.102902`，SHA256 `8ac9d9f4bc3b47da451dd373277f44fe23a0da4c3a6d612fd4d5efa0ececc924`），快照与旧包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-icon-text-build-20261118-102902`；未启动、未替换 `/Applications`。
 
 ## 最新补充（2026-11-17，第三方平台导入实现）
 

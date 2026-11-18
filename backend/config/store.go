@@ -187,6 +187,22 @@ func ListConnections() ([]ConnectionConfig, error) {
 	return store.Connections, nil
 }
 
+func normalizeIconText(value string) string {
+	const maxRunes = 4
+	cleaned := strings.Map(func(r rune) rune {
+		switch r {
+		case '\n', '\r', '\t':
+			return -1
+		}
+		return r
+	}, value)
+	runes := []rune(strings.TrimSpace(cleaned))
+	if len(runes) > maxRunes {
+		runes = runes[:maxRunes]
+	}
+	return string(runes)
+}
+
 // SaveConnection 新建（ID为空）或更新连接配置
 func SaveConnection(cfg ConnectionConfig) (ConnectionConfig, error) {
 	storeMu.Lock()
@@ -203,6 +219,7 @@ func SaveConnection(cfg ConnectionConfig) (ConnectionConfig, error) {
 	// 同一分组下名称唯一：忽略首尾空格与大小写，避免出现两个看起来一样的连接
 	cfg.Name = strings.TrimSpace(cfg.Name)
 	cfg.Group = strings.TrimSpace(cfg.Group)
+	cfg.IconText = normalizeIconText(cfg.IconText)
 	if cfg.Name == "" {
 		return cfg, fmt.Errorf("连接名称不能为空")
 	}

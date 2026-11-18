@@ -23,6 +23,7 @@ type ConnectionConfig struct {
 	ProxyEnabled     bool       `json:"proxy_enabled"`
 	ProxyURL         string     `json:"proxy_url,omitempty"`
 	IconColor        string     `json:"icon_color,omitempty"`
+	IconText         string     `json:"icon_text,omitempty"` // 图标内自定义字符，最多 4 个；空则用名称首字
 	SSHEnabled       bool       `json:"ssh_enabled"`
 	SSHProfileID     string     `json:"ssh_profile_id,omitempty"`
 	SSH              *SSHConfig `json:"ssh,omitempty"`
