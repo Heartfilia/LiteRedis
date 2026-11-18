@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"LiteRedis/backend/config"
 	goredis "github.com/redis/go-redis/v9"
@@ -14,7 +15,8 @@ func TestStringPreviewIsBoundedAndReadOnlyWhenIncomplete(t *testing.T) {
 		t.Run("type="+known, func(t *testing.T) {
 			client := testRedisClient(t)
 			ctx := context.Background()
-			if err := client.Set(ctx, "large", strings.Repeat("x", maxStringValueBytes+100), 0).Err(); err != nil {
+			value := "PREFIX-" + strings.Repeat("x", maxStringValueBytes+100)
+			if err := client.Set(ctx, "large", value, 0).Err(); err != nil {
 				t.Fatal(err)
 			}
 			client.AddHook(exportCommandHook{before: func(cmd goredis.Cmder) error {
@@ -34,10 +36,41 @@ func TestStringPreviewIsBoundedAndReadOnlyWhenIncomplete(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !kv.Truncated || kv.ReadOnlyReason != "truncated" || len(kv.StringVal) != maxStringValueBytes || kv.EditToken != "" {
+			if !kv.Truncated || kv.ReadOnlyReason != "truncated" || kv.EditToken != "" {
 				t.Fatalf("unsafe preview: %+v", kv)
 			}
+			if len(kv.StringVal) != maxStringPreviewRunes {
+				t.Fatalf("preview length = %d, want %d", len(kv.StringVal), maxStringPreviewRunes)
+			}
+			if !strings.HasPrefix(value, kv.StringVal) {
+				t.Fatal("preview is not the original prefix")
+			}
 		})
+	}
+}
+
+func TestHugeMultibyteStringPreviewKeepsWholeCharacters(t *testing.T) {
+	client := testRedisClient(t)
+	ctx := context.Background()
+	value := strings.Repeat("缓存A", maxStringValueBytes/7+1)
+	if err := client.Set(ctx, "huge", value, 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	kv, err := readStringPreview(ctx, client, "huge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !kv.Truncated || kv.ReadOnlyReason != "truncated" || kv.EditToken != "" {
+		t.Fatalf("unsafe preview: %+v", kv)
+	}
+	if got := []rune(kv.StringVal); len(got) != maxStringPreviewRunes {
+		t.Fatalf("preview runes = %d, want %d", len(got), maxStringPreviewRunes)
+	}
+	if !utf8.ValidString(kv.StringVal) {
+		t.Fatal("preview cut through a UTF-8 character")
+	}
+	if want := string([]rune(value)[:maxStringPreviewRunes]); kv.StringVal != want {
+		t.Fatal("preview does not match the first 2000 characters")
 	}
 }
 

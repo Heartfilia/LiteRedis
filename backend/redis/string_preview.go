@@ -18,13 +18,14 @@ func stringEditToken(value string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// 只读取预览上限+1 字节，不因源值过大而把整个值传到客户端。
+// 超大值只读取预览窗口，不因源值过大而把整个值传到客户端。
 func readStringPreview(ctx context.Context, client redis.UniversalClient, key string) (config.KeyValue, error) {
 	pipe := client.Pipeline()
 	kind := pipe.Type(ctx, key)
 	ttl := pipe.TTL(ctx, key)
 	size := pipe.StrLen(ctx, key)
-	value := pipe.GetRange(ctx, key, 0, maxStringValueBytes)
+	// 一次多取 1 字节，普通小值可直接命中，超大值也只传输很小的窗口。
+	head := pipe.GetRange(ctx, key, 0, maxStringPreviewBytes)
 	if _, err := pipe.Exec(ctx); err != nil {
 		return config.KeyValue{}, err
 	}
@@ -32,18 +33,24 @@ func readStringPreview(ctx context.Context, client redis.UniversalClient, key st
 		return config.KeyValue{}, fmt.Errorf("key no longer exists or its type changed; refresh before editing")
 	}
 	kv := config.KeyValue{Key: key, Type: "string", TTL: ttlSecondsOf(ttl.Val()), TotalCount: size.Val()}
-	raw := value.Val()
-	kv.Truncated = size.Val() > maxStringValueBytes || len(raw) > maxStringValueBytes
-	if kv.Truncated {
-		kv.ReadOnlyReason = "truncated"
-		raw = raw[:min(len(raw), maxStringValueBytes)]
-		// 仅移除边界处被切开的 UTF-8 编码，不遍历删除含二进制的整个前缀。
-		for i := 0; i < 3 && len(raw) > 0 && !utf8.ValidString(raw); i++ {
-			if utf8.RuneStart(raw[len(raw)-1]) && utf8.FullRuneInString(raw[len(raw)-1:]) {
-				break
-			}
-			raw = raw[:len(raw)-1]
+	raw := head.Val()
+	truncated := false
+	switch {
+	case size.Val() > maxStringValueBytes:
+		// 超大 key：只展示前 2000 个字符，不拉取剩余内容，也不生成编辑令牌。
+		truncated = true
+		raw = truncatePreviewRunes(raw, maxStringPreviewRunes)
+	case int64(len(raw)) < size.Val():
+		// 超过初次读取窗口、但仍允许完整编辑的值，再补一次有上限的读取。
+		full, err := client.GetRange(ctx, key, 0, maxStringValueBytes).Result()
+		if err != nil {
+			return config.KeyValue{}, err
 		}
+		raw = full
+	}
+	kv.Truncated = truncated
+	if truncated {
+		kv.ReadOnlyReason = "truncated"
 	} else if int64(len(raw)) != size.Val() {
 		kv.ReadOnlyReason = "changed"
 	}

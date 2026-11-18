@@ -23,9 +23,17 @@ async function openValue(page, value) {
 }
 
 for (const reason of ['truncated', 'binary', 'changed']) test(`${reason} String preview cannot be edited or saved`, async ({ page }) => {
-  await openValue(page, { string_val: 'partial value', truncated: reason === 'truncated', read_only_reason: reason })
+  const preview = reason === 'truncated' ? 'x'.repeat(2000) : 'partial value'
+  await openValue(page, { string_val: preview, truncated: reason === 'truncated', read_only_reason: reason })
   await expect(page.locator('.string-editor textarea')).toHaveAttribute('readonly', '')
   await expect(page.locator('.string-editor').getByRole('button', { name: '保存', exact: true })).toBeDisabled()
+  await expect(page.locator('.string-editor .btn-json').first()).toBeDisabled()
+  await expect(page.locator('.string-editor .btn-json').nth(1)).toBeDisabled()
+  await expect(page.locator('.string-editor').getByRole('button', { name: '复制' })).toBeDisabled()
+  if (reason === 'truncated') {
+    await expect(page.locator('.string-editor textarea')).toHaveValue(preview)
+    await expect(page.locator('.string-editor .truncated-hint').first()).toContainText('2000')
+  }
   expect(await page.evaluate(() => window.__writes.length)).toBe(0)
 })
 

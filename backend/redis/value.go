@@ -61,8 +61,25 @@ return 1
 
 // GetValue 读取 key 的值（按类型分支），支持 cursor/offset 分页。
 // cursor=0, offset=0 表示第一页。loadCount 控制每次加载条数（≤0 取默认）。
-// maxStringValueBytes string 全量 GET 的字节上限，超过即截断展示，防止大 key 打爆内存
+// maxStringValueBytes string 可完整读取和编辑的字节上限；超过后只返回少量预览字符。
 const maxStringValueBytes = 5 << 20 // 5MB
+
+// 超大 string 只回传前 2000 个字符，避免把 5MB 内容传到前端后卡住界面。
+// GETRANGE 的 end 是包含的，按 UTF-8 单字符最多 4 字节预留读取窗口。
+const (
+	maxStringPreviewRunes = 2000
+	maxStringPreviewBytes = maxStringPreviewRunes * 4
+)
+
+// truncatePreviewRunes 保留前 maxRunes 个字符，并替换窗口末尾被截断的 UTF-8 序列。
+func truncatePreviewRunes(s string, maxRunes int) string {
+	s = strings.ToValidUTF8(s, "\uFFFD")
+	runes := []rune(s)
+	if len(runes) > maxRunes {
+		runes = runes[:maxRunes]
+	}
+	return string(runes)
+}
 
 // truncateUTF8Safe 按字节截断并回退到最后一个完整 UTF-8 字符边界
 func truncateUTF8Safe(s string, limit int) string {

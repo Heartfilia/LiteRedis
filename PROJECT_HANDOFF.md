@@ -2,6 +2,14 @@
 
 最后更新：2026-11-18
 
+## 最新补充（2026-11-18，超大 String 只读预览）
+
+- 超过 5MB 的 string 不再先拉取 5MB：后端只读取前 8001 字节，按 UTF-8 字符边界截成前 2000 个字符返回，避免打开几十 MB 的 key 时界面长时间转圈甚至卡死。
+- 超大值标记为 `truncated` / `read_only_reason=truncated` 且不生成 `edit_token`；前端 textarea 只读，保存、复制、JSON 格式化和树形预览按钮均禁用，提示明确说明只读，避免复制或保存不完整内容。
+- 8KB 到 5MB 之间的值仍走原有完整读取，保持可编辑；5MB 以内的普通值不受影响。
+- 验证：新增 1 项后端中文超大值测试，并加强截断/二进制/大小变化预览的浏览器回归；`go test -race ./...`、`go vet ./...`、104 项前端单测、80 项 Playwright、lint/build、`git diff --check` 通过。尚未提交或推送。
+- 已打包工程测试包 `build/bin/LiteRedis.app`（`0.7.5-local.large-key-readonly.20261118.152552`，SHA256 `5b2b6b7db9f9239ba7c59d3e539d2bb3086c38ae8e4fb5654e255ee8251febae`），快照与旧包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-large-key-readonly-build-20261118-152552`；未启动、未替换 `/Applications`。
+
 ## 最新补充（2026-11-18，应用包更新代理默认地址）
 
 - 设置页「应用包更新代理」的地址为空时默认填入 `http://127.0.0.1:1081`：首次打开、点击重置、启用代理后都直接带默认值，不需要手动输入；已经保存过的地址不会被覆盖。

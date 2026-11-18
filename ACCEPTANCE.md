@@ -20,6 +20,14 @@
 
 ## 可复现命令
 
+### 超大 String 只读预览（2026-11-18）
+
+- 后端读取 string 时先在同一 pipeline 里取 TYPE / TTL / STRLEN 和前 8001 字节：超过 5MB 的值只返回前 2000 个字符，不再传输 5MB 内容；8KB 到 5MB 之间的值再补一次有上限的读取，保持原有可编辑行为。
+- 2000 字符按 UTF-8 字符边界截取，中文等多字节值不会截出半个字符；超大值的 `truncated` 和 `read_only_reason=truncated` 保持不变，且不生成 `edit_token`，后端保存接口会拒绝截断预览。
+- 前端超大值 textarea 只读，保存、复制、JSON 格式化和树形预览按钮均禁用；提示文案改为「仅展示前 2000 个字符，只读预览」。
+- 验证：新增 1 项后端测试（中文超大值保留完整字符），并加强现有截断/二进制/变更预览的浏览器回归；`go test -race ./...`、`go vet ./...`、104 项前端单测、80 项 Playwright、lint/build、`git diff --check` 通过。
+- 已打包工程测试包到 `build/bin/LiteRedis.app`，构建标识 `0.7.5-local.large-key-readonly.20261118.152552`，macOS arm64，本地 ad-hoc 签名校验通过，可执行文件 SHA256 `5b2b6b7db9f9239ba7c59d3e539d2bb3086c38ae8e4fb5654e255ee8251febae`。快照与旧包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-large-key-readonly-build-20261118-152552`。未替换或启动 `/Applications` 中的应用，未提交或推送。
+
 ### 应用包更新代理默认地址（2026-11-18）
 
 - 设置页「应用包更新代理」在地址为空时默认填入 `http://127.0.0.1:1081`：首次打开、点击重置、以及启用代理后输入框里都直接有默认值，不需要手动输入一次；已经保存过的地址保持不变。

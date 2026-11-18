@@ -2,25 +2,25 @@
   <div class="string-editor" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <FloatingMessage :message="msg" :success="ok" />
     <div v-if="props.keyValue?.truncated" class="truncated-hint">⚠️ {{ t('keyEditor.stringTruncated') }}</div>
-    <div v-if="readOnlyPreview" class="truncated-hint">{{ t('reliability.previewReadOnly') }}</div>
+    <div v-if="readOnlyPreview && !props.keyValue?.truncated" class="truncated-hint">{{ t('reliability.previewReadOnly') }}</div>
     <JsonViewer v-if="treeMode" :data="treeData" />
     <textarea v-else v-model="localVal" rows="10" :disabled="saving" :readonly="readOnlyPreview || readOnlyConnection" />
     <div class="editor-actions">
       <button
         class="btn-action btn-json"
         :class="{ active: formatApplied }"
-        :disabled="saving || (!formatApplied && !localVal.trim())"
+        :disabled="saving || readOnlyPreview || (!formatApplied && !localVal.trim())"
         @click="toggleJson"
       >{{ formatApplied ? t('keyEditor.jsonRestore') : t('keyEditor.jsonFormat') }}</button>
       <button
         class="btn-action btn-json"
         :class="{ active: treeMode }"
-        :disabled="saving || !localVal.trim()"
+        :disabled="saving || readOnlyPreview || !localVal.trim()"
         @click="toggleTreeView"
       >
         {{ treeMode ? t('keyEditor.jsonTextView') : t('keyEditor.jsonTreeView') }}
       </button>
-      <button class="btn-action" :class="{ copied }" @click="copyValue">{{ copied ? '✓ ' + t('keyEditor.copied') : t('keyEditor.copy') }}</button>
+      <button class="btn-action" :class="{ copied }" :disabled="readOnlyPreview" @click="copyValue">{{ copied ? '✓ ' + t('keyEditor.copied') : t('keyEditor.copy') }}</button>
       <button
         :class="[isDirty ? 'btn-primary' : 'btn-action', { 'success-flash': saveFlashing, 'error-flash': errorFlashing }]"
         @click="save"
@@ -192,6 +192,7 @@ function toggleJson() {
 }
 
 async function copyValue() {
+  if (readOnlyPreview.value) return
   const result = await copyToClipboard(localVal.value)
   if (result) {
     copied.value = true
