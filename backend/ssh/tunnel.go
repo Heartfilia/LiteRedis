@@ -20,6 +20,21 @@ const defaultSSHTimeout = 10 * time.Second
 const defaultSSHDialTimeout = 10 * time.Second
 const minSupportedDeadline = 100 * time.Millisecond
 
+func TestSSHConnection(cfg config.SSHConfig) error {
+	if cfg.Port == 0 {
+		cfg.Port = 22
+	}
+	if err := config.ValidateSSHConfig(cfg); err != nil {
+		return err
+	}
+	client, err := NewSSHTunnelWithConfig(cfg.Host, cfg.Port, strings.TrimSpace(cfg.User), cfg.Password, cfg.PrivateKeyPath, cfg.Passphrase, defaultSSHTimeout)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	return nil
+}
+
 // NewSSHTunnel 创建 SSH 客户端，返回可用于 Dial 的客户端
 func NewSSHTunnel(host string, port int, user string, password string) (*gossh.Client, error) {
 	return NewSSHTunnelWithConfig(host, port, user, password, "", "", defaultSSHTimeout)

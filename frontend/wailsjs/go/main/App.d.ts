@@ -3,6 +3,8 @@
 import {config} from '../models';
 import {main} from '../models';
 
+export function ApplyThirdPartyImport(arg1:string):Promise<config.ImportSummary>;
+
 export function BatchDeleteKeys(arg1:string,arg2:Array<string>):Promise<config.BatchKeyResult>;
 
 export function BatchRenamePrefix(arg1:string,arg2:Array<string>,arg3:string,arg4:string):Promise<config.BatchKeyResult>;
@@ -14,6 +16,8 @@ export function CancelKeyExport():Promise<config.OperationResult>;
 export function CancelMemoryScan():Promise<config.OperationResult>;
 
 export function CancelOperationTask(arg1:string):Promise<boolean>;
+
+export function CancelThirdPartyImport(arg1:string):Promise<config.OperationResult>;
 
 export function CheckLatestRelease():Promise<main.VersionInfo>;
 
@@ -36,6 +40,8 @@ export function DBSize(arg1:string):Promise<number>;
 export function DeleteConnection(arg1:string):Promise<config.OperationResult>;
 
 export function DeleteKey(arg1:string,arg2:string):Promise<config.OperationResult>;
+
+export function DeleteSSHProfile(arg1:string):Promise<config.OperationResult>;
 
 export function Disconnect(arg1:string):Promise<config.OperationResult>;
 
@@ -101,9 +107,13 @@ export function ListConnections():Promise<Array<config.ConnectionConfig>>;
 
 export function ListOperationTasks():Promise<Array<main.OperationTask>>;
 
+export function ListSSHProfiles():Promise<Array<config.SSHProfile>>;
+
 export function MarkVersionSeen(arg1:string):Promise<config.OperationResult>;
 
 export function PingConnection(arg1:string):Promise<config.OperationResult>;
+
+export function PreviewThirdPartyImport(arg1:string):Promise<config.ThirdPartyImportPreview>;
 
 export function PublishKeyValue(arg1:string,arg2:config.KeyValue,arg3:number,arg4:string):Promise<config.OperationResult>;
 
@@ -128,6 +138,8 @@ export function SAdd(arg1:string,arg2:string,arg3:string):Promise<config.Operati
 export function SRem(arg1:string,arg2:string,arg3:string):Promise<config.OperationResult>;
 
 export function SaveConnection(arg1:config.ConnectionConfig):Promise<config.OperationResult>;
+
+export function SaveSSHProfile(arg1:config.SSHProfile):Promise<config.SSHProfileResult>;
 
 export function SaveSettings(arg1:config.AppSettings):Promise<config.OperationResult>;
 
@@ -154,6 +166,8 @@ export function StartUpdate():Promise<main.UpdateResult>;
 export function StopPubSub(arg1:string):Promise<config.OperationResult>;
 
 export function TestConnection(arg1:config.ConnectionConfig):Promise<config.OperationResult>;
+
+export function TestSSHProfile(arg1:config.SSHProfile):Promise<config.OperationResult>;
 
 export function ZAdd(arg1:string,arg2:string,arg3:string,arg4:number):Promise<config.OperationResult>;
 

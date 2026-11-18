@@ -24,6 +24,7 @@ type ConnectionConfig struct {
 	ProxyURL         string     `json:"proxy_url,omitempty"`
 	IconColor        string     `json:"icon_color,omitempty"`
 	SSHEnabled       bool       `json:"ssh_enabled"`
+	SSHProfileID     string     `json:"ssh_profile_id,omitempty"`
 	SSH              *SSHConfig `json:"ssh,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`
@@ -43,6 +44,23 @@ type SSHConfig struct {
 	Password       string `json:"password"`
 	PrivateKeyPath string `json:"private_key_path,omitempty"`
 	Passphrase     string `json:"passphrase,omitempty"`
+}
+
+// SSHProfile is a reusable SSH account. Credentials follow the existing local
+// config storage policy (0600 file); they are never copied to browser storage.
+type SSHProfile struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	SSH       SSHConfig `json:"ssh"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type SSHProfileResult struct {
+	Success         bool        `json:"success"`
+	Message         string      `json:"message,omitempty"`
+	Profile         *SSHProfile `json:"profile,omitempty"`
+	DisconnectedIDs []string    `json:"disconnected_ids,omitempty"`
 }
 
 // AppSettings 全局应用设置
@@ -160,6 +178,7 @@ func DefaultSettings() AppSettings {
 
 // ConfigStore 配置文件根结构
 type ConfigStore struct {
+	SSHProfiles []SSHProfile       `json:"ssh_profiles,omitempty"`
 	Version     int                `json:"version"`
 	Connections []ConnectionConfig `json:"connections"`
 	Settings    AppSettings        `json:"settings"`

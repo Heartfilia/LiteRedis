@@ -322,6 +322,7 @@
         @click.stop
       >
         <div class="ctx-item" @click="openEdit(ctxMenu.conn); ctxMenu.visible = false">{{ t('sidebar.edit') }}</div>
+        <button type="button" class="ctx-item ctx-copy" :disabled="connectionsStore.duplicatingIds.has(ctxMenu.conn.id)" @click="duplicateConnection(ctxMenu.conn)">{{ t('connManager.copyConn') }}</button>
         <div class="ctx-divider" />
         <div class="ctx-item ctx-danger" @click="removeConnection(ctxMenu.conn.id); ctxMenu.visible = false">{{ t('sidebar.delete') }}</div>
       </div>
@@ -701,6 +702,12 @@ onBeforeUnmount(() => {
 // 编辑连接（打开 ConnectionManager）
 function openEdit(conn) {
   openConnManager(conn)
+}
+
+async function duplicateConnection(conn) {
+  ctxMenu.value.visible = false
+  const result = await connectionsStore.duplicate(conn.id)
+  if (result.connection) openEdit(result.connection)
 }
 
 function openOverview(conn) {
@@ -1796,6 +1803,8 @@ async function disconnectConn(id) {
   color: #333;
 }
 .ctx-item:hover { background: #f0f0f0; }
+.ctx-copy { display: block; width: 100%; text-align: left; border: none; background: transparent; font-family: inherit; }
+.ctx-copy:disabled { opacity: .5; cursor: not-allowed; }
 .ctx-danger { color: #e53e3e; }
 .ctx-danger:hover { background: #fff5f5; color: #e53e3e; }
 .ctx-divider { height: 1px; background: #eee; margin: 3px 0; }

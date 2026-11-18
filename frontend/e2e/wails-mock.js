@@ -55,6 +55,7 @@ export async function installWailsMock(page, options = {}) {
 
       const impl = {
         ListConnections: () => connections,
+        ListSSHProfiles: () => [],
         GetSettings: () => ({ ...settings }),
         SaveSettings: () => ({ success: true }),
         GetAppVersion: () => '1.0.0',
@@ -106,6 +107,9 @@ export async function installWailsMock(page, options = {}) {
         GetDiagnostics: () => ({ connections: [] }),
         GetUpdateInfo: () => ({ need_update: false, latest: '1.0.0' }),
         CheckLatestRelease: () => ({ need_update: false, latest: '1.0.0' }),
+        PreviewThirdPartyImport: () => ({ canceled: true, total: 0, importable: 0, skipped: 0 }),
+        ApplyThirdPartyImport: () => ({ added: 0, updated: 0, skipped: 0 }),
+        CancelThirdPartyImport: () => ({ success: true }),
       }
 
       window.go = {

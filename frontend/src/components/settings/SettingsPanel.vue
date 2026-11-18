@@ -366,6 +366,41 @@
         </div>
       </section>
 
+      <section class="third-party-import-section" aria-labelledby="settings-third-party-import-title">
+        <div id="settings-third-party-import-title" class="section-title mt">{{ t('settings.thirdPartyImport') }}</div>
+        <p class="label-hint third-party-import-hint">{{ t('settings.thirdPartyImportHint') }}</p>
+        <div class="setting-item third-party-platform">
+          <div class="third-party-platform-info">
+            <span class="label-text third-party-platform-name">AnotherRedisDesktopManager</span>
+            <span class="label-hint">{{ t('settings.thirdPartyARDMHint') }}</span>
+          </div>
+          <button
+            type="button"
+            class="local-api-btn third-party-import-btn"
+            :disabled="!!thirdPartyImporting"
+            @click="handleThirdPartyImport('ardm')"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4" /></svg>
+            {{ thirdPartyImporting === 'ardm' ? t('settings.importing') : t('settings.thirdPartyImportAction') }}
+          </button>
+        </div>
+        <div class="setting-item third-party-platform">
+          <div class="third-party-platform-info">
+            <span class="label-text third-party-platform-name">Tiny RDM</span>
+            <span class="label-hint">{{ t('settings.thirdPartyTinyRDMHint') }}</span>
+          </div>
+          <button
+            type="button"
+            class="local-api-btn third-party-import-btn"
+            :disabled="!!thirdPartyImporting"
+            @click="handleThirdPartyImport('tinyrdm')"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4" /></svg>
+            {{ thirdPartyImporting === 'tinyrdm' ? t('settings.importing') : t('settings.thirdPartyImportAction') }}
+          </button>
+        </div>
+      </section>
+
       <div class="section-title mt">{{ t('settings.installGuide') }}</div>
       <div class="setting-item">
         <label>
@@ -493,11 +528,12 @@ import { useSettingsStore } from '../../stores/settings.js'
 import { useUpdateStore } from '../../stores/update.js'
 import InstallGuideModal from '../common/InstallGuideModal.vue'
 import { useI18n } from '../../i18n/index.js'
-import { getAppVersion, getLocalAPIInfo, regenerateLocalAPIToken, exportConnectionsToFile, importConnectionsFromFile } from '../../api/wails.js'
+import { getAppVersion, getLocalAPIInfo, regenerateLocalAPIToken, exportConnectionsToFile, importConnectionsFromFile, previewThirdPartyImport, applyThirdPartyImport, cancelThirdPartyImport } from '../../api/wails.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { refreshLocalAPIRuntime } from '../../services/browserExtract.js'
 import { copyToClipboard } from '../../utils/clipboard.js'
 import { createRequestGuard } from '../../utils/requestGuard.js'
+import { askConfirmation } from '../../utils/confirm.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 
 const { t, setLanguage } = useI18n()
@@ -557,6 +593,7 @@ function openDiagnostics() {
 const showGuide = ref(false)
 const exportConfirming = ref(false)
 const importing = ref(false)
+const thirdPartyImporting = ref('')
 let exportConfirmTimer = null
 const appVersion = ref('dev')
 const updateStore = useUpdateStore()
@@ -889,12 +926,13 @@ async function handleImportConfig() {
   try {
     const summary = await importConnectionsFromFile()
     if (!summary) return
-    if (summary.added || summary.updated) {
+    if (summary.added || summary.updated || summary.ssh_added) {
       await useConnectionsStore().loadConnections()
       ok.value = true
       let text = t('settings.importConfigDone')
         .replace('{added}', summary.added || 0)
         .replace('{updated}', summary.updated || 0)
+      if (summary.ssh_added) text += ' · ' + t('settings.importSSHAdded').replace('{n}', summary.ssh_added)
       if (summary.skipped) {
         text += ' · ' + t('settings.importSkipped').replace('{n}', summary.skipped)
       }
@@ -908,6 +946,96 @@ async function handleImportConfig() {
     msg.value = e?.message || String(e)
   } finally {
     importing.value = false
+  }
+}
+
+function thirdPartyItemLine(item) {
+  return t('settings.thirdPartyPreviewItem')
+    .replace('{name}', item.name || '')
+    .replace('{reason}', item.reason || '')
+}
+
+function thirdPartyPreviewMessage(preview) {
+  const lines = [
+    t('settings.thirdPartyPreviewFile').replace('{file}', preview.file_name || ''),
+    t('settings.thirdPartyPreviewCounts')
+      .replace('{importable}', preview.importable || 0)
+      .replace('{skipped}', preview.skipped || 0),
+  ]
+  if (preview.renamed) {
+    lines.push(t('settings.thirdPartyPreviewRenamed').replace('{n}', preview.renamed))
+  }
+  const skipped = preview.skipped_items || []
+  if (skipped.length) {
+    lines.push(t('settings.thirdPartyPreviewSkipped'))
+    for (const item of skipped.slice(0, 8)) lines.push(thirdPartyItemLine(item))
+    if (skipped.length > 8) {
+      lines.push(t('settings.thirdPartyPreviewMore').replace('{n}', skipped.length - 8))
+    }
+  }
+  const warnings = preview.warnings || []
+  if (warnings.length) {
+    lines.push(t('settings.thirdPartyPreviewWarnings'))
+    for (const warning of warnings.slice(0, 6)) lines.push('· ' + warning)
+    if (warnings.length > 6) {
+      lines.push(t('settings.thirdPartyPreviewMore').replace('{n}', warnings.length - 6))
+    }
+  }
+  lines.push(t('settings.thirdPartyPreviewMerge'))
+  return lines.join('\n')
+}
+
+async function handleThirdPartyImport(platform) {
+  if (thirdPartyImporting.value) return
+  thirdPartyImporting.value = platform
+  let token = ''
+  try {
+    const preview = await previewThirdPartyImport(platform)
+    if (!preview || preview.canceled) return
+    if (!preview.token) {
+      ok.value = false
+      const skipped = preview.skipped_items || []
+      msg.value = skipped.length
+        ? [t('settings.thirdPartyNothingImportable'), ...skipped.slice(0, 5).map(thirdPartyItemLine)].join('\n')
+        : t('settings.thirdPartyNothingImportable')
+      return
+    }
+    token = preview.token
+    const confirmed = await askConfirmation(thirdPartyPreviewMessage(preview), false, {
+      title: t('settings.thirdPartyConfirmTitle'),
+      acceptLabel: t('settings.thirdPartyConfirmAccept'),
+      cancelLabel: t('settings.thirdPartyConfirmCancel'),
+    })
+    if (!confirmed) return
+
+    const summary = await applyThirdPartyImport(token)
+    token = ''
+    if (summary.added || summary.updated || summary.ssh_added) {
+      await useConnectionsStore().loadConnections()
+      ok.value = true
+      let text = t('settings.thirdPartyImportDone').replace('{added}', summary.added || 0)
+      if (summary.ssh_added) text += ' · ' + t('settings.importSSHAdded').replace('{n}', summary.ssh_added)
+      if (summary.renamed) text += ' · ' + t('settings.thirdPartyRenamedToast').replace('{n}', summary.renamed)
+      if (summary.skipped) text += ' · ' + t('settings.importSkipped').replace('{n}', summary.skipped)
+      msg.value = text
+    } else {
+      ok.value = false
+      msg.value = (summary.messages && summary.messages.length)
+        ? summary.messages.join('；')
+        : t('settings.thirdPartyNothingImportable')
+    }
+  } catch (e) {
+    ok.value = false
+    msg.value = e?.message || String(e)
+  } finally {
+    if (token) {
+      try {
+        await cancelThirdPartyImport(token)
+      } catch {
+        // Best effort: an unapplied preview expires on its own.
+      }
+    }
+    thirdPartyImporting.value = ''
   }
 }
 
@@ -995,6 +1123,12 @@ function openGitHub() {
   box-shadow: 0 4px 12px rgba(148, 163, 184, 0.06);
 }
 .section-title.mt { margin-top: 24px; }
+.third-party-import-hint { margin: 0 0 12px; }
+.third-party-platform { flex-wrap: wrap; gap: 12px; }
+.third-party-platform-info { flex: 1; min-width: 0; }
+.third-party-platform-name { overflow-wrap: anywhere; }
+.third-party-import-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; }
+.third-party-import-btn:disabled { opacity: .65; cursor: not-allowed; }
 .shortcuts-hint { margin: 0 0 12px; }
 .shortcut-group { margin-bottom: 14px; }
 .shortcut-group-title { margin: 0 0 6px; }

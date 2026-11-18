@@ -1,5 +1,5 @@
 export namespace config {
-	
+
 	export class AppSettings {
 	    key_scan_count: number;
 	    hash_load_count: number;
@@ -28,11 +28,11 @@ export namespace config {
 	    onboarding_done: boolean;
 	    connection_tabs_enabled: boolean;
 	    command_history?: string[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new AppSettings(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key_scan_count = source["key_scan_count"];
@@ -70,11 +70,11 @@ export namespace config {
 	    affected: number;
 	    failed: number;
 	    message?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new BatchKeyResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.code = source["code"];
@@ -91,11 +91,11 @@ export namespace config {
 	    password: string;
 	    private_key_path?: string;
 	    passphrase?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SSHConfig(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.host = source["host"];
@@ -127,16 +127,17 @@ export namespace config {
 	    proxy_url?: string;
 	    icon_color?: string;
 	    ssh_enabled: boolean;
+	    ssh_profile_id?: string;
 	    ssh?: SSHConfig;
 	    // Go type: time
 	    created_at: any;
 	    // Go type: time
 	    updated_at: any;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ConnectionConfig(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -159,11 +160,12 @@ export namespace config {
 	        this.proxy_url = source["proxy_url"];
 	        this.icon_color = source["icon_color"];
 	        this.ssh_enabled = source["ssh_enabled"];
+	        this.ssh_profile_id = source["ssh_profile_id"];
 	        this.ssh = this.convertValues(source["ssh"], SSHConfig);
 	        this.created_at = this.convertValues(source["created_at"], null);
 	        this.updated_at = this.convertValues(source["updated_at"], null);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -186,11 +188,11 @@ export namespace config {
 	    id: string;
 	    group?: string;
 	    sort_order: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ConnectionOrderItem(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -208,11 +210,11 @@ export namespace config {
 	    list_value?: string;
 	    member?: string;
 	    score?: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new CreateKeyRequest(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
@@ -245,19 +247,21 @@ export namespace config {
 	    }
 	}
 	export class ImportSummary {
+	    ssh_added?: number;
 	    added: number;
 	    updated: number;
 	    skipped: number;
 	    renamed: number;
 	    updated_ids?: string[];
 	    messages?: string[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ImportSummary(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ssh_added = source["ssh_added"];
 	        this.added = source["added"];
 	        this.updated = source["updated"];
 	        this.skipped = source["skipped"];
@@ -269,11 +273,11 @@ export namespace config {
 	export class StreamEntry {
 	    id: string;
 	    fields: Record<string, string>;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new StreamEntry(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -283,11 +287,11 @@ export namespace config {
 	export class ZSetMember {
 	    member: string;
 	    score: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ZSetMember(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.member = source["member"];
@@ -312,11 +316,11 @@ export namespace config {
 	    truncated?: boolean;
 	    read_only_reason?: string;
 	    edit_token?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new KeyValue(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
@@ -337,7 +341,7 @@ export namespace config {
 	        this.read_only_reason = source["read_only_reason"];
 	        this.edit_token = source["edit_token"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -362,11 +366,11 @@ export namespace config {
 	    size: number;
 	    len?: number;
 	    ttl: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MemoryKeyInfo(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
@@ -380,11 +384,11 @@ export namespace config {
 	    prefix: string;
 	    keys: number;
 	    bytes: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MemoryPrefixStat(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.prefix = source["prefix"];
@@ -396,11 +400,11 @@ export namespace config {
 	    type: string;
 	    keys: number;
 	    bytes: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MemoryTypeStat(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.type = source["type"];
@@ -429,11 +433,11 @@ export namespace config {
 	    big_keys: MemoryKeyInfo[];
 	    prefixes: MemoryPrefixStat[];
 	    types: MemoryTypeStat[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new MemoryReport(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.conn_id = source["conn_id"];
@@ -457,7 +461,7 @@ export namespace config {
 	        this.prefixes = this.convertValues(source["prefixes"], MemoryPrefixStat);
 	        this.types = this.convertValues(source["types"], MemoryTypeStat);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -476,17 +480,17 @@ export namespace config {
 		    return a;
 		}
 	}
-	
+
 	export class OperationResult {
 	    code?: string;
 	    success: boolean;
 	    message?: string;
 	    disconnected?: boolean;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new OperationResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.code = source["code"];
@@ -517,11 +521,11 @@ export namespace config {
 	    evicted_keys: number;
 	    blocked_clients: number;
 	    hit_rate: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new RedisConnectionOverview(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.conn_id = source["conn_id"];
@@ -555,11 +559,11 @@ export namespace config {
 	    error?: string;
 	    elapsed_ms: number;
 	    blocked?: boolean;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new RedisConsoleResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.code = source["code"];
@@ -576,11 +580,11 @@ export namespace config {
 	    type: string;
 	    ttl: number;
 	    count: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new RedisKey(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -589,23 +593,99 @@ export namespace config {
 	        this.count = source["count"];
 	    }
 	}
-	
+
+	export class SSHProfile {
+	    id: string;
+	    name: string;
+	    ssh: SSHConfig;
+	    // Go type: time
+	    created_at: any;
+	    // Go type: time
+	    updated_at: any;
+
+	    static createFrom(source: any = {}) {
+	        return new SSHProfile(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.ssh = this.convertValues(source["ssh"], SSHConfig);
+	        this.created_at = this.convertValues(source["created_at"], null);
+	        this.updated_at = this.convertValues(source["updated_at"], null);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SSHProfileResult {
+	    success: boolean;
+	    message?: string;
+	    profile?: SSHProfile;
+	    disconnected_ids?: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new SSHProfileResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.message = source["message"];
+	        this.profile = this.convertValues(source["profile"], SSHProfile);
+	        this.disconnected_ids = source["disconnected_ids"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ScanResult {
 	    keys: RedisKey[];
 	    next_cursor: number;
 	    has_more: boolean;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ScanResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.keys = this.convertValues(source["keys"], RedisKey);
 	        this.next_cursor = source["next_cursor"];
 	        this.has_more = source["has_more"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -632,11 +712,11 @@ export namespace config {
 	    client_addr?: string;
 	    client_name?: string;
 	    node?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SlowLogEntry(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -648,21 +728,84 @@ export namespace config {
 	        this.node = source["node"];
 	    }
 	}
-	
+
+	export class ThirdPartySkippedItem {
+	    name: string;
+	    reason: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ThirdPartySkippedItem(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.reason = source["reason"];
+	    }
+	}
+	export class ThirdPartyImportPreview {
+	    platform: string;
+	    file_name: string;
+	    canceled?: boolean;
+	    total: number;
+	    importable: number;
+	    skipped: number;
+	    renamed?: number;
+	    skipped_items?: ThirdPartySkippedItem[];
+	    warnings?: string[];
+	    token?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ThirdPartyImportPreview(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.platform = source["platform"];
+	        this.file_name = source["file_name"];
+	        this.canceled = source["canceled"];
+	        this.total = source["total"];
+	        this.importable = source["importable"];
+	        this.skipped = source["skipped"];
+	        this.renamed = source["renamed"];
+	        this.skipped_items = this.convertValues(source["skipped_items"], ThirdPartySkippedItem);
+	        this.warnings = source["warnings"];
+	        this.token = source["token"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
 
 }
 
 export namespace main {
-	
+
 	export class ConnectResult {
 	    success: boolean;
 	    message?: string;
 	    init_db: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ConnectResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
@@ -678,11 +821,11 @@ export namespace main {
 	    connected: boolean;
 	    latency_ms: number;
 	    error?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new DiagnosticConnection(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -705,11 +848,11 @@ export namespace main {
 	    local_api_port: number;
 	    connections: DiagnosticConnection[];
 	    log_tail: string[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Diagnostics(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.app_version = source["app_version"];
@@ -723,7 +866,7 @@ export namespace main {
 	        this.connections = this.convertValues(source["connections"], DiagnosticConnection);
 	        this.log_tail = source["log_tail"];
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -747,11 +890,11 @@ export namespace main {
 	    port: number;
 	    token: string;
 	    error?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new LocalAPIInfo(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.running = source["running"];
@@ -838,11 +981,11 @@ export namespace main {
 	    patterns: string[];
 	    count: number;
 	    error?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new PubSubStatus(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.running = source["running"];
@@ -858,11 +1001,11 @@ export namespace main {
 	    body: string;
 	    url: string;
 	    found: boolean;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new ReleaseNotes(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.version = source["version"];
@@ -879,11 +1022,11 @@ export namespace main {
 	    asset_name?: string;
 	    asset_path?: string;
 	    needs_restart?: boolean;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new UpdateResult(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.success = source["success"];
@@ -901,11 +1044,11 @@ export namespace main {
 	    release_url?: string;
 	    checked_at?: string;
 	    error?: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new VersionInfo(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.version = source["version"];

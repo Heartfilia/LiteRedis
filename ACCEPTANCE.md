@@ -6,7 +6,7 @@
 
 | 层次 | 结果与范围 |
 | --- | --- |
-| 前端 | 95 项单测；43 项 Playwright 浏览器测试（23 项可靠性专项、6 项 key 分页及加载样式回归）；lint / build |
+| 前端 | 97 项单测；75 项 Playwright 浏览器测试（含 12 项 SSH 账号管理、6 项连接复制、6 项设置页、4 项第三方平台导入、27 项可靠性、6 项分页/加载回归）；lint / build |
 | Go | `go test -race ./...`、`go vet ./...`、`go build` |
 | Redis 7.2.6 / 3.0.7 | String/Hash/List/Set/ZSet 导入、默认跳过和显式覆盖、完整内容与 TTL 读回；String/Hash CAS、普通集合编辑、批量 TTL/删除；7 支持 COPY，3 明确不支持；Stream 仅在 7 测试 |
 | Redis 7.2.6 ACL | EVAL / 临时 key 权限拒绝、脚本内部 HMSET/PEXPIRE/PERSIST/RENAME 拒绝保留目标值和 TTL；DEL 清理失败返回临时 key 且保留过期时间 |
@@ -19,6 +19,47 @@
 本轮真实 ACL 暴露 `ERR ACL failure in script` 格式，已保守归类 `partial_possible`。macOS WebView 未实现浏览器 confirm/alert 回调，因此改为应用内异步确认；默认取消、Esc、焦点循环、重复请求和保存中关闭已有浏览器回归。最新退出策略：有已连接 Redis 才弹确认（无草稿也确认，有草稿合并一次提示）；无连接直接退出，不提醒断线草稿，但保存中仍阻止。Cmd+W 仅关闭 key 并保护草稿；macOS File / Close Key 使用原生快捷键桥接。**所有浏览器测试使用 Wails mock，不等同原生窗口或文件对话框测试。**
 
 ## 可复现命令
+
+### 第三方平台导入实现（2026-11-17）
+
+- 按用户要求于 17:44 打包至 `build/bin/LiteRedis.app`，构建标识 `0.7.5-local.thirdparty-import2.20261117.174429`，macOS arm64，本地 ad-hoc 签名校验通过。可执行文件 SHA256：`f1e800adbe95c4efca648e7696c222b0668e295614bd3931cbdc8447601acd7d`。源码快照、构建身份和旧包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-thirdparty-import2-build-20261117-174429`。未启动应用、未替换 `/Applications`、未操作真实用户配置、未提交或推送。
+
+- 新增后端解析模块 `backend/config/thirdparty_import.go`：ARDM `.ano` 支持 UTF-8 Base64 与已解码 JSON、旧连接数组和新 `{connections, groups}`；Tiny RDM `.zip` 读取根目录 `connections.yaml`，限制解压后 YAML 不超过 8MiB，避免异常压缩包。两者统一转换为 `ConnectionConfig`，不读取或写入 Redis。
+- 导入采用“预览 → 确认 → 单次令牌应用”：后端在内存暂存解析结果 15 分钟，令牌只能用一次；密码不会回传前端。确认后通过现有 `ImportConfiguration` 只新增连接，同组重名自动加序号，不覆盖现有记录；内联 SSH 配置由 `ensureSSHProfiles` 整理为独立账号，结果会统计新增 SSH 账号数。
+- 按地址去重：以 `host:port` 生成端点键，与现有连接地址相同的一律跳过并在预览中给出原因（含现有连接名），绝不覆盖；同一次文件内地址重复只保留第一条。启用 SSH 时端点键同时包含跳板机用户/主机/端口，同一 Redis 地址经不同跳板机会保留为不同连接；Cluster 连接没有单独 host 时用首个节点地址参与判断。预览阶段和应用阶段都会再检查一次，避免预览后新增连接造成重复。
+- 映射范围：名称、地址/端口、ACL、密码、只读、DB、分组、Cluster 初始节点、SSH（密码或私钥）、TLS 开关/CA/跳过校验、自定义代理、图标颜色。明确跳过并提示：Sentinel、Unix Socket、双向 TLS（客户端证书/私钥）、自定义 SNI、SSH Agent、系统代理。ARDM TLS 的事实行为是 `rejectUnauthorized: false`，导入保持跳过证书校验并提示；ARDM 的 DB 编号保留但提示它表示上次使用的库。
+- 前端在设置页保留 ARDM 和 Tiny RDM 两行入口，不显示编号小标题；按钮改为可用，接入应用内确认弹窗、取消清理、成功/失败提示和连接列表刷新。新增中英文文案，移除“功能暂未开放”说明。
+- 验证：`go test -race ./...`、`go vet ./...`、`go build ./...`、97 项前端单测、75 项 Playwright 浏览器测试（新增 4 项第三方导入）、lint/build、`git diff --check` 全部通过。新增 13 项 Go 配置测试，覆盖两种格式、Base64/旧数组、字段映射、跳过原因、重名与不覆盖、内联 SSH 账号统计，以及地址去重（现有地址跳过、不同端口保留、同文件重复只留第一条、不同 SSH 跳板机保留、Cluster 回退节点地址、原因包含“不会覆盖现有连接”）。
+- 未覆盖：没有使用真实用户的 `.ano` / `.zip` 导出文件，也没有在原生窗口验证系统文件选择器；浏览器测试使用 Wails mock。工程测试包已更新为上述 17:44 版本，但原生导入交互仍待人工验收；未提交或推送。
+
+### 第三方平台导入入口预览（2026-11-17）
+
+- 后续按用户要求移除「平台 1」小标题并再次打包：`build/bin/LiteRedis.app`（16:51），标识 `0.7.5-local.import-preview2.20261117.165133`，macOS arm64，本地 ad-hoc 签名校验通过。SHA256：`b24c0550aad8fb6e3d50de6ce9f706e6670f45b5404bc1cbf2ae7f4a6ee6513a`。快照与旧包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-import-preview2-build-20261117-165133`。未启动、未替换 `/Applications`、未操作用户配置、未提交或推送。
+
+- 仅增加设置页入口样式，在安装说明上方显示第三方平台导入分区及 AnotherRedisDesktopManager 平台行；平台行只显示名称和文件类型，不再显示「平台 1」小标题，导入按钮禁用并明确提示尚未开放。没有接入原有导入接口，也没有文件读取或配置写入。
+- 已通过 6 项设置浏览器回归（中英文、深浅色、分区顺序、无水平溢出、按钮禁用、安装说明和开发者隐藏保护）、lint/build 和 diff 检查。Vite 单包体积提示仍为非阻断警告。本次未打包、提交或推送，等待用户确认样式。
+
+### SSH 账号管理补充（2026-11-17）
+
+- 最新打包（16:14）：按用户要求将与 DB Index 等高的 SSH 选择框调整打包到 `build/bin/LiteRedis.app`，构建标识 `0.7.5-local.ssh-compact.20261117.161449`，macOS arm64，本地 ad-hoc 签名校验通过。可执行文件 SHA256：`597495ee1ea4e953657c27fdb820205a27312d378758e88411bfdfc3ab29b437`。源码快照、身份记录和旧包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-ssh-compact-build-20261117-161449`。未启动、未替换 `/Applications`、未操作用户配置、未提交或推送。下面“高度微调尚未重新打包”为之前阶段记录。
+
+- 后续用户反馈 40px 仍偏高：SSH 账号选择框取消固定高度，复用 DB Index 输入框的字号、上下内边距和边框样式。深浅色浏览器回归直接比较两者实际高度，2 项通过，lint 和 diff 检查通过。本次高度微调尚未重新打包；16:02 包仍使用 40px。
+
+- 再次按用户要求于 2026-11-17 16:02 打包最新界面优化及连接复制：`build/bin/LiteRedis.app`，构建标识 `0.7.5-local.ssh-copy.20261117.160217`，macOS arm64，本地 ad-hoc 签名校验通过。可执行文件 SHA256：`03b28609f82355cdacfe0a638b8f3ffb844dab136c7041ac141c0954573223b4`。源码快照、构建身份及旧工程包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-ssh-copy-build-20261117-160217`（旧包在 `backup-project/LiteRedis.app`）。未启动应用、未替换 `/Applications`、未操作真实连接配置、未提交或推送；原生交互仍待人工验收。
+
+- 后续界面优化与连接复制：SSH 页返回 Redis 的按钮改为独立绿色并加返回箭头，深浅色适配；SSH 选择框统一为 40px 高并保留键盘焦点态，移除下方重复管理按钮，顶部切换和下拉新建继续保留。
+- 主侧栏及连接管理列表右键均支持「复制连接」。深复制全部配置，清空 ID、时间和排序，由后端创建独立记录；保留分组，名称追加 `copy`，同组忽略大小写/首尾空格重名时递增 `copy 2`、`copy 3`。成功后打开副本供修改，不自动连接；SSH 仍引用原共享账号。
+- 此次增加 2 项单测、8 项浏览器回归（深浅色样式、两处入口、完整配置、副本修改不影响原记录、编号、失败、重复提交、英文/代理）。最新 97 项单测、71 项浏览器测试、lint/build、Go 全量竞态测试及 vet 通过，`git diff --check` 通过。本次优化尚未重新打包，工程 App 仍为下述 15:46 初版 SSH 包；未提交或推送。
+
+- 连接管理默认展示 Redis；右上角新建按钮左侧切换到 SSH 账号管理，左侧账号列表、右侧配置表单。Redis 启用 SSH 后选择账号，下拉框底部可跳转新建，保存后返回并选中，Redis 未保存表单保留。
+- 支持 SSH 账号创建、编辑、删除、独立认证测试及主机指纹重置确认。切换子页面保留 SSH 草稿，切换账号/关闭管理器前确认丢弃，测试或保存中阻止重复操作。
+- 旧内联 SSH 配置在读取时无损整理为稳定账号关联，不在只读加载时改写文件；下一次显式保存时落盘。完全相同的凭据复用账号，密码不同的账号不合并，密码和口令首尾空格保留。配置仍为本地明文，沿用 0600 文件保护，未新增浏览器凭据持久化。
+- 共享账号修改后更新所有引用的配置快照，对活跃 SSH 连接复用原传输层失效机制并提示重连；被引用账号禁止直接删除。禁用 Redis SSH 并保存后取消关联。
+- 导出包含独立 SSH 账号（含未使用账号）及兼容旧版本的内联快照；导入按凭据匹配，冲突名称加后缀，不覆盖无关本地共享账号。新增导入 SSH 账号数量提示。
+- 新增 5 项 Go 配置测试覆盖迁移稳定性、去重、引用、更新、删除、校验、损坏文件保护、旧导入和跨设备导出/导入；另用本地临时 SSH 服务验证认证成功后连接关闭，不打开 SSH channel 或远程命令。
+- 新增 10 项 Wails mock 浏览器测试覆盖深浅色、英文、独立测试、下拉新建往返、草稿、引用删除、测试中操作保护、共享连接失效和旧 Redis 配置回显。前端 95 项单测、63 项浏览器测试、lint/build，以及 Go 全量竞态测试、vet/build 通过；Wails 绑定已重新生成。Vite 仍有单包超过 500kB 的非阻断提示。
+- 本轮未访问用户真实 SSH/Redis，未运行应用安装包的新功能联动验收，未替换 `/Applications`、打包、提交或推送。Playwright 仍仅本地运行，CI 冒烟测试未恢复。
+- 后续按用户要求于 2026-11-17 15:46 完成 macOS arm64 工程测试包：`build/bin/LiteRedis.app`，构建标识 `0.7.5-local.ssh.20261117.154640`，本地 ad-hoc 签名校验通过（不是发行签名或公证）。可执行文件 SHA256：`83c5458e3b91e7bbf919bf0561d0015852d47c6e5bbf6d483157b6b8203a4399`。构建快照、身份记录及旧工程包备份位于临时目录 `literedis-ssh-build-20261117-154640`。未启动新包、未修改用户连接配置、未替换 `/Applications`，原生交互待用户测试。
 
 前端（在 `frontend/` 中分别执行）：
 

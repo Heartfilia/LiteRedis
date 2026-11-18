@@ -79,6 +79,7 @@ func loadStore() (*ConfigStore, error) {
 	}
 	ensureUniqueConnectionNames(&store)
 	ensureConnectionOrder(&store)
+	ensureSSHProfiles(&store)
 	return &store, nil
 }
 
@@ -139,6 +140,7 @@ func backupCorruptStore(data []byte) (string, error) {
 // saveStore 写入磁盘（不加锁，调用方负责）
 func saveStore(store *ConfigStore) error {
 	ensureConnectionOrder(store)
+	ensureSSHProfiles(store)
 	data, err := json.MarshalIndent(store, "", "  ")
 	if err != nil {
 		return err
@@ -192,6 +194,9 @@ func SaveConnection(cfg ConnectionConfig) (ConnectionConfig, error) {
 
 	store, err := loadStore()
 	if err != nil {
+		return cfg, err
+	}
+	if err := resolveConnectionSSH(store, &cfg); err != nil {
 		return cfg, err
 	}
 
@@ -251,7 +256,15 @@ func SaveConnection(cfg ConnectionConfig) (ConnectionConfig, error) {
 		}
 	}
 
-	return cfg, saveStore(store)
+	if err := saveStore(store); err != nil {
+		return cfg, err
+	}
+	for _, saved := range store.Connections {
+		if saved.ID == cfg.ID {
+			return saved, nil
+		}
+	}
+	return cfg, nil
 }
 
 func ReorderConnections(items []ConnectionOrderItem) error {
@@ -325,6 +338,9 @@ func GetConnection(id string) (*ConnectionConfig, error) {
 	for _, c := range store.Connections {
 		if c.ID == id {
 			cc := c
+			if err := resolveConnectionSSH(store, &cc); err != nil {
+				return nil, err
+			}
 			return &cc, nil
 		}
 	}

@@ -5,6 +5,59 @@ import { createPinia, setActivePinia } from 'pinia'
 
 import { useConnectionsStore } from './connections.js'
 
+test('duplicate deep-copies every config field, clears identity and selects by unique name', async () => {
+  setActivePinia(createPinia())
+  const store = useConnectionsStore()
+  const source = {
+    id: 'original', name: 'Redis', group: ' prod ', created_at: 'old', updated_at: 'old', sort_order: 42,
+    host: 'redis.internal', port: 6380, username: 'acl', password: ' secret ', db: 4,
+    tls_enabled: true, tls_skip_verify: true, tls_ca_file: '/ca.pem', read_only: true,
+    is_cluster: true, allow_cluster_scan: true, cluster_addrs: ['one:6379', 'two:6380'],
+    proxy_enabled: false, proxy_url: 'socks5://user:pass@proxy:1080', icon_color: '#10b981',
+    ssh_enabled: true, ssh_profile_id: 'jump', ssh: { host: 'jump', port: 22, user: 'ubuntu', password: ' pass ', passphrase: ' phrase ', private_key_path: '/key' },
+  }
+  store.connections = [source, { id: 'collision', name: ' REDIS COPY ', group: 'prod' }, { id: 'other-group', name: 'Redis copy 2', group: 'other' }]
+  const original = JSON.parse(JSON.stringify(store.connections[0]))
+  let saved
+  store.save = async cfg => {
+    saved = cfg
+    store.connections.unshift({ ...cfg, id: 'new-id' })
+    return { success: true }
+  }
+  const result = await store.duplicate('original')
+  assert.equal(result.connection.id, 'new-id')
+  const expected = { ...original, id: '', name: 'Redis copy 2' }
+  delete expected.created_at
+  delete expected.updated_at
+  delete expected.sort_order
+  assert.deepEqual(saved, expected)
+  saved.cluster_addrs.push('three:6379')
+  saved.ssh.password = 'changed'
+  assert.deepEqual(store.connections.find(c => c.id === 'original'), original)
+  assert.equal(store.connectedIds.has('new-id'), false)
+})
+
+test('duplicate handles repeated clicks and failed saves without mutating the source', async () => {
+  setActivePinia(createPinia())
+  const store = useConnectionsStore()
+  store.connections = [{ id: 'original', name: 'Redis', group: '' }]
+  let finish
+  store.save = () => new Promise(resolve => { finish = resolve })
+  const toasts = []
+  store.showGlobalToast = (...args) => toasts.push(args)
+  const pending = store.duplicate('original')
+  assert.equal(store.duplicatingIds.has('original'), true)
+  assert.equal((await store.duplicate('original')).cancelled, true)
+  finish({ success: false, message: 'disk full' })
+  assert.equal((await pending).success, false)
+  assert.deepEqual(toasts, [['disk full', false]])
+  assert.equal(store.duplicatingIds.size, 0)
+  assert.deepEqual(store.connections, [{ id: 'original', name: 'Redis', group: '' }])
+  store.save = async () => { throw new Error('write denied') }
+  assert.equal((await store.duplicate('original')).message, 'write denied')
+  assert.equal(store.duplicatingIds.size, 0)
+})
+
 test('heartbeat schedules serial cycles and does not restart after stop', async (t) => {
   const originalSetTimeout = globalThis.setTimeout
   const originalClearTimeout = globalThis.clearTimeout

@@ -4,17 +4,18 @@
       <div class="cm-card dialog-in">
         <!-- 顶部 header -->
         <div class="cm-header">
-          <span class="cm-title">{{ t('connManager.title') }}</span>
+          <span class="cm-title">{{ pageMode === 'ssh' ? t('connManager.sshManage') : t('connManager.title') }}</span>
           <div class="cm-header-actions">
-            <button class="btn-new" @click="newConnection">＋ {{ t('connManager.newConn') }}</button>
-            <button class="btn-close" @click="$emit('close')">✕</button>
+            <button class="btn-new btn-mode" :class="{ 'btn-back-redis': pageMode === 'ssh' }" :disabled="sshBusy" @click="switchPage"><span v-if="pageMode === 'ssh'" aria-hidden="true">←</span>{{ pageMode === 'redis' ? t('connManager.sshManage') : t('connManager.redisManage') }}</button>
+            <button class="btn-new" :disabled="sshBusy" @click="pageMode === 'redis' ? newConnection() : newSSHProfile()">＋ {{ pageMode === 'redis' ? t('connManager.newConn') : t('connManager.sshCreate') }}</button>
+            <button class="btn-close" :disabled="sshBusy" @click="requestClose">✕</button>
           </div>
         </div>
 
         <!-- 主体：左侧分组列表 + 右侧表单 -->
         <div class="cm-body">
           <!-- 左侧连接列表 -->
-          <div ref="sidebarRef" class="cm-sidebar" :class="{ 'suppress-hover': suppressHover }">
+          <div v-show="pageMode === 'redis'" ref="sidebarRef" class="cm-sidebar" :class="{ 'suppress-hover': suppressHover }">
             <!-- 未分组连接 -->
             <div
               class="cm-group-zone"
@@ -120,12 +121,28 @@
           </div>
 
           <!-- 右侧表单 -->
-          <div class="cm-form-area">
+          <div v-show="pageMode === 'redis'" class="cm-form-area">
             <ConnectionForm
               :connection="selectedConn"
+              :createdSSHProfileId="createdSSHProfileId"
               @saved="onSaved"
-              @cancel="$emit('close')"
+              @cancel="requestClose"
+              @create-ssh="openSSHCreate"
             />
+          </div>
+          <div v-if="pageMode === 'ssh'" class="cm-sidebar ssh-sidebar">
+            <div v-if="sshProfilesStore.loading" class="cm-empty">{{ t('connManager.testing') }}</div>
+            <div v-if="sshProfilesStore.error" class="cm-empty" role="alert">{{ sshProfilesStore.error }}</div>
+            <div v-if="!sshProfilesStore.loading && !sshProfilesStore.profiles.length" class="cm-empty">{{ t('connManager.sshEmpty') }}</div>
+            <button v-for="profile in sshProfilesStore.profiles" :key="profile.id" type="button" class="cm-conn-item ssh-account-item" :class="{ selected: selectedSSHProfile?.id === profile.id }" :disabled="sshBusy" @click="selectSSHAccount(profile)">
+              <div class="conn-info">
+                <span class="conn-name">{{ profile.name }}</span>
+                <span class="conn-host">{{ profile.ssh.user }}@{{ profile.ssh.host }}:{{ profile.ssh.port }}</span>
+              </div>
+            </button>
+          </div>
+          <div v-show="pageMode === 'ssh'" class="cm-form-area">
+            <SSHProfileForm ref="sshFormRef" :key="sshFormKey" :profile="selectedSSHProfile" :return-to-redis="returnToRedis" @busy="sshBusy = $event" @saved="onSSHProfileSaved" @deleted="selectedSSHProfile = null" @return="pageMode = 'redis'; returnToRedis = false" />
           </div>
         </div>
       </div>
@@ -137,6 +154,8 @@
         :style="{ top: ctxMenu.y + 'px', left: ctxMenu.x + 'px' }"
         @click.stop
       >
+        <button type="button" class="ctx-item ctx-copy" :disabled="connectionsStore.duplicatingIds.has(ctxMenu.conn.id)" @click="duplicateConn(ctxMenu.conn)">{{ t('connManager.copyConn') }}</button>
+        <div class="ctx-divider" />
         <div class="ctx-section-label">{{ t('connManager.moveToGroup') }}</div>
         <div class="ctx-item" @click="moveToGroup(ctxMenu.conn, '')">（{{ t('connManager.ungrouped') }}）</div>
         <div
@@ -157,6 +176,8 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import ConnectionForm from './ConnectionForm.vue'
+import SSHProfileForm from './SSHProfileForm.vue'
+import { useSSHProfilesStore } from '../../stores/sshProfiles.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
 import { useSettingsStore } from '../../stores/settings.js'
@@ -169,12 +190,56 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 let disposeEscape = null
-onMounted(() => { disposeEscape = registerEscapeHandler(() => emit('close')) })
+onMounted(() => { disposeEscape = registerEscapeHandler(requestClose); sshProfilesStore.load() })
 onBeforeUnmount(() => { if (disposeEscape) disposeEscape() })
 const connectionsStore = useConnectionsStore()
 const workspaceStore = useWorkspaceStore()
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
+const sshProfilesStore = useSSHProfilesStore()
+const pageMode = ref('redis')
+const selectedSSHProfile = ref(null)
+const createdSSHProfileId = ref('')
+const returnToRedis = ref(false)
+const sshBusy = ref(false)
+const sshFormKey = ref(0)
+const sshFormRef = ref(null)
+
+async function requestClose() {
+  if (!sshBusy.value && await sshFormRef.value?.beforeReplace()) emit('close')
+}
+async function selectSSHAccount(profile) {
+  if (selectedSSHProfile.value?.id === profile.id) return
+  if (await sshFormRef.value?.beforeReplace()) selectedSSHProfile.value = profile
+}
+
+function switchPage() {
+  closeCtxMenu()
+  pageMode.value = pageMode.value === 'redis' ? 'ssh' : 'redis'
+  returnToRedis.value = false
+}
+async function newSSHProfile() {
+  if (!await sshFormRef.value?.beforeReplace()) return false
+  selectedSSHProfile.value = null
+  sshFormKey.value++
+  return true
+}
+async function openSSHCreate() {
+  if (!await newSSHProfile()) return
+  createdSSHProfileId.value = ''
+  returnToRedis.value = true
+  pageMode.value = 'ssh'
+}
+function onSSHProfileSaved(profile, disconnectedIDs) {
+  sshBusy.value = false
+  if (disconnectedIDs.length) connectionsStore.showGlobalToast(t('connManager.sshReconnect'), true)
+  selectedSSHProfile.value = profile
+  if (returnToRedis.value) {
+    createdSSHProfileId.value = profile.id
+    pageMode.value = 'redis'
+    returnToRedis.value = false
+  }
+}
 
 const selectedConn = ref(null)
 const collapsed = ref({})
@@ -377,6 +442,15 @@ async function moveToGroup(conn, targetGroup) {
   }
 }
 
+async function duplicateConn(conn) {
+  closeCtxMenu()
+  const result = await connectionsStore.duplicate(conn.id)
+  if (result.connection) {
+    collapsed.value[result.connection.group || ''] = false
+    selectConn(result.connection)
+  }
+}
+
 async function moveToNewGroup(conn) {
   closeCtxMenu()
   // WebView 不支持原生 prompt，直接打开编辑表单，在分组输入框里填新分组
@@ -427,6 +501,8 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.ssh-account-item { width: 100%; text-align: left; background: transparent; border: none; cursor: pointer; }
+.ssh-account-item:disabled { opacity: .6; cursor: not-allowed; }
 .cm-backdrop {
   position: fixed;
   inset: 0;
@@ -480,6 +556,12 @@ onBeforeUnmount(() => {
   transition: background var(--motion-base);
 }
 .btn-new:hover { background: #2563eb; }
+.btn-mode { gap: 6px; }
+.btn-back-redis { background: #047857; box-shadow: 0 2px 8px rgba(4, 120, 87, .2); }
+.btn-back-redis:hover { background: #065f46; }
+.btn-mode:focus-visible { outline: 2px solid #10b981; outline-offset: 3px; }
+.cm-backdrop.theme-dark .btn-back-redis { background: #6ee7b7; color: #064e3b; }
+.cm-backdrop.theme-dark .btn-back-redis:hover { background: #a7f3d0; }
 .btn-close {
   display: inline-flex; align-items: center; justify-content: center;
   width: 32px;
@@ -719,6 +801,8 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 .ctx-item:hover { background: #f3f4f6; }
+.ctx-copy { display: block; width: 100%; text-align: left; border: none; background: transparent; font-family: inherit; }
+.ctx-copy:disabled { opacity: .5; cursor: not-allowed; }
 .ctx-divider { height: 1px; background: #e5e7eb; margin: 4px 0; }
 .ctx-danger { color: #dc2626; }
 .ctx-danger:hover { background: #fff1f2; color: #dc2626; }

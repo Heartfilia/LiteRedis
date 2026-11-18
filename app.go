@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"LiteRedis/backend/localapi"
 	redisbackend "LiteRedis/backend/redis"
 	sshbackend "LiteRedis/backend/ssh"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -41,7 +43,21 @@ type App struct {
 	closeGuardReady  bool
 	tasksMu          sync.Mutex
 	tasks            []*operationRun
+
+	thirdPartyMu      sync.Mutex
+	thirdPartyPending *thirdPartyPendingImport
 }
+
+// thirdPartyPendingImport keeps a parsed export in memory between the preview
+// confirmation and the single write. Passwords never go back to the frontend.
+type thirdPartyPendingImport struct {
+	token       string
+	connections []config.ConnectionConfig
+	skipped     []config.ThirdPartySkippedItem
+	expiresAt   time.Time
+}
+
+const maxThirdPartyImportFileSize = 8 << 20
 
 func (a *App) beforeClose(ctx context.Context) bool {
 	a.closeMu.Lock()
@@ -188,10 +204,57 @@ func (a *App) DeleteConnection(id string) config.OperationResult {
 
 // TestConnection 测试连通性（不持久化）
 func (a *App) TestConnection(cfg config.ConnectionConfig) config.OperationResult {
+	var err error
+	cfg, err = config.ResolveConnectionSSH(cfg)
+	if err != nil {
+		return config.OperationResult{Success: false, Message: err.Error()}
+	}
 	if err := redisbackend.TestConnection(cfg); err != nil {
 		return config.OperationResult{Success: false, Message: err.Error() + "\nDebug log: " + config.DebugLogPath()}
 	}
 	return config.OperationResult{Success: true, Message: "连接成功\nDebug log: " + config.DebugLogPath()}
+}
+
+func (a *App) ListSSHProfiles() ([]config.SSHProfile, error) {
+	return config.ListSSHProfiles()
+}
+
+func (a *App) SaveSSHProfile(profile config.SSHProfile) config.SSHProfileResult {
+	saved, err := config.SaveSSHProfile(profile)
+	if err != nil {
+		return config.SSHProfileResult{Message: err.Error()}
+	}
+	result := config.SSHProfileResult{Success: true, Profile: &saved}
+	// Config snapshots are refreshed by SaveSSHProfile. Apply the same transport
+	// invalidation as editing a Redis connection; metadata-only edits stay live.
+	connections, err := config.ListConnections()
+	if err != nil {
+		result.Message = "SSH account saved; reload connection settings: " + err.Error()
+		return result
+	}
+	for _, cfg := range connections {
+		if cfg.SSHEnabled && cfg.SSHProfileID == saved.ID && a.manager.ApplyConnectionConfig(cfg) {
+			a.registry.UnpublishConn(cfg.ID)
+			result.DisconnectedIDs = append(result.DisconnectedIDs, cfg.ID)
+		}
+	}
+	return result
+}
+
+func (a *App) DeleteSSHProfile(id string) config.OperationResult {
+	if err := config.DeleteSSHProfile(id); err != nil {
+		return config.OperationResult{Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
+}
+
+// TestSSHProfile validates SSH authentication only, without opening a shell,
+// port forward or Redis connection. The authenticated client is always closed.
+func (a *App) TestSSHProfile(profile config.SSHProfile) config.OperationResult {
+	if err := sshbackend.TestSSHConnection(profile.SSH); err != nil {
+		return config.OperationResult{Message: err.Error()}
+	}
+	return config.OperationResult{Success: true}
 }
 
 // ForgetSSHHostFingerprint 删除指定 SSH 主机的已记录指纹（服务器换钥后重置用）
@@ -1081,7 +1144,7 @@ func (a *App) ImportConnectionsFromFile() (config.ImportSummary, error) {
 	if payload.App != "" && payload.App != "LiteRedis" {
 		return config.ImportSummary{}, fmt.Errorf("不是 LiteRedis 的配置文件")
 	}
-	summary, err := config.ImportConnections(payload.Connections)
+	summary, err := config.ImportConfiguration(payload.Connections, payload.SSHProfiles)
 	if err != nil {
 		return summary, err
 	}
@@ -1096,6 +1159,136 @@ func (a *App) ImportConnectionsFromFile() (config.ImportSummary, error) {
 		}
 	}
 	return summary, nil
+}
+
+// PreviewThirdPartyImport reads an AnotherRedisDesktopManager (.ano) or Tiny RDM
+// (.zip) export and converts it in memory. Nothing is written until the user
+// confirms and the returned single-use token is applied.
+func (a *App) PreviewThirdPartyImport(platform string) (config.ThirdPartyImportPreview, error) {
+	title, displayName, pattern := "", "", ""
+	switch platform {
+	case config.ThirdPartyPlatformARDM:
+		title, displayName, pattern = "导入 AnotherRedisDesktopManager 连接配置", "AnotherRedisDesktopManager", "*.ano"
+	case config.ThirdPartyPlatformTinyRDM:
+		title, displayName, pattern = "导入 Tiny RDM 连接配置", "Tiny RDM", "*.zip"
+	default:
+		return config.ThirdPartyImportPreview{}, fmt.Errorf("不支持的第三方平台")
+	}
+
+	path, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title:   title,
+		Filters: []wailsruntime.FileFilter{{DisplayName: displayName, Pattern: pattern}},
+	})
+	if err != nil {
+		return config.ThirdPartyImportPreview{}, err
+	}
+	preview := config.ThirdPartyImportPreview{Platform: platform}
+	if path == "" {
+		preview.Canceled = true
+		return preview, nil
+	}
+	preview.FileName = filepath.Base(path)
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return preview, err
+	}
+	if info.Size() > maxThirdPartyImportFileSize {
+		return preview, fmt.Errorf("文件过大（超过 8MiB）")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return preview, err
+	}
+	result, err := config.ParseThirdPartyExport(platform, data)
+	if err != nil {
+		return preview, err
+	}
+	kept, duplicates := config.FilterThirdPartyDuplicates(result.Connections)
+	result.Connections = kept
+	result.Skipped = append(result.Skipped, duplicates...)
+	preview.Total = result.Total
+	preview.Importable = len(result.Connections)
+	preview.Skipped = len(result.Skipped)
+	preview.SkippedItems = result.Skipped
+	preview.Warnings = result.Warnings
+	if result.Total == 0 {
+		return preview, fmt.Errorf("文件里没有连接配置")
+	}
+	if len(result.Connections) == 0 {
+		// Everything was unsupported: report the reasons without offering a write.
+		return preview, nil
+	}
+
+	preview.Renamed = config.CountThirdPartyNameConflicts(result.Connections)
+	token := uuid.NewString()
+	a.thirdPartyMu.Lock()
+	a.thirdPartyPending = &thirdPartyPendingImport{
+		token:       token,
+		connections: result.Connections,
+		skipped:     result.Skipped,
+		expiresAt:   time.Now().Add(15 * time.Minute),
+	}
+	a.thirdPartyMu.Unlock()
+	preview.Token = token
+	return preview, nil
+}
+
+// ApplyThirdPartyImport merges the previously previewed connections as new
+// entries. It never overwrites an existing LiteRedis connection.
+func (a *App) ApplyThirdPartyImport(token string) (config.ImportSummary, error) {
+	a.thirdPartyMu.Lock()
+	pending := a.thirdPartyPending
+	a.thirdPartyPending = nil
+	a.thirdPartyMu.Unlock()
+
+	if pending == nil || token == "" || pending.token != token {
+		return config.ImportSummary{}, fmt.Errorf("导入预览已失效，请重新选择文件")
+	}
+	if time.Now().After(pending.expiresAt) {
+		return config.ImportSummary{}, fmt.Errorf("导入预览已过期，请重新选择文件")
+	}
+
+	connections, duplicates := config.FilterThirdPartyDuplicates(pending.connections)
+	summary, err := config.ImportConfiguration(connections, nil)
+	if err != nil {
+		return summary, err
+	}
+	// Preview-time skips (unsupported features and endpoints that already
+	// existed when the file was opened) are not part of ImportConfiguration,
+	// so fold them into the same summary. Duplicates found only at apply time
+	// are counted separately to avoid double counting.
+	summary.Skipped += len(pending.skipped)
+	for _, item := range pending.skipped {
+		summary.Messages = append(summary.Messages, "跳过「"+item.Name+"」："+item.Reason)
+	}
+	if len(duplicates) > 0 {
+		summary.Skipped += len(duplicates)
+		for _, item := range duplicates {
+			summary.Messages = append(summary.Messages, "跳过「"+item.Name+"」："+item.Reason)
+		}
+	}
+	for _, id := range summary.UpdatedIDs {
+		cfg, cfgErr := config.GetConnection(id)
+		if cfgErr != nil || cfg == nil {
+			continue
+		}
+		if a.manager.ApplyConnectionConfig(*cfg) {
+			a.registry.UnpublishConn(id)
+		}
+	}
+	return summary, nil
+}
+
+// CancelThirdPartyImport discards a pending preview when the user closes the
+// confirmation dialog without importing.
+func (a *App) CancelThirdPartyImport(token string) config.OperationResult {
+	a.thirdPartyMu.Lock()
+	if a.thirdPartyPending != nil && a.thirdPartyPending.token == token {
+		a.thirdPartyPending = nil
+	}
+	a.thirdPartyMu.Unlock()
+	return config.OperationResult{Success: true}
 }
 
 // MarkVersionSeen 记录已经看过某个版本的更新说明，保证每个版本只提示一次

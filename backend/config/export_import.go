@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -15,10 +16,12 @@ type ConfigExport struct {
 	App         string             `json:"app"`
 	ExportedAt  string             `json:"exported_at"`
 	Connections []ConnectionConfig `json:"connections"`
+	SSHProfiles []SSHProfile       `json:"ssh_profiles,omitempty"`
 }
 
 // ImportSummary 导入结果，用于界面提示
 type ImportSummary struct {
+	SSHAdded   int      `json:"ssh_added,omitempty"`
 	Added      int      `json:"added"`
 	Updated    int      `json:"updated"`
 	Skipped    int      `json:"skipped"`
@@ -38,6 +41,14 @@ func ExportConnections() (ConfigExport, error) {
 	}
 	conns := make([]ConnectionConfig, len(store.Connections))
 	copy(conns, store.Connections)
+	// Portable inline snapshots: importing must not bind to an unrelated local
+	// account with the same ID. Legacy import also works on older app versions.
+	for i := range conns {
+		if err := resolveConnectionSSH(store, &conns[i]); err != nil {
+			return ConfigExport{}, err
+		}
+		conns[i].SSHProfileID = ""
+	}
 	sort.SliceStable(conns, func(i, j int) bool { return conns[i].SortOrder < conns[j].SortOrder })
 
 	return ConfigExport{
@@ -45,13 +56,20 @@ func ExportConnections() (ConfigExport, error) {
 		App:         "LiteRedis",
 		ExportedAt:  time.Now().Format(time.RFC3339),
 		Connections: conns,
+		SSHProfiles: store.SSHProfiles,
 	}, nil
 }
 
 // ImportConnections 合并导入：同 ID 覆盖、同组重名自动加后缀，不会静默丢数据
 func ImportConnections(in []ConnectionConfig) (ImportSummary, error) {
+	return ImportConfiguration(in, nil)
+}
+
+// ImportConfiguration also imports standalone SSH accounts. Match credentials,
+// not incoming IDs, so an import cannot overwrite an unrelated shared account.
+func ImportConfiguration(in []ConnectionConfig, profiles []SSHProfile) (ImportSummary, error) {
 	var summary ImportSummary
-	if len(in) == 0 {
+	if len(in) == 0 && len(profiles) == 0 {
 		summary.Messages = append(summary.Messages, "文件里没有连接配置")
 		return summary, nil
 	}
@@ -62,6 +80,44 @@ func ImportConnections(in []ConnectionConfig) (ImportSummary, error) {
 	store, err := loadStore()
 	if err != nil {
 		return summary, err
+	}
+	profileIDs := make(map[string]string)
+	addedProfiles := 0
+	for _, profile := range profiles {
+		originalID := profile.ID
+		profile.SSH = normalizeSSH(profile.SSH)
+		if err := ValidateSSHConfig(profile.SSH); err != nil {
+			return summary, fmt.Errorf("invalid imported SSH account: %w", err)
+		}
+		if strings.TrimSpace(profile.Name) == "" {
+			return summary, fmt.Errorf("imported SSH account name is required")
+		}
+		if profile.ID != "" && profileIDs[profile.ID] != "" {
+			return summary, fmt.Errorf("duplicate imported SSH account ID")
+		}
+		localID := ""
+		for _, existing := range store.SSHProfiles {
+			if reflect.DeepEqual(existing.SSH, profile.SSH) {
+				localID = existing.ID
+				break
+			}
+		}
+		if localID == "" {
+			name := strings.TrimSpace(profile.Name)
+			for n := 2; sshNameUsed(store, name, ""); n++ {
+				name = fmt.Sprintf("%s (%d)", strings.TrimSpace(profile.Name), n)
+			}
+			profile.ID = uuid.NewString()
+			localID = profile.ID
+			profile.Name = name
+			profile.CreatedAt, profile.UpdatedAt = time.Now(), time.Now()
+			store.SSHProfiles = append(store.SSHProfiles, profile)
+			addedProfiles++
+			summary.SSHAdded++
+		}
+		if originalID != "" {
+			profileIDs[originalID] = localID
+		}
 	}
 
 	indexByID := make(map[string]int, len(store.Connections))
@@ -78,6 +134,17 @@ func ImportConnections(in []ConnectionConfig) (ImportSummary, error) {
 
 	now := time.Now()
 	for _, cfg := range in {
+		// Exported inline credentials are authoritative; recreate local accounts.
+		if cfg.SSH != nil {
+			cfg.SSHProfileID = ""
+		} else {
+			if id := profileIDs[cfg.SSHProfileID]; id != "" {
+				cfg.SSHProfileID = id
+			}
+			if err := resolveConnectionSSH(store, &cfg); err != nil {
+				return summary, err
+			}
+		}
 		cfg.Name = strings.TrimSpace(cfg.Name)
 		cfg.Group = strings.TrimSpace(cfg.Group)
 		if cfg.Name == "" {
@@ -125,10 +192,19 @@ func ImportConnections(in []ConnectionConfig) (ImportSummary, error) {
 		summary.Added++
 	}
 
-	if summary.Added == 0 && summary.Updated == 0 {
+	if summary.Added == 0 && summary.Updated == 0 && addedProfiles == 0 {
 		return summary, nil
 	}
-	return summary, saveStore(store)
+	profilesBefore := len(store.SSHProfiles)
+	if err := saveStore(store); err != nil {
+		return summary, err
+	}
+	// saveStore migrates inline SSH settings into standalone accounts; count
+	// those without double-counting profiles imported explicitly above.
+	if created := len(store.SSHProfiles) - profilesBefore; created > 0 {
+		summary.SSHAdded += created
+	}
+	return summary, nil
 }
 
 // uniqueName 在分组内找一个没被占用的名字：name → name (2) → name (3)

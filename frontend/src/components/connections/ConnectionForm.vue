@@ -134,49 +134,17 @@
           <input type="checkbox" v-model="form.sshEnabled" />
         </div>
 
-        <template v-if="form.sshEnabled">
-          <div class="ssh-panel">
-            <div class="form-row">
-              <div class="form-group flex1">
-                <label>{{ t('connManager.sshHostRequired') }}</label>
-                <input v-model="form.ssh.host" type="text" placeholder="jump.example.com" />
-              </div>
-              <div class="form-group w80">
-                <label>Port</label>
-                <input v-model.number="form.ssh.port" type="number" placeholder="22" min="1" max="65535" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group flex1">
-                <label>{{ t('connManager.sshUserRequired') }}</label>
-                <input v-model="form.ssh.user" type="text" placeholder="ubuntu" />
-              </div>
-              <div class="form-group flex1">
-                <label>SSH Password</label>
-                <input v-model="form.ssh.password" type="password" :placeholder="t('connManager.sshPasswordPlaceholder')" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group flex1">
-                <label>{{ t('connManager.sshPrivateKey') }}</label>
-                <input v-model="form.ssh.private_key_path" type="text" :placeholder="t('connManager.sshPrivateKeyPlaceholder')" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group flex1">
-                <label>{{ t('connManager.sshPassphrase') }}</label>
-                <input v-model="form.ssh.passphrase" type="password" :placeholder="t('connManager.sshPassphrasePlaceholder')" />
-              </div>
-            </div>
-            <div class="form-row ssh-fingerprint-row" v-if="form.ssh.host">
-              <button type="button" class="btn-secondary btn-fingerprint-reset" :disabled="resettingFingerprint" @click="handleResetFingerprint">
-                {{ resettingFingerprint ? '...' : t('connManager.sshResetFingerprint') }}
-              </button>
-              <span class="fingerprint-hint">{{ t('connManager.sshResetFingerprintHint') }}</span>
-            </div>
-            <div v-if="fingerprintMsg" :class="['test-msg', fingerprintOk ? 'ok' : 'err']">{{ fingerprintMsg }}</div>
-          </div>
-        </template>
+        <div v-if="form.sshEnabled" class="ssh-panel">
+          <label for="redis-ssh-profile">{{ t('connManager.sshAccount') }}</label>
+          <select id="redis-ssh-profile" :value="form.sshProfileId" @change="selectSSHProfile">
+            <option value="" disabled>{{ t('connManager.sshChoose') }}</option>
+            <option v-if="form.sshProfileId && !selectedSSHProfile" :value="form.sshProfileId" disabled>{{ t('connManager.sshMissing') }}</option>
+            <option v-for="profile in sshProfilesStore.profiles" :key="profile.id" :value="profile.id">{{ profile.name }}</option>
+            <option value="__create_ssh__">＋ {{ t('connManager.sshCreate') }}</option>
+          </select>
+          <p v-if="selectedSSHProfile" class="field-hint">{{ selectedSSHProfile.ssh.user }}@{{ selectedSSHProfile.ssh.host }}:{{ selectedSSHProfile.ssh.port }}</p>
+          <p v-if="sshProfilesStore.error" class="test-msg err" role="alert">{{ sshProfilesStore.error }}</p>
+        </div>
       </div>
 
       <div class="icon-color-section">
@@ -246,14 +214,16 @@ import { useConnectionsStore } from '../../stores/connections.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useI18n } from '../../i18n/index.js'
 import { formatDebugMessage } from '../../utils/debug.js'
-import { forgetSSHHostFingerprint } from '../../api/wails.js'
+import { useSSHProfilesStore } from '../../stores/sshProfiles.js'
 const props = defineProps({
   connection: { type: Object, default: null },
+  createdSSHProfileId: { type: String, default: '' },
 })
-const emit = defineEmits(['cancel', 'saved'])
+const emit = defineEmits(['cancel', 'saved', 'create-ssh'])
 
 const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
+const sshProfilesStore = useSSHProfilesStore()
 const { t } = useI18n()
 
 const isEdit = computed(() => !!props.connection?.id)
@@ -289,7 +259,7 @@ const defaultForm = () => ({
   proxyUrl: '',
   iconColor: '',
   sshEnabled: false,
-  ssh: { host: '', port: 22, user: '', password: '', private_key_path: '', passphrase: '' },
+  sshProfileId: '',
 })
 
 const form = reactive(defaultForm())
@@ -349,18 +319,27 @@ function snapshotValue() {
     proxyUrl: form.proxyUrl || '',
     iconColor: form.iconColor || '',
     sshEnabled: !!form.sshEnabled,
-    ssh: form.sshEnabled ? {
-      host: form.ssh.host || '',
-      port: form.ssh.port || 22,
-      user: form.ssh.user || '',
-      password: form.ssh.password || '',
-      private_key_path: form.ssh.private_key_path || '',
-      passphrase: form.ssh.passphrase || '',
-    } : null,
+    sshProfileId: form.sshProfileId,
   })
 }
 
 const isDirty = computed(() => snapshotValue() !== initialSnapshot.value)
+
+// These refs must exist before the immediate connection watcher resets them.
+const saveOkMsg = ref('')
+const saveMsg = ref('')
+const selectedSSHProfile = computed(() => sshProfilesStore.profiles.find(p => p.id === form.sshProfileId))
+function selectSSHProfile(event) {
+  if (event.target.value === '__create_ssh__') {
+    event.target.value = form.sshProfileId
+    emit('create-ssh')
+  } else {
+    form.sshProfileId = event.target.value
+  }
+}
+watch(() => props.createdSSHProfileId, id => {
+  if (id) { form.sshProfileId = id; form.sshEnabled = true }
+})
 
 watch(() => props.connection, (conn) => {
   if (conn) {
@@ -378,7 +357,8 @@ watch(() => props.connection, (conn) => {
       proxyEnabled: conn.proxyEnabled ?? conn.proxy_enabled,
       proxyUrl: conn.proxyUrl ?? conn.proxy_url ?? '',
       iconColor: conn.iconColor ?? conn.icon_color ?? '',
-      ssh: conn.ssh ? { ...conn.ssh } : { host: '', port: 22, user: '', password: '', private_key_path: '', passphrase: '' },
+      sshEnabled: conn.sshEnabled ?? conn.ssh_enabled ?? false,
+      sshProfileId: conn.ssh_profile_id || '',
     })
     clusterAddrsText.value = (conn.clusterAddrs || conn.cluster_addrs || []).join('\n')
   } else {
@@ -396,8 +376,6 @@ const testing = ref(false)
 const saving = ref(false)
 const testMsg = ref('')
 const testOk = ref(false)
-const saveOkMsg = ref('')
-const saveMsg = ref('')
 const saveFlashing = ref(false)
 const saveErrorFlashing = ref(false)
 const testErrorFlashing = ref(false)
@@ -466,14 +444,8 @@ function buildCfg() {
     proxy_url: form.proxyEnabled ? form.proxyUrl.trim() : '',
     icon_color: normalizeIconColor(form.iconColor),
     ssh_enabled: form.sshEnabled,
-    ssh: form.sshEnabled ? {
-      host: form.ssh.host,
-      port: form.ssh.port || 22,
-      user: form.ssh.user,
-      password: form.ssh.password,
-      private_key_path: form.ssh.private_key_path,
-      passphrase: form.ssh.passphrase,
-    } : null,
+    ssh_profile_id: form.sshEnabled ? form.sshProfileId : '',
+    ssh: null,
   }
   return cfg
 }
@@ -484,27 +456,8 @@ function normalizeIconColor(value) {
   return /^#[0-9a-fA-F]{6}$/.test(color) ? color : ''
 }
 
-const resettingFingerprint = ref(false)
-const fingerprintMsg = ref('')
-const fingerprintOk = ref(false)
-
-async function handleResetFingerprint() {
-  if (!form.ssh.host) return
-  fingerprintMsg.value = ''
-  resettingFingerprint.value = true
-  try {
-    const result = await forgetSSHHostFingerprint(form.ssh.host, form.ssh.port || 22)
-    fingerprintOk.value = !!result.success
-    fingerprintMsg.value = (result.success ? '✓ ' : '✗ ') + (result.message || '')
-  } catch (e) {
-    fingerprintOk.value = false
-    fingerprintMsg.value = '✗ ' + (e.message || String(e))
-  } finally {
-    resettingFingerprint.value = false
-  }
-}
-
 async function handleTest() {
+  if (form.sshEnabled && !selectedSSHProfile.value) { testOk.value = false; testMsg.value = t('connManager.sshChoose'); return }
   testMsg.value = ''
   testing.value = true
   try {
@@ -531,6 +484,7 @@ async function handleSave() {
   saveOkMsg.value = ''
   if (!form.name.trim()) { saveMsg.value = t('connManager.nameRequiredErr'); return }
   if (!form.isCluster && !form.host.trim()) { saveMsg.value = t('connManager.hostRequiredErr'); return }
+  if (form.sshEnabled && !selectedSSHProfile.value) { saveMsg.value = t('connManager.sshChoose'); return }
   // 同一分组下名称唯一（忽略大小写与首尾空格），先在前端拦一次，省得等后端报错
   const nameKey = form.name.trim().toLowerCase()
   const groupKey = (form.group || '').trim()
@@ -595,7 +549,7 @@ h3 {
 }
 .form-group { margin-bottom: 12px; position: relative; }
 .form-group label { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; font-weight: 500; }
-input[type=text], input[type=password], input[type=number], textarea {
+input[type=text], input[type=password], input[type=number], textarea, .ssh-panel select {
   width: 100%; padding: 6px 9px; border: 1px solid #d1d5db; border-radius: var(--radius-sm);
   font-size: 13px; box-sizing: border-box; outline: none; color: #1f2937;
   transition: border-color var(--motion-base);
@@ -641,9 +595,10 @@ textarea { resize: vertical; font-family: monospace; }
 .proxy-panel { background: #f9fafb; padding: 12px; border-radius: var(--radius-sm); margin-top: 8px; border: 1px solid #e5e7eb; }
 .ssh-section { border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 4px; }
 .ssh-panel { background: #f9fafb; padding: 12px; border-radius: var(--radius-sm); margin-top: 8px; border: 1px solid #e5e7eb; }
-.ssh-fingerprint-row { align-items: center; gap: 10px; }
-.btn-fingerprint-reset { white-space: nowrap; }
-.fingerprint-hint { font-size: 12px; color: #6b7280; }
+.ssh-panel label { display: block; font-size: 12px; color: #64748b; margin-bottom: 6px; }
+.ssh-panel select { appearance: none; padding-right: 36px; background-color: #fff; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer; }
+.ssh-panel select:focus-visible { outline: 2px solid rgba(59, 130, 246, .25); outline-offset: 2px; border-color: #3b82f6; }
+.theme-dark .ssh-panel select { color: #e2e8f0; background-color: #0f172a; border-color: #475569; }
 .icon-color-section { border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 4px; }
 .icon-color-card {
   display: flex;

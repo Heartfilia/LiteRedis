@@ -11,6 +11,7 @@ export const useConnectionsStore = defineStore('connections', {
     connections: [],
     connectedIds: new Set(),
     connectingIds: new Set(),
+    duplicatingIds: new Set(),
     heartbeatFailures: {},
     heartbeatTimer: null,
     heartbeatRunning: false,
@@ -66,6 +67,44 @@ export const useConnectionsStore = defineStore('connections', {
         await this.loadConnections()
       }
       return result
+    },
+
+    async duplicate(id) {
+      if (this.duplicatingIds.has(id)) return { success: false, cancelled: true }
+      this.duplicatingIds.add(id)
+      try {
+        const source = this.connections.find(conn => conn.id === id)
+        if (!source) throw new Error(t('connManager.copyMissing'))
+        // Configs are JSON data. Deep-copy arrays and SSH snapshots, never live state.
+        const cfg = JSON.parse(JSON.stringify(source))
+        cfg.id = ''
+        delete cfg.created_at
+        delete cfg.updated_at
+        delete cfg.sort_order
+        const group = String(source.group || '').trim()
+        const base = `${source.name.trim()} copy`
+        const usedNames = new Set(this.connections
+          .filter(conn => String(conn.group || '').trim() === group)
+          .map(conn => conn.name.trim().toLowerCase()))
+        cfg.name = base
+        for (let n = 2; usedNames.has(cfg.name.toLowerCase()); n++) cfg.name = `${base} ${n}`
+        const result = await this.save(cfg)
+        if (!result.success) {
+          this.showGlobalToast(result.message || t('connManager.copyFailed'), false)
+          return result
+        }
+        // SaveConnection returns no ID; locate by the backend's unique group/name,
+        // not list position (which can change after reload).
+        const connection = this.connections.find(conn => conn.id !== id &&
+          String(conn.group || '').trim() === group && conn.name === cfg.name)
+        return { ...result, connection }
+      } catch (e) {
+        const message = e.message || String(e)
+        this.showGlobalToast(message, false)
+        return { success: false, message }
+      } finally {
+        this.duplicatingIds.delete(id)
+      }
     },
 
     async reorder(items) {
