@@ -56,35 +56,34 @@ test('saved update proxy addresses are not replaced by the default', async ({ pa
 
 for (const language of ['zh', 'en']) {
   for (const theme of ['light', 'dark']) {
-    test(`settings documents shortcuts and ends with installation, hiding developer tools (${language}, ${theme})`, async ({ page }) => {
+    test(`settings groups software guides at the bottom, opens shortcuts subpage, and hides developer tools (${language}, ${theme})`, async ({ page }) => {
       // Even an enabled API and a dev build must not expose the developer group by default.
       await openSettings(page, { language, theme, apiEnabled: true })
       const panel = page.locator('.settings-panel')
       await expect(panel).toHaveClass(new RegExp(`theme-${theme}`))
       await expect(panel.locator('.local-api-item')).toHaveCount(0)
-      const titles = panel.locator('.settings-body .section-title')
-      await expect(titles.last()).toHaveText(language === 'zh' ? '安装说明' : 'Installation guide')
-      await expect(titles.nth(await titles.count() - 2)).toHaveText(language === 'zh' ? '第三方平台数据导入' : 'Third-party platform import')
-      await expect(titles.nth(await titles.count() - 3)).toHaveText(language === 'zh' ? '快捷键说明' : 'Keyboard shortcuts')
-      await expect(panel.locator('.settings-body > :last-child')).toContainText(language === 'zh' ? '查看安装说明' : 'View installation guide')
+      await expect(panel.locator('.shortcuts-section')).toHaveCount(0)
 
-      const shortcuts = panel.getByRole('region', { name: language === 'zh' ? '快捷键说明' : 'Keyboard shortcuts' })
-      await shortcuts.scrollIntoViewIfNeeded()
-      await expect(shortcuts.locator('.shortcut-group')).toHaveCount(3)
-      await expect(shortcuts.locator('.shortcut-row')).toHaveCount(10)
-      await expect(shortcuts.locator('.shortcut-row dt')).toHaveText([
-        'Cmd / Ctrl+K', 'Cmd / Ctrl+R', 'Cmd / Ctrl+W', 'Cmd / Ctrl+Q', 'Esc',
-        '↑ / ↓', 'Enter', 'Tab', 'Enter', '↑ / ↓',
-      ])
-      await expect(shortcuts).toContainText(language === 'zh' ? 'macOS 使用 Cmd' : 'Use Cmd')
-      await expect(shortcuts.locator('.shortcut-row').nth(2)).toContainText(language === 'zh' ? '仅关闭当前 key' : 'Close only the current key')
-      await expect(shortcuts.locator('.shortcut-row').nth(3)).toContainText(language === 'zh' ? '无连接直接退出' : 'quit directly otherwise')
-      await expect(shortcuts.locator('.shortcut-row').last()).toContainText(language === 'zh' ? '浏览历史命令' : 'browse command history')
-      await expect(shortcuts).not.toContainText('settings.')
-      // Keycaps use separate light/dark palettes and stay inside the scrollable panel.
-      const keycap = shortcuts.locator('kbd').first()
-      expect(await keycap.evaluate(el => getComputedStyle(el).color)).toBe(theme === 'dark' ? 'rgb(226, 232, 240)' : 'rgb(51, 65, 85)')
-      expect(await panel.locator('.settings-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+      const titles = panel.locator('.settings-body .section-title')
+      await expect(titles.last()).toHaveText(language === 'zh' ? '软件说明' : 'Software guide')
+      await expect(titles.nth(await titles.count() - 2)).toHaveText(language === 'zh' ? '第三方平台数据导入' : 'Third-party platform import')
+
+      const softwareGuide = panel.getByRole('region', { name: language === 'zh' ? '软件说明' : 'Software guide' })
+      await expect(panel.locator('.settings-body > :last-child')).toHaveClass(/software-guide-section/)
+      await softwareGuide.scrollIntoViewIfNeeded()
+      const guideItems = softwareGuide.locator('.setting-item')
+      await expect(guideItems).toHaveCount(2)
+      await expect(guideItems.nth(0)).toContainText(language === 'zh' ? '版本新功能' : 'What’s new')
+      await expect(guideItems.nth(0)).toContainText(language === 'zh' ? '查看新功能' : 'View new features')
+      await expect(guideItems.nth(1)).toContainText(language === 'zh' ? '快捷键指示' : 'Keyboard shortcuts')
+      await expect(guideItems.nth(1)).toContainText(language === 'zh' ? '查看快捷键' : 'View shortcuts')
+      await expect(softwareGuide).not.toContainText('settings.')
+      await softwareGuide.getByRole('button', { name: language === 'zh' ? '查看新功能' : 'View new features' }).click()
+      await expect(page.locator('.wn-overlay')).toBeVisible()
+      await expect(page.locator('.wn-notes')).toContainText(language === 'zh' ? '软件说明' : 'Software guide')
+      await page.keyboard.press('Escape')
+      await expect(page.locator('.wn-overlay')).toHaveCount(0)
+      await expect(panel).toBeVisible()
 
       const thirdParty = panel.getByRole('region', { name: language === 'zh' ? '第三方平台数据导入' : 'Third-party platform import' })
       await thirdParty.scrollIntoViewIfNeeded()
@@ -102,11 +101,39 @@ for (const language of ['zh', 'en']) {
       await expect(thirdParty.locator('input[type=file]')).toHaveCount(0)
       await expect(thirdParty).not.toContainText('settings.')
       expect(await thirdParty.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+      expect(await panel.locator('.settings-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+
+      // Clicking "View shortcuts" switches into the secondary subpage inside settings.
+      await softwareGuide.getByRole('button', { name: language === 'zh' ? '查看快捷键' : 'View shortcuts' }).click()
+      await expect(panel.locator('.settings-body')).toBeHidden()
+      await expect(panel.locator('.settings-subpage-title')).toHaveText(language === 'zh' ? '快捷键说明' : 'Keyboard shortcuts')
+
+      const shortcuts = panel.getByRole('region', { name: language === 'zh' ? '快捷键说明' : 'Keyboard shortcuts' })
+      await expect(shortcuts).toBeVisible()
+      await expect(shortcuts.locator('.shortcut-group')).toHaveCount(3)
+      await expect(shortcuts.locator('.shortcut-row')).toHaveCount(10)
+      await expect(shortcuts.locator('.shortcut-row dt')).toHaveText([
+        'Cmd / Ctrl+K', 'Cmd / Ctrl+R', 'Cmd / Ctrl+W', 'Cmd / Ctrl+Q', 'Esc',
+        '↑ / ↓', 'Enter', 'Tab', 'Enter', '↑ / ↓',
+      ])
+      await expect(shortcuts).toContainText(language === 'zh' ? 'macOS 使用 Cmd' : 'Use Cmd')
+      await expect(shortcuts.locator('.shortcut-row').nth(2)).toContainText(language === 'zh' ? '仅关闭当前 key' : 'Close only the current key')
+      await expect(shortcuts.locator('.shortcut-row').nth(3)).toContainText(language === 'zh' ? '无连接直接退出' : 'quit directly otherwise')
+      await expect(shortcuts.locator('.shortcut-row').last()).toContainText(language === 'zh' ? '浏览历史命令' : 'browse command history')
+      await expect(shortcuts).not.toContainText('settings.')
+      // Keycaps use separate light/dark palettes and stay inside the scrollable subpage.
+      const keycap = shortcuts.locator('kbd').first()
+      expect(await keycap.evaluate(el => getComputedStyle(el).color)).toBe(theme === 'dark' ? 'rgb(226, 232, 240)' : 'rgb(51, 65, 85)')
+      expect(await panel.locator('.settings-subpage-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+
+      await panel.locator('.btn-subpage-back').click()
+      await expect(panel.locator('.shortcuts-section')).toHaveCount(0)
+      await expect(panel.locator('.settings-body')).toBeVisible()
     })
   }
 }
 
-test('developer API remains gated and appears after installation at the very bottom when unlocked', async ({ page }) => {
+test('developer API remains gated and appears after software guide at the very bottom when unlocked', async ({ page }) => {
   await openSettings(page)
   const panel = page.locator('.settings-panel')
   const title = panel.locator('.settings-title-trigger')
@@ -115,7 +142,7 @@ test('developer API remains gated and appears after installation at the very bot
   await title.click()
   const titles = panel.locator('.settings-body .section-title')
   await expect(titles.last()).toHaveText('开发者')
-  await expect(titles.nth(await titles.count() - 2)).toHaveText('安装说明')
+  await expect(titles.nth(await titles.count() - 2)).toHaveText('软件说明')
   await expect(titles.nth(await titles.count() - 3)).toHaveText('第三方平台数据导入')
   await expect(panel.locator('.settings-body > :last-child')).toHaveClass(/local-api-item/)
   const api = panel.locator('.local-api-item')
@@ -132,16 +159,34 @@ test('developer API remains gated and appears after installation at the very bot
   await page.reload()
   await page.locator('.btn-settings').click()
   await expect(page.locator('.local-api-item')).toHaveCount(0)
-  await expect(page.locator('.settings-body .section-title').last()).toHaveText('安装说明')
+  await expect(page.locator('.settings-body .section-title').last()).toHaveText('软件说明')
 })
 
-test('installation guide still opens and settings still closes with Escape', async ({ page }) => {
+test('release features, shortcuts subpage Escape return, and form draft preservation work together', async ({ page }) => {
   await openSettings(page)
-  await page.getByRole('button', { name: '查看安装说明' }).click()
-  await expect(page.locator('.guide-overlay')).toBeVisible()
-  await page.locator('.guide-close').click()
-  await expect(page.locator('.guide-overlay')).toHaveCount(0)
-  await expect(page.locator('.settings-panel')).toBeVisible()
+  const panel = page.locator('.settings-panel')
+  const proxyToggle = panel.locator('.setting-item').filter({ hasText: '启用代理' }).locator('input[type=checkbox]')
+  await proxyToggle.check()
+  await panel.locator('.proxy-url-input').fill('http://127.0.0.1:7890')
+
+  await page.getByRole('button', { name: '查看新功能' }).click()
+  await expect(page.locator('.wn-overlay')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.wn-overlay')).toHaveCount(0)
+
+  await page.getByRole('button', { name: '查看快捷键' }).click()
+  await expect(panel.locator('.settings-subpage-body')).toBeVisible()
+  // Escape exits the shortcuts subpage first instead of closing the whole settings modal.
+  await page.keyboard.press('Escape')
+  await expect(panel.locator('.settings-subpage-body')).toHaveCount(0)
+  await expect(panel.locator('.settings-body')).toBeVisible()
+  await expect(panel.locator('.proxy-url-input')).toHaveValue('http://127.0.0.1:7890')
+
+  // Footer back button in the shortcuts subpage also returns to main settings.
+  await page.getByRole('button', { name: '查看快捷键' }).click()
+  await panel.locator('.settings-footer').getByRole('button', { name: '返回设置' }).click()
+  await expect(panel.locator('.settings-body')).toBeVisible()
+
   await page.keyboard.press('Escape')
   await expect(page.locator('.settings-panel')).toHaveCount(0)
 })

@@ -5,6 +5,7 @@ import { useSettingsStore } from './settings.js'
 import { useConnectionsStore } from './connections.js'
 import { isConnectionErrorMessage, formatConnectionLostMessage } from '../utils/connection.js'
 import { confirmDiscardEdits, hasUnsavedEdits } from '../utils/editSafety.js'
+import { confirmProductionOperation } from '../utils/productionSafety.js'
 
 function ensureConnSearchEntry(entry) {
   if (Array.isArray(entry)) {
@@ -1033,17 +1034,22 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     async batchDeleteSelected() {
-      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
       const keys = [...this.selectedKeys]
       if (!keys.length || !this.activeConnID) return { success: false }
       const connID = this.activeConnID
+      const db = this.currentDB
+      const connection = useConnectionsStore().connections.find(item => item.id === connID)
+      if (!await confirmProductionOperation(connection, db, 'delete', keys.length)) return { success: false, cancelled: true }
+      if (connID !== this.activeConnID || db !== this.currentDB || JSON.stringify(keys) !== JSON.stringify(this.selectedKeys)) return { success: false, cancelled: true }
+      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
+      if (connID !== this.activeConnID || db !== this.currentDB || JSON.stringify(keys) !== JSON.stringify(this.selectedKeys)) return { success: false, cancelled: true }
       try {
         const result = await batchDeleteKeys(connID, keys)
         if (!result?.success) {
           useConnectionsStore().showGlobalToast(result?.message || 'Batch delete failed', false)
           return result || { success: false }
         }
-        if (connID !== this.activeConnID) return result
+        if (connID !== this.activeConnID || db !== this.currentDB) return result
         this._dropKeysFromSessions(keys)
         this.totalKeys = Math.max(0, (this.totalKeys || 0) - (result.affected || 0))
         this.selectedKeys = []
@@ -1055,17 +1061,22 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     async batchSetTTLSelected(ttlSec) {
-      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
       const keys = [...this.selectedKeys]
       if (!keys.length || !this.activeConnID) return { success: false }
       const connID = this.activeConnID
+      const db = this.currentDB
+      const connection = useConnectionsStore().connections.find(item => item.id === connID)
+      if (!await confirmProductionOperation(connection, db, 'ttl', keys.length)) return { success: false, cancelled: true }
+      if (connID !== this.activeConnID || db !== this.currentDB || JSON.stringify(keys) !== JSON.stringify(this.selectedKeys)) return { success: false, cancelled: true }
+      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
+      if (connID !== this.activeConnID || db !== this.currentDB || JSON.stringify(keys) !== JSON.stringify(this.selectedKeys)) return { success: false, cancelled: true }
       try {
         const result = await batchSetKeysTTL(connID, keys, ttlSec)
         if (!result?.success) {
           useConnectionsStore().showGlobalToast(result?.message || 'Batch TTL failed', false)
           return result || { success: false }
         }
-        if (connID !== this.activeConnID) return result
+        if (connID !== this.activeConnID || db !== this.currentDB) return result
         const nextTTL = ttlSec < 0 ? -1 : ttlSec
         const target = new Set(keys)
         this.searchSessions = this.searchSessions.map(session => {
@@ -1084,17 +1095,22 @@ export const useWorkspaceStore = defineStore('workspace', {
     },
 
     async batchRenameSelectedPrefix(oldPrefix, newPrefix) {
-      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
       const keys = [...this.selectedKeys]
       if (!keys.length || !this.activeConnID) return { success: false }
       const connID = this.activeConnID
+      const db = this.currentDB
+      const connection = useConnectionsStore().connections.find(item => item.id === connID)
+      if (!await confirmProductionOperation(connection, db, 'rename', keys.length)) return { success: false, cancelled: true }
+      if (connID !== this.activeConnID || db !== this.currentDB || JSON.stringify(keys) !== JSON.stringify(this.selectedKeys)) return { success: false, cancelled: true }
+      if (!await confirmDiscardEdits()) return { success: false, cancelled: true }
+      if (connID !== this.activeConnID || db !== this.currentDB || JSON.stringify(keys) !== JSON.stringify(this.selectedKeys)) return { success: false, cancelled: true }
       try {
         const result = await batchRenamePrefix(connID, keys, oldPrefix, newPrefix)
         if (!result?.success) {
           useConnectionsStore().showGlobalToast(result?.message || 'Batch rename failed', false)
           return result || { success: false }
         }
-        if (connID !== this.activeConnID) return result
+        if (connID !== this.activeConnID || db !== this.currentDB) return result
         this.selectedKeys = []
         // key 名称变了，重新拉一次当前搜索，保证列表与实际一致
         const pattern = this.activeSession?.pattern

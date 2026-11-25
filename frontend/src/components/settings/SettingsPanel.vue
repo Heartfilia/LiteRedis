@@ -1,11 +1,19 @@
 <template>
   <div class="settings-panel" :class="`theme-${settingsStore.themeMode || 'light'}`">
     <div class="settings-header">
-      <span class="settings-title-trigger" @click="handleTitleClick">⚙️ {{ t('settings.title') }}</span>
+      <div v-if="showShortcuts" class="settings-subpage-nav">
+        <button type="button" class="btn-subpage-back" @click="closeShortcuts">
+          <span class="subpage-back-arrow" aria-hidden="true">←</span>
+          <span>{{ t('settings.shortcutsBack') }}</span>
+        </button>
+        <span class="settings-subpage-sep" aria-hidden="true">/</span>
+        <span id="settings-shortcuts-title" class="settings-subpage-title">{{ t('settings.shortcuts') }}</span>
+      </div>
+      <span v-else class="settings-title-trigger" @click="handleTitleClick">⚙️ {{ t('settings.title') }}</span>
       <button class="btn-close" @click="$emit('close')">✕</button>
     </div>
 
-    <div class="settings-body">
+    <div v-show="!showShortcuts" class="settings-body">
       <div class="section-title">{{ t('settings.keyLoadCount') }}</div>
 
       <div class="setting-item">
@@ -150,13 +158,7 @@
 
       <div class="section-title mt">{{ t('settings.other') }}</div>
 
-      <div class="setting-item">
-        <label>
-          <span class="label-text">{{ t('settings.connectionTabs') }}</span>
-          <span class="label-hint">{{ t('settings.connectionTabsHint') }}</span>
-        </label>
-        <input v-model="form.connectionTabsEnabled" type="checkbox" class="check-input" />
-      </div>
+      <!-- 顶部连接 Tab 暂不开放，保留既有配置以便后续优化。 -->
 
       <div class="setting-item">
         <label>
@@ -347,25 +349,6 @@
         </div>
       </div>
 
-      <section class="shortcuts-section" aria-labelledby="settings-shortcuts-title">
-        <div id="settings-shortcuts-title" class="section-title mt">{{ t('settings.shortcuts') }}</div>
-        <p class="shortcuts-hint label-hint">{{ t('settings.shortcutsHint') }}</p>
-        <div v-for="group in shortcutGroups" :key="group.title" class="shortcut-group">
-          <h3 class="shortcut-group-title label-text">{{ t(`settings.${group.title}`) }}</h3>
-          <dl class="shortcut-list">
-            <div v-for="shortcut in group.items" :key="shortcut.description" class="shortcut-row">
-              <dt class="shortcut-keys">
-                <template v-for="(key, index) in shortcut.keys" :key="index">
-                  <span v-if="index" class="shortcut-separator" aria-hidden="true">+</span>
-                  <kbd>{{ key }}</kbd>
-                </template>
-              </dt>
-              <dd>{{ t(`settings.${shortcut.description}`) }}</dd>
-            </div>
-          </dl>
-        </div>
-      </section>
-
       <section class="third-party-import-section" aria-labelledby="settings-third-party-import-title">
         <div id="settings-third-party-import-title" class="section-title mt">{{ t('settings.thirdPartyImport') }}</div>
         <p class="label-hint third-party-import-hint">{{ t('settings.thirdPartyImportHint') }}</p>
@@ -401,18 +384,31 @@
         </div>
       </section>
 
-      <div class="section-title mt">{{ t('settings.installGuide') }}</div>
-      <div class="setting-item">
-        <label>
-          <span class="label-text">{{ t('settings.installGuide') }}</span>
-          <span class="label-hint">{{ t('settings.installGuideEntry') }}</span>
-        </label>
-        <div class="input-unit">
-          <button type="button" class="local-api-btn" @click="showGuide = true">
-            {{ t('settings.installGuideOpen') }}
-          </button>
+      <section class="software-guide-section" aria-labelledby="settings-software-guide-title">
+        <div id="settings-software-guide-title" class="section-title mt">{{ t('settings.softwareGuide') }}</div>
+        <div class="setting-item">
+          <label>
+            <span class="label-text">{{ t('settings.releaseFeatures') }}</span>
+            <span class="label-hint">{{ t('settings.releaseFeaturesHint') }}</span>
+          </label>
+          <div class="input-unit">
+            <button type="button" class="local-api-btn" @click="showFeatures = true">
+              {{ t('settings.releaseFeaturesOpen') }}
+            </button>
+          </div>
         </div>
-      </div>
+        <div class="setting-item">
+          <label>
+            <span class="label-text">{{ t('settings.shortcutGuide') }}</span>
+            <span class="label-hint">{{ t('settings.shortcutGuideEntry') }}</span>
+          </label>
+          <div class="input-unit">
+            <button type="button" class="local-api-btn" @click="openShortcuts">
+              {{ t('settings.shortcutsOpen') }}
+            </button>
+          </div>
+        </div>
+      </section>
 
       <template v-if="settingsStore.debugMode">
         <div class="section-title mt">{{ t('settings.developer') }}</div>
@@ -480,7 +476,33 @@
       </template>
     </div>
 
-    <InstallGuideModal v-if="showGuide" @close="showGuide = false" />
+    <div v-if="showShortcuts" class="settings-subpage-body">
+      <section class="shortcuts-section" aria-labelledby="settings-shortcuts-title">
+        <p class="shortcuts-hint label-hint">{{ t('settings.shortcutsHint') }}</p>
+        <div v-for="group in shortcutGroups" :key="group.title" class="shortcut-group">
+          <h3 class="shortcut-group-title label-text">{{ t(`settings.${group.title}`) }}</h3>
+          <dl class="shortcut-list">
+            <div v-for="shortcut in group.items" :key="shortcut.description" class="shortcut-row">
+              <dt class="shortcut-keys">
+                <template v-for="(key, index) in shortcut.keys" :key="index">
+                  <span v-if="index" class="shortcut-separator" aria-hidden="true">+</span>
+                  <kbd>{{ key }}</kbd>
+                </template>
+              </dt>
+              <dd>{{ t(`settings.${shortcut.description}`) }}</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+    </div>
+
+    <WhatsNewModal
+      v-if="showFeatures"
+      :version="(featureNotes?.version || appVersion).replace(/^v/i, '')"
+      :body="featureNotes?.body || t('settings.releaseFeaturesMissing')"
+      :url="featureNotes?.url || ''"
+      @close="showFeatures = false"
+    />
 
     <!-- floating toast -->
     <Teleport to="body">
@@ -513,7 +535,10 @@
               : (updateStore.hasUpdate ? t('settings.updateNow') : `${t('settings.version')} ${appVersion}`)) }}
         </button>
       </div>
-      <div class="footer-actions">
+      <div v-if="showShortcuts" class="footer-actions">
+        <button type="button" class="btn-close-modal" @click="closeShortcuts">{{ t('settings.shortcutsBack') }}</button>
+      </div>
+      <div v-else class="footer-actions">
         <button class="btn-cancel" @click="reset">{{ t('settings.reset') }}</button>
         <button class="btn-close-modal" @click="$emit('close')">{{ t('settings.close') }}</button>
         <button class="btn-save" :class="{ 'success-flash': saveFlashing, 'error-flash': errorFlashing }" :disabled="saving" @click="doSave">{{ saving ? t('settings.applying') : t('settings.apply') }}</button>
@@ -523,11 +548,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onBeforeUnmount, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useUpdateStore } from '../../stores/update.js'
-import InstallGuideModal from '../common/InstallGuideModal.vue'
+import WhatsNewModal from '../common/WhatsNewModal.vue'
+import { getLocalReleaseNotes } from '../../utils/releaseNotes.js'
 import { useI18n } from '../../i18n/index.js'
+import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { getAppVersion, getLocalAPIInfo, regenerateLocalAPIToken, exportConnectionsToFile, importConnectionsFromFile, previewThirdPartyImport, applyThirdPartyImport, cancelThirdPartyImport } from '../../api/wails.js'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { refreshLocalAPIRuntime } from '../../services/browserExtract.js'
@@ -537,7 +564,7 @@ import { askConfirmation } from '../../utils/confirm.js'
 import { appProxyUrlOrDefault, DEFAULT_UPDATE_PROXY_URL } from '../../utils/appProxy.js'
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime.js'
 
-const { t, setLanguage } = useI18n()
+const { t, lang, setLanguage } = useI18n()
 
 const settingsStore = useSettingsStore()
 
@@ -591,7 +618,30 @@ const saving = ref(false)
 function openDiagnostics() {
   window.dispatchEvent(new CustomEvent('literedis:open-diagnostics'))
 }
-const showGuide = ref(false)
+const showFeatures = ref(false)
+const featureNotes = computed(() => getLocalReleaseNotes(appVersion.value, lang.value))
+const showShortcuts = ref(false)
+let disposeShortcutsEscape = null
+
+function openShortcuts() {
+  showShortcuts.value = true
+}
+
+function closeShortcuts() {
+  showShortcuts.value = false
+}
+
+watch(showShortcuts, (visible) => {
+  if (disposeShortcutsEscape) {
+    disposeShortcutsEscape()
+    disposeShortcutsEscape = null
+  }
+  if (visible) {
+    disposeShortcutsEscape = registerEscapeHandler(() => {
+      showShortcuts.value = false
+    })
+  }
+})
 const exportConfirming = ref(false)
 const importing = ref(false)
 const thirdPartyImporting = ref('')
@@ -636,6 +686,10 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  if (disposeShortcutsEscape) {
+    disposeShortcutsEscape()
+    disposeShortcutsEscape = null
+  }
   if (regenTimer) clearTimeout(regenTimer)
   requestGuard.invalidateAll()
   if (titleTapTimer) clearTimeout(titleTapTimer)
@@ -1086,6 +1140,56 @@ function openGitHub() {
   user-select: none;
   letter-spacing: 0.01em;
 }
+.settings-subpage-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.btn-subpage-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.86);
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--motion-fast), border-color var(--motion-fast), background var(--motion-fast), transform var(--motion-fast);
+}
+.btn-subpage-back:hover {
+  color: #2563eb;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+.btn-subpage-back:focus-visible {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
+}
+.subpage-back-arrow {
+  font-size: 13px;
+  line-height: 1;
+}
+.settings-subpage-sep {
+  color: #cbd5e1;
+  font-weight: 400;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.settings-subpage-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .btn-close {
   background: rgba(255,255,255,0.76);
   border: 1px solid rgba(226,232,240,0.9);
@@ -1101,7 +1205,8 @@ function openGitHub() {
 }
 .btn-close:hover { color: #dc2626; border-color: #fca5a5; background: #fff1f2; transform: translateY(-1px); }
 
-.settings-body {
+.settings-body,
+.settings-subpage-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -1131,7 +1236,15 @@ function openGitHub() {
 .third-party-import-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; }
 .third-party-import-btn:disabled { opacity: .65; cursor: not-allowed; }
 .shortcuts-hint { margin: 0 0 12px; }
-.shortcut-group { margin-bottom: 14px; }
+.shortcut-group {
+  padding: 12px 14px 4px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 6px 18px rgba(148, 163, 184, 0.06);
+}
+.shortcut-group:last-child { margin-bottom: 0; }
 .shortcut-group-title { margin: 0 0 6px; }
 .shortcut-list { margin: 0; }
 .shortcut-row {
@@ -1142,6 +1255,7 @@ function openGitHub() {
   padding: 9px 0;
   border-bottom: 1px solid rgba(226, 232, 240, 0.88);
 }
+.shortcut-row:last-child { border-bottom: none; }
 .shortcut-keys { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .shortcut-keys kbd {
   padding: 3px 6px;
@@ -1157,6 +1271,11 @@ function openGitHub() {
 .shortcut-row dd { margin: 0; color: #475569; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 @media (max-width: 480px) {
   .shortcut-row { grid-template-columns: 1fr; gap: 6px; }
+}
+.settings-panel.theme-dark .shortcut-group {
+  border-color: rgba(51, 65, 85, 0.88);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 8px 18px rgba(2, 6, 23, 0.18);
 }
 .settings-panel.theme-dark .shortcut-row { border-bottom-color: rgba(51, 65, 85, 0.88); }
 .settings-panel.theme-dark .shortcut-keys kbd { background: #1e293b; color: #e2e8f0; border-color: #475569; }
@@ -1575,6 +1694,22 @@ function openGitHub() {
   color: #e2e8f0;
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.92));
 }
+.settings-panel.theme-dark .btn-subpage-back {
+  background: rgba(15, 23, 42, 0.92);
+  border-color: rgba(71, 85, 105, 0.96);
+  color: #cbd5e1;
+}
+.settings-panel.theme-dark .btn-subpage-back:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: #60a5fa;
+  color: #eff6ff;
+}
+.settings-panel.theme-dark .settings-subpage-sep {
+  color: #475569;
+}
+.settings-panel.theme-dark .settings-subpage-title {
+  color: #e2e8f0;
+}
 
 .settings-panel.theme-dark .btn-close {
   background: rgba(15, 23, 42, 0.9);
@@ -1673,6 +1808,7 @@ function openGitHub() {
 
 /* 按下时回落到原位，避免只有抬起没有按下反馈 */
 .btn-close:active:not(:disabled),
+.btn-subpage-back:active:not(:disabled),
 .btn-save:active:not(:disabled),
 .btn-cancel:active:not(:disabled),
 .git-link:active:not(:disabled),

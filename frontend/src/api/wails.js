@@ -144,3 +144,12 @@ export const cancelThirdPartyImport = (token) => callGo('CancelThirdPartyImport'
 // ===== 诊断 =====
 export const getDiagnostics = () => callGo('GetDiagnostics')
 export const exportDebugLog = () => callGo('ExportDebugLog')
+
+export const getEditConflict = (connID, db, key, field, isHash) => callGo('GetEditConflict', connID, db, key, field, isHash)
+
+export const getStringRangePreview = (connID, db, key, offset) => callGo('GetStringRangePreview', connID, db, key, offset)
+
+export const diagnoseConnection = (cfg) => callGo('DiagnoseConnection', cfg)
+
+export const diagnoseConnectionWithID = (requestID, cfg) => callGo('DiagnoseConnectionWithID', requestID, cfg)
+export const cancelConnectionDiagnosis = (requestID) => callGo('CancelConnectionDiagnosis', requestID)

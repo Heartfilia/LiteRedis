@@ -74,6 +74,19 @@ func ImportConfiguration(in []ConnectionConfig, profiles []SSHProfile) (ImportSu
 		return summary, nil
 	}
 
+	// Validate the entire batch before processing profiles/connections. Do not
+	// mutate the caller's slice, or silently strip an unknown environment label.
+	normalized := make([]ConnectionConfig, len(in))
+	copy(normalized, in)
+	for i := range normalized {
+		environment, err := NormalizeConnectionEnvironment(normalized[i].Environment)
+		if err != nil {
+			return summary, fmt.Errorf("导入连接 %d：%w", i+1, err)
+		}
+		normalized[i].Environment = environment
+	}
+	in = normalized
+
 	storeMu.Lock()
 	defer storeMu.Unlock()
 

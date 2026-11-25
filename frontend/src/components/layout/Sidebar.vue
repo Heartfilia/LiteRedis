@@ -85,6 +85,7 @@
               </span>
             </span>
             <span :class="['conn-dot', connectionStateClass(conn.id)]" />
+            <EnvironmentBadge :environment="conn.environment" />
               <span class="conn-name">
                 <svg
                   v-if="isReadOnlyConn(conn)"
@@ -197,6 +198,7 @@
               </span>
             </span>
                 <span :class="['conn-dot', connectionStateClass(conn.id)]" />
+            <EnvironmentBadge :environment="conn.environment" />
                 <span class="conn-name">
                   <svg
                     v-if="isReadOnlyConn(conn)"
@@ -450,6 +452,7 @@
 </template>
 
 <script setup>
+import EnvironmentBadge from '../common/EnvironmentBadge.vue'
 import { computed, ref, inject, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useConnectionsStore } from '../../stores/connections.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'

@@ -30,6 +30,17 @@
         </div>
       </div>
 
+      <div class="form-group">
+        <label for="connection-environment">{{ t('environment.label') }}</label>
+        <select id="connection-environment" v-model="form.environment" class="environment-select" aria-describedby="connection-environment-hint">
+          <option value="">{{ t('environment.unspecified') }}</option>
+          <option value="development">{{ t('environment.development') }}</option>
+          <option value="staging">{{ t('environment.staging') }}</option>
+          <option value="production">{{ t('environment.production') }}</option>
+        </select>
+        <div id="connection-environment-hint" class="field-hint">{{ t('environment.hint') }}</div>
+      </div>
+
       <div class="form-group toggle-row">
         <label>{{ t('connManager.clusterMode') }}</label>
         <input type="checkbox" v-model="form.isCluster" />
@@ -205,6 +216,7 @@
           <div class="field-hint">Leave empty to use the default connection color.</div>
         </div>
       </div>
+      <ConnectionDiagnosis :config="{ ...buildCfg(), ssh: form.sshEnabled ? selectedSSHProfile?.ssh || null : null }" />
     </div>
 
     <div class="form-actions">
@@ -232,6 +244,7 @@ import { useI18n } from '../../i18n/index.js'
 import { formatDebugMessage } from '../../utils/debug.js'
 import { connectionIconCompact, connectionIconLines, normalizeIconText } from '../../utils/iconText.js'
 import { useSSHProfilesStore } from '../../stores/sshProfiles.js'
+import ConnectionDiagnosis from './ConnectionDiagnosis.vue'
 const props = defineProps({
   connection: { type: Object, default: null },
   createdSSHProfileId: { type: String, default: '' },
@@ -260,6 +273,7 @@ const defaultForm = () => ({
   name: '',
   sort_order: 0,
   group: '',
+  environment: '',
   host: '127.0.0.1',
   port: 6379,
   username: '',
@@ -317,6 +331,7 @@ function snapshotValue() {
     id: form.id || '',
     name: form.name || '',
     group: form.group || '',
+    environment: form.environment || '',
     host: form.host || '',
     port: form.port || 6379,
     username: form.username || '',
@@ -364,6 +379,7 @@ watch(() => props.connection, (conn) => {
       ...defaultForm(),
       ...conn,
       group: conn.group || '',
+      environment: conn.environment || '',
       isCluster: conn.isCluster ?? conn.is_cluster,
       username: conn.username || '',
       tlsEnabled: conn.tlsEnabled ?? conn.tls_enabled ?? false,
@@ -444,6 +460,7 @@ function buildCfg() {
     name: form.name,
     sort_order: form.sort_order || 0,
     group: form.group || '',
+    environment: form.environment || '',
     host: form.host,
     port: form.port || 6379,
     username: (form.username || '').trim(),
@@ -568,12 +585,13 @@ h3 {
 }
 .form-group { margin-bottom: 12px; position: relative; }
 .form-group label { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; font-weight: 500; }
-input[type=text], input[type=password], input[type=number], textarea, .ssh-panel select {
+input[type=text], input[type=password], input[type=number], textarea, .ssh-panel select, .environment-select {
   width: 100%; padding: 6px 9px; border: 1px solid #d1d5db; border-radius: var(--radius-sm);
   font-size: 13px; box-sizing: border-box; outline: none; color: #1f2937;
   transition: border-color var(--motion-base);
 }
-input:focus, textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.12); }
+.environment-select { background-color: #fff; cursor: pointer; }
+input:focus, textarea:focus, .environment-select:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.12); }
 textarea { resize: vertical; font-family: monospace; }
 .group-suggestions {
   position: absolute;
@@ -793,7 +811,8 @@ textarea { resize: vertical; font-family: monospace; }
 .connection-form.theme-dark input[type=text],
 .connection-form.theme-dark input[type=password],
 .connection-form.theme-dark input[type=number],
-.connection-form.theme-dark textarea {
+.connection-form.theme-dark textarea,
+.connection-form.theme-dark .environment-select {
   background: rgba(15, 23, 42, 0.94);
   color: #e2e8f0;
   border-color: rgba(71, 85, 105, 0.96);

@@ -18,6 +18,10 @@ export function BatchSetKeysTTL(arg1, arg2, arg3) {
   return window['go']['main']['App']['BatchSetKeysTTL'](arg1, arg2, arg3);
 }
 
+export function CancelConnectionDiagnosis(arg1) {
+  return window['go']['main']['App']['CancelConnectionDiagnosis'](arg1);
+}
+
 export function CancelKeyExport() {
   return window['go']['main']['App']['CancelKeyExport']();
 }
@@ -82,6 +86,14 @@ export function DeleteSSHProfile(arg1) {
   return window['go']['main']['App']['DeleteSSHProfile'](arg1);
 }
 
+export function DiagnoseConnection(arg1) {
+  return window['go']['main']['App']['DiagnoseConnection'](arg1);
+}
+
+export function DiagnoseConnectionWithID(arg1, arg2) {
+  return window['go']['main']['App']['DiagnoseConnectionWithID'](arg1, arg2);
+}
+
 export function Disconnect(arg1) {
   return window['go']['main']['App']['Disconnect'](arg1);
 }
@@ -138,6 +150,10 @@ export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
 }
 
+export function GetEditConflict(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['GetEditConflict'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function GetKeyInfo(arg1, arg2) {
   return window['go']['main']['App']['GetKeyInfo'](arg1, arg2);
 }
@@ -160,6 +176,10 @@ export function GetSettings() {
 
 export function GetSlowLog(arg1, arg2) {
   return window['go']['main']['App']['GetSlowLog'](arg1, arg2);
+}
+
+export function GetStringRangePreview(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetStringRangePreview'](arg1, arg2, arg3, arg4);
 }
 
 export function GetValue(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {

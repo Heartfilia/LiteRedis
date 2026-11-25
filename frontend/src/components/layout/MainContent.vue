@@ -1,6 +1,6 @@
 <template>
   <div ref="mainContentRef" class="main-content" :class="`theme-${settingsStore.themeMode || 'light'}`">
-    <ConnectionTabs v-if="settingsStore.connectionTabsEnabled" />
+    <!-- 顶部连接 Tab 暂不开放，连接仍从侧栏切换。 -->
     <div class="main-body">
     <div class="key-tree-panel" :style="{ width: panelWidth + 'px' }">
       <KeyTree />
@@ -27,7 +27,6 @@
 import { computed, ref } from 'vue'
 import KeyTree from '../keys/KeyTree.vue'
 import KeyEditor from '../editor/KeyEditor.vue'
-import ConnectionTabs from './ConnectionTabs.vue'
 import { useSettingsStore } from '../../stores/settings.js'
 
 const MIN_WIDTH = 250

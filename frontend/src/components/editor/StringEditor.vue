@@ -5,7 +5,10 @@
     <div v-if="readOnlyPreview && !props.keyValue?.truncated" class="truncated-hint">{{ t('reliability.previewReadOnly') }}</div>
     <JsonViewer v-if="treeMode" :data="treeData" />
     <textarea v-else v-model="localVal" rows="10" :disabled="saving" :readonly="readOnlyPreview || readOnlyConnection" />
+    <StringRangePreview v-if="props.keyValue?.truncated" :key-name="props.keyValue.key" />
+    <ConflictComparison v-if="comparisonSnapshot" :snapshot="comparisonSnapshot" @close="comparisonSnapshot = null" />
     <div class="editor-actions">
+      <button v-if="conflictSnapshot" class="btn-action" @click="comparisonSnapshot = { ...conflictSnapshot, draft: localVal }">{{ t('conflict.open') }}</button>
       <button
         class="btn-action btn-json"
         :class="{ active: formatApplied }"
@@ -54,6 +57,8 @@ import { formatJsonLossless, parseJsonLossless } from '../../utils/losslessJson.
 import { registerEditorGuard, editResultMessage } from '../../utils/editSafety.js'
 import FloatingMessage from '../common/FloatingMessage.vue'
 import JsonViewer from '../common/JsonViewer.vue'
+import ConflictComparison from './ConflictComparison.vue'
+import StringRangePreview from './StringRangePreview.vue'
 import './editorShared.css'
 
 const props = defineProps({ keyValue: Object })
@@ -84,6 +89,12 @@ const readOnlyPreview = computed(() => !!(props.keyValue?.truncated || props.key
 const readOnlyConnection = computed(() => connectionsStore.isReadOnly(workspaceStore.activeConnID))
 const editToken = ref(props.keyValue?.edit_token || '')
 const outcomeUnknown = ref(false)
+const conflictSnapshot = ref(null)
+const comparisonSnapshot = ref(null)
+watch(() => [workspaceStore.activeConnID, workspaceStore.currentDB, props.keyValue?.key], () => {
+  conflictSnapshot.value = null
+  comparisonSnapshot.value = null
+}, { flush: 'sync' })
 const unregisterEditor = registerEditorGuard(Symbol('string'), () => ({ dirty: isDirty.value && !readOnlyPreview.value, saving: saving.value, discard: () => { localVal.value = originalVal.value } }))
 onBeforeUnmount(unregisterEditor)
 let saveFlashTimer = null
@@ -124,6 +135,8 @@ watch(() => props.keyValue, (kv) => {
   originalVal.value = kv?.string_val || ''
   editToken.value = kv?.edit_token || ''
   outcomeUnknown.value = false
+  conflictSnapshot.value = null
+  comparisonSnapshot.value = null
   formatApplied.value = false
   treeMode.value = false
   treeData.value = null
@@ -229,6 +242,10 @@ async function save() {
   try {
     const result = await setStringChecked(request.context.connID, request.context.db, request.context.key, value, editToken.value)
     if (!requestGuard.isCurrent(request)) return
+    conflictSnapshot.value = result.code === 'conflict'
+      ? { ...request.context, original: originalVal.value, draft: value, isHash: false }
+      : null
+    comparisonSnapshot.value = null
     outcomeUnknown.value = ['outcome_unknown', 'partial_possible'].includes(result.code)
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.saveSuccess') : editResultMessage(result)

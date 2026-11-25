@@ -139,6 +139,13 @@ func backupCorruptStore(data []byte) (string, error) {
 
 // saveStore 写入磁盘（不加锁，调用方负责）
 func saveStore(store *ConfigStore) error {
+	for i := range store.Connections {
+		environment, err := NormalizeConnectionEnvironment(store.Connections[i].Environment)
+		if err != nil {
+			return err
+		}
+		store.Connections[i].Environment = environment
+	}
 	ensureConnectionOrder(store)
 	ensureSSHProfiles(store)
 	data, err := json.MarshalIndent(store, "", "  ")
@@ -203,8 +210,26 @@ func normalizeIconText(value string) string {
 	return string(runes)
 }
 
+// NormalizeConnectionEnvironment 规范化环境标签；未知标签返回错误，不能静默丢弃生产环境标记。
+// 空标签兼容旧配置；该标签不改变 ReadOnly 保护模式。
+func NormalizeConnectionEnvironment(value string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	switch normalized {
+	case "", "development", "staging", "production":
+		return normalized, nil
+	default:
+		return "", fmt.Errorf("无效的连接环境 %q：仅支持 development、staging、production 或留空", value)
+	}
+}
+
 // SaveConnection 新建（ID为空）或更新连接配置
 func SaveConnection(cfg ConnectionConfig) (ConnectionConfig, error) {
+	environment, err := NormalizeConnectionEnvironment(cfg.Environment)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Environment = environment
+
 	storeMu.Lock()
 	defer storeMu.Unlock()
 

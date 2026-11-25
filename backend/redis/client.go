@@ -251,6 +251,7 @@ func (m *ClientManager) NewReadClientForDB(id string, db int) (redis.UniversalCl
 	// 复用实际拨号选项，保留 SSH/代理/TLS/ACL，但不与主界面共用连接池。
 	opts := *single.Options()
 	opts.DB = db
+	opts.ContextTimeoutEnabled = true // 独立操作遵循调用方 deadline。
 	opts.PoolSize = 2
 	opts.MinIdleConns = 0
 	opts.MaxIdleConns = 2
@@ -276,6 +277,7 @@ func (m *ClientManager) NewOperationClientForDB(id string, db int) (redis.Univer
 		return client, release, nil
 	}
 	opts := *cluster.Options()
+	opts.ContextTimeoutEnabled = true
 	opts.MaxRetries = -1
 	opts.MaxRedirects = -1
 	opts.PoolSize, opts.MinIdleConns, opts.MaxIdleConns, opts.MaxActiveConns = 2, 0, 2, 2

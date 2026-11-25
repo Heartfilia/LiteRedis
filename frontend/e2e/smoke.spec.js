@@ -208,25 +208,16 @@ test('keyboard navigation keeps working inside the window', async ({ page }) => 
   expect(inViewport).toBe(true)
 })
 
-test('reorders tabs by dragging and closes them with the middle click', async ({ page }) => {
+test('connection tabs remain hidden even when a saved setting enables them', async ({ page }) => {
   await installWailsMock(page, { keyCount: 200, tabs: true })
   await page.goto('/')
   await page.locator('.conn-item .conn-main').first().click()
   await page.locator('.conn-item .conn-main').nth(1).click()
-
-  const tabs = page.locator('.conn-tab')
-  await expect(tabs).toHaveCount(2)
-  expect(await tabs.nth(0).innerText()).toContain('dev')
-
-  const target = await tabs.nth(1).boundingBox()
-  await tabs.nth(0).dragTo(tabs.nth(1), {
-    targetPosition: { x: Math.max(10, target.width - 6), y: target.height / 2 },
-  })
-  await expect(tabs.nth(0)).toContainText('prod-backup')
-  await expect(tabs.nth(1)).toContainText('dev')
-
-  await tabs.nth(0).click({ button: 'middle' })
-  await expect(page.locator('.conn-tab')).toHaveCount(1)
+  await expect(page.locator('.conn-tab')).toHaveCount(0)
+  await expect(page.locator('.conn-item.active .conn-name')).toContainText('prod-backup')
+  await page.locator('.btn-settings').click()
+  await expect(page.locator('.settings-panel')).toBeVisible()
+  await expect(page.locator('.settings-panel')).not.toContainText('顶部Tab')
 })
 
 test('console completes command names, subcommands and keywords', async ({ page }) => {

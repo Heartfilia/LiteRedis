@@ -53,6 +53,7 @@
         </div>
         <div class="expand-body">
           <div v-if="saveMessage" role="status">{{ saveMessage }}</div>
+          <slot name="save-extra" :draft="localContent" />
           <JsonViewer v-if="treeMode" :data="treeData" />
           <textarea
             v-else-if="editable"

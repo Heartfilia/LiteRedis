@@ -312,7 +312,13 @@
       </span>
     </div>
 
-    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :save-blocked="outcomeUnknown" :save-message="expandSaveMessage" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal" />
+    <button v-if="conflictSnapshot && conflictSnapshot.source !== 'modal'" class="btn-tiny" @click="openComparison()">{{ t('conflict.open') }}</button>
+    <ConflictComparison v-if="comparisonSnapshot" :snapshot="comparisonSnapshot" @close="comparisonSnapshot = null" />
+    <ExpandModal :show="expandShow" :title="expandTitle" :content="expandContent" :editable="expandEditable" :saving="expandSaving" :save-blocked="outcomeUnknown" :save-message="expandSaveMessage" :anchor="expandAnchor" @close="expandShow = false" @save="saveFromModal">
+      <template #save-extra="{ draft }">
+        <button v-if="conflictSnapshot?.source === 'modal'" class="btn-tiny" @click="openComparison(draft)">{{ t('conflict.open') }}</button>
+      </template>
+    </ExpandModal>
     <ExtractMenu
       :visible="extractMenu.visible"
       :x="extractMenu.x"
@@ -338,6 +344,7 @@ import { createRequestGuard } from '../../utils/requestGuard.js'
 import { hSetChecked, hDel, searchValue, getValue } from '../../api/wails.js'
 import { editResultMessage, registerEditorGuard } from '../../utils/editSafety.js'
 import ExpandModal from './ExpandModal.vue'
+import ConflictComparison from './ConflictComparison.vue'
 import InlineDeleteConfirm from '../common/InlineDeleteConfirm.vue'
 import FloatingMessage from '../common/FloatingMessage.vue'
 import ExtractMenu from '../common/ExtractMenu.vue'
@@ -464,6 +471,26 @@ const expandSaving = ref(false)
 const expandSaveMessage = ref('')
 const expandAnchor = ref(null)
 const editModalField = ref('')
+const conflictSnapshot = ref(null)
+const comparisonSnapshot = ref(null)
+function clearConflict() {
+  conflictSnapshot.value = null
+  comparisonSnapshot.value = null
+}
+function recordConflict(result, request, field, original, draft, source, originalExists = true) {
+  comparisonSnapshot.value = null
+  conflictSnapshot.value = result.code === 'conflict'
+    ? { ...request.context, field, original, draft, source, originalExists, isHash: true }
+    : null
+}
+function openComparison(draft) {
+  const snapshot = conflictSnapshot.value
+  if (!snapshot) return
+  comparisonSnapshot.value = { ...snapshot, draft: draft ?? (snapshot.source === 'inline' ? editValue.value : newValue.value) }
+}
+watch(() => [workspaceStore.activeConnID, workspaceStore.currentDB, props.keyValue?.key], clearConflict, { flush: 'sync' })
+let editGeneration = 0
+watch([expandShow, editModalField, editingField, newField, showAdd], () => { editGeneration++; clearConflict() }, { flush: 'sync' })
 
 // 服务端分页状态
 const hasMore = ref(false)
@@ -597,6 +624,7 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.keyValue, (kv) => {
+  clearConflict()
   outcomeUnknown.value = false
   requestGuard.invalidateAll()
   persistSearchState(lastKey.value)
@@ -1207,12 +1235,15 @@ function openEdit(field, val, event) {
 async function saveFromModal(newVal) {
   const field = editModalField.value
   if (expandSaving.value || outcomeUnknown.value || connectionsStore.isReadOnly(workspaceStore.activeConnID)) return
+  const generation = editGeneration
   const request = requestGuard.begin(`write:modal:${field}`)
   expandSaveMessage.value = ''
   expandSaving.value = true
   try {
-    const result = await hSetChecked(request.context.connID, request.context.db, request.context.key, field, newVal, expandContent.value, true)
-    if (!requestGuard.isCurrent(request)) return
+    const original = expandContent.value
+    const result = await hSetChecked(request.context.connID, request.context.db, request.context.key, field, newVal, original, true)
+    if (!requestGuard.isCurrent(request) || generation !== editGeneration || !expandShow.value || editModalField.value !== field) return
+    recordConflict(result, request, field, original, newVal, 'modal')
     outcomeUnknown.value = ['outcome_unknown', 'partial_possible'].includes(result.code)
     ok.value = result.success
     msg.value = result.success ? '' : editResultMessage(result)
@@ -1226,7 +1257,7 @@ async function saveFromModal(newVal) {
       expandShow.value = false
     }
   } catch (e) {
-    if (requestGuard.isCurrent(request)) {
+    if (requestGuard.isCurrent(request) && generation === editGeneration) {
       outcomeUnknown.value = true
       ok.value = false
       msg.value = t('reliability.outcomeUnknown')
@@ -1247,11 +1278,14 @@ async function copyVal(val, field) {
 async function saveEdit(field) {
   if (editingField.value !== field || fieldSaving.value || outcomeUnknown.value || connectionsStore.isReadOnly(workspaceStore.activeConnID)) return
   const nextValue = editValue.value
+  const generation = editGeneration
   const request = requestGuard.begin(`write:field:${field}`)
   fieldSaving.value = true
   try {
-    const result = await hSetChecked(request.context.connID, request.context.db, request.context.key, field, nextValue, rawHashVal.value[field], true)
-    if (!requestGuard.isCurrent(request)) return
+    const original = rawHashVal.value[field]
+    const result = await hSetChecked(request.context.connID, request.context.db, request.context.key, field, nextValue, original, true)
+    if (!requestGuard.isCurrent(request) || generation !== editGeneration || editingField.value !== field) return
+    recordConflict(result, request, field, original, nextValue, 'inline')
     outcomeUnknown.value = ['outcome_unknown', 'partial_possible'].includes(result.code)
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.updated') : editResultMessage(result)
@@ -1263,7 +1297,7 @@ async function saveEdit(field) {
       }
     }
   } catch(e) {
-    if (requestGuard.isCurrent(request)) {
+    if (requestGuard.isCurrent(request) && generation === editGeneration) {
       outcomeUnknown.value = true
       ok.value = false
       msg.value = t('reliability.outcomeUnknown')
@@ -1305,12 +1339,14 @@ async function addField() {
   if (!newField.value.trim() || fieldSaving.value || outcomeUnknown.value || connectionsStore.isReadOnly(workspaceStore.activeConnID)) return
   const field = newField.value.trim()
   const value = newValue.value
+  const generation = editGeneration
   const request = requestGuard.begin(`write:add:${field}`)
   fieldSaving.value = true
   try {
     const existed = Object.prototype.hasOwnProperty.call(rawHashVal.value, field)
     const result = await hSetChecked(request.context.connID, request.context.db, request.context.key, field, value, '', false)
-    if (!requestGuard.isCurrent(request)) return
+    if (!requestGuard.isCurrent(request) || generation !== editGeneration || newField.value.trim() !== field) return
+    recordConflict(result, request, field, '', value, 'add', false)
     outcomeUnknown.value = ['outcome_unknown', 'partial_possible'].includes(result.code)
     ok.value = result.success
     msg.value = result.success ? t('keyEditor.added') : editResultMessage(result)
@@ -1323,7 +1359,7 @@ async function addField() {
       triggerAddFlash()
     }
   } catch(e) {
-    if (requestGuard.isCurrent(request)) {
+    if (requestGuard.isCurrent(request) && generation === editGeneration) {
       outcomeUnknown.value = true
       ok.value = false
       msg.value = t('reliability.outcomeUnknown')

@@ -49,6 +49,7 @@
               </div>
             </div>
 
+            <details class="console-templates"><summary>{{ t('template.title') }}</summary><CommandTemplates :connID="props.connId" :db="overview?.current_db ?? workspaceStore.currentDB" @prepared="prepareTemplate" /></details>
             <div class="console-panel">
               <div class="console-head">
                 <div class="console-title">{{ t('sidebar.redisConsole') }}</div>
@@ -146,6 +147,9 @@ import { REDIS_COMMAND_HINTS, filterCommandNames, suggestArguments, tokenizeComm
 import { executeRedisCommand, executeRedisCommandForce, getConnectionOverview, getCommandHistory, pushCommandHistory } from '../../api/wails.js'
 import { confirmDiscardEdits, registerEditorGuard } from '../../utils/editSafety.js'
 import { askConfirmation } from '../../utils/confirm.js'
+import { confirmProductionOperation } from '../../utils/productionSafety.js'
+import { isReadOnlyConsoleCommand } from '../../utils/redisCommandName.js'
+import CommandTemplates from './CommandTemplates.vue'
 import { useI18n } from '../../i18n/index.js'
 import { useSettingsStore } from '../../stores/settings.js'
 import { useWorkspaceStore } from '../../stores/workspace.js'
@@ -468,13 +472,34 @@ function parseSelectTargetDB(text) {
   return Number.isInteger(db) ? db : null
 }
 
+async function prepareTemplate(text) {
+  if (running.value) return
+  if (command.value.trim() && !await askConfirmation(t('template.replace'))) return
+  command.value = text
+  await nextTick()
+  consoleInputRef.value?.focus?.()
+}
+
 async function runCommand() {
   const text = command.value.trim()
   if (!text || running.value) return
 
+  const target = connectionsStore.connections.find(item => item.id === props.connId)
+  const targetID = props.connId
+  const db = overview.value?.current_db ?? workspaceStore.currentDB
+  // Only a small explicit read-only set bypasses production confirmation.
+  const readCommand = isReadOnlyConsoleCommand(text)
+  if (!readCommand) {
+    running.value = true
+    try {
+      if (!await confirmProductionOperation(target, db, 'console')) return
+      if (targetID !== props.connId || db !== (overview.value?.current_db ?? workspaceStore.currentDB)) return
+    } finally { running.value = false }
+  }
   const promptBeforeRun = consolePrompt.value
   const selectTargetDB = parseSelectTargetDB(text)
   if (selectTargetDB !== null && !await confirmDiscardEdits()) return
+  if (targetID !== props.connId || db !== (overview.value?.current_db ?? workspaceStore.currentDB)) return
   rememberCommand(text)
   running.value = true
 
@@ -493,7 +518,8 @@ async function runCommand() {
         command.value = ''
         return
       }
-      result = await executeRedisCommandForce(props.connId, text)
+      if (targetID !== props.connId || db !== (overview.value?.current_db ?? workspaceStore.currentDB)) return
+      result = await executeRedisCommandForce(targetID, text)
     }
     let connectionFailureReported = false
     uncertainCommand.value = ['outcome_unknown', 'partial_possible'].includes(result.code)
@@ -708,6 +734,8 @@ onBeforeUnmount(() => {
   color: #0f172a;
 }
 
+.console-templates { padding: 6px 12px; font-size: 12px; max-height: 45vh; overflow: auto; }
+.console-templates summary { cursor: pointer; }
 .console-panel {
   display: flex;
   flex-direction: column;

@@ -111,6 +111,7 @@ export namespace config {
 	    name: string;
 	    sort_order: number;
 	    group?: string;
+	    environment?: string;
 	    host: string;
 	    port: number;
 	    password: string;
@@ -145,6 +146,7 @@ export namespace config {
 	        this.name = source["name"];
 	        this.sort_order = source["sort_order"];
 	        this.group = source["group"];
+	        this.environment = source["environment"];
 	        this.host = source["host"];
 	        this.port = source["port"];
 	        this.password = source["password"];
@@ -1059,6 +1061,112 @@ export namespace main {
 	        this.release_url = source["release_url"];
 	        this.checked_at = source["checked_at"];
 	        this.error = source["error"];
+	    }
+	}
+
+}
+
+export namespace redis {
+
+	export class ConflictSnapshot {
+	    exists: boolean;
+	    type: string;
+	    value: string;
+	    truncated: boolean;
+	    binary: boolean;
+	    total_bytes: number;
+
+	    static createFrom(source: any = {}) {
+	        return new ConflictSnapshot(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.exists = source["exists"];
+	        this.type = source["type"];
+	        this.value = source["value"];
+	        this.truncated = source["truncated"];
+	        this.binary = source["binary"];
+	        this.total_bytes = source["total_bytes"];
+	    }
+	}
+	export class ConnectionDiagnosticStage {
+	    stage: string;
+	    status: string;
+	    duration_ms: number;
+	    code: string;
+	    hint: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ConnectionDiagnosticStage(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.stage = source["stage"];
+	        this.status = source["status"];
+	        this.duration_ms = source["duration_ms"];
+	        this.code = source["code"];
+	        this.hint = source["hint"];
+	    }
+	}
+	export class ConnectionDiagnosis {
+	    stages: ConnectionDiagnosticStage[];
+
+	    static createFrom(source: any = {}) {
+	        return new ConnectionDiagnosis(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.stages = this.convertValues(source["stages"], ConnectionDiagnosticStage);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+	export class StringRangePreview {
+	    offset: number;
+	    next_offset: number;
+	    total_bytes: number;
+	    has_more: boolean;
+	    value: string;
+	    binary: boolean;
+	    encoding: string;
+	    start: number;
+	    end: number;
+
+	    static createFrom(source: any = {}) {
+	        return new StringRangePreview(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.offset = source["offset"];
+	        this.next_offset = source["next_offset"];
+	        this.total_bytes = source["total_bytes"];
+	        this.has_more = source["has_more"];
+	        this.value = source["value"];
+	        this.binary = source["binary"];
+	        this.encoding = source["encoding"];
+	        this.start = source["start"];
+	        this.end = source["end"];
 	    }
 	}
 

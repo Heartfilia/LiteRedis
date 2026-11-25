@@ -9,8 +9,9 @@ export function askConfirmation(message, notice = false, options = {}) {
   return new Promise(resolve => { confirmation.value = { ...options, message, notice, resolve } })
 }
 
-export function resolveConfirmation(accepted) {
+export function resolveConfirmation(accepted, typedText = '') {
   const current = confirmation.value
+  if (accepted && current?.requiredText && typedText !== current.requiredText) return
   confirmation.value = null
   current?.resolve(accepted)
 }

@@ -29,6 +29,9 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Validate bilingual release notes for tag
+        run: node frontend/scripts/check-release-notes.mjs
+
       # main.go 用 //go:embed all:frontend/dist，前端必须先构建，
       # 否则 go vet / build / test 都会因为找不到 frontend/dist 而失败
       - name: Install frontend deps

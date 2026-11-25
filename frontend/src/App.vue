@@ -31,7 +31,7 @@
     <WhatsNewModal
       v-if="showWhatsNew"
       :version="whatsNew.version"
-      :body="whatsNew.body"
+      :body="getLocalReleaseNotes(whatsNew.version, lang)?.body || whatsNew.body"
       :url="whatsNew.url"
       @close="closeWhatsNew"
     />
@@ -76,12 +76,12 @@ import ConfirmationDialog from './components/common/ConfirmationDialog.vue'
 import { askConfirmation, confirmation } from './utils/confirm.js'
 import { uncertainWrites, acknowledgeWrite } from './utils/writeSafety.js'
 import { useI18n } from './i18n/index.js'
-import { RELEASE_NOTES } from './changelog.js'
+import { getLocalReleaseNotes } from './utils/releaseNotes.js'
 
 const connectionsStore = useConnectionsStore()
 const settingsStore = useSettingsStore()
 const workspaceStore = useWorkspaceStore()
-const { t } = useI18n()
+const { t, lang } = useI18n()
 async function acknowledgeUnknown(scope) {
   if (await askConfirmation(t('reliability.verifyWriteConfirm'))) acknowledgeWrite(scope)
 }
@@ -141,13 +141,6 @@ function notesKey(version) {
   return String(version || '').replace(/^v/i, '').trim()
 }
 
-// changelog 里最后加的一条，开发环境每次启动都用它预览
-function latestLocalNotes() {
-  const keys = Object.keys(RELEASE_NOTES)
-  if (!keys.length) return ''
-  return RELEASE_NOTES[keys[keys.length - 1]] || ''
-}
-
 async function maybeShowWhatsNew() {
   let version = ''
   try {
@@ -157,7 +150,7 @@ async function maybeShowWhatsNew() {
   }
   // 开发版（编译期 AppVersion 为 dev）：每次启动都弹，方便确认文案和样式
   if (!version || version.toLowerCase() === 'dev') {
-    const body = latestLocalNotes()
+    const body = getLocalReleaseNotes(version, lang.value)?.body
     if (!body) return
     whatsNew.value = { version: '', body, url: '' }
     showWhatsNew.value = true
@@ -165,12 +158,12 @@ async function maybeShowWhatsNew() {
   }
   if (settingsStore.lastSeenVersion === version) return
   // 本地 changelog 优先，不受网络与 GitHub 限流影响
-  const localNotes = RELEASE_NOTES[notesKey(version)]
+  const localNotes = getLocalReleaseNotes(version, lang.value)
   if (localNotes) {
     whatsNew.value = {
       version: notesKey(version),
-      body: localNotes,
-      url: 'https://github.com/Heartfilia/LiteRedis/releases/tag/v' + notesKey(version),
+      body: localNotes.body,
+      url: localNotes.url,
     }
     showWhatsNew.value = true
     return

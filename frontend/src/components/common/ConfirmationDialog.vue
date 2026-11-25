@@ -15,13 +15,17 @@
           <div class="confirmation-copy">
             <h2 id="confirmation-title">{{ confirmation.title || t(confirmation.notice ? 'reliability.noticeTitle' : 'reliability.confirmTitle') }}</h2>
             <p id="confirmation-message">{{ confirmation.message }}</p>
+            <label v-if="confirmation.requiredText" class="confirmation-typed">
+              {{ t('environment.typeToConfirm', { text: confirmation.requiredText }) }}
+              <input v-model="typedText" autocomplete="off" spellcheck="false" :aria-label="t('environment.confirmInput')" />
+            </label>
           </div>
         </div>
         <div class="confirmation-actions">
           <span class="confirmation-key-hint" aria-hidden="true">Esc<span>{{ t('keyEditor.cancel') }}</span></span>
           <div class="confirmation-buttons">
             <button ref="cancelButton" class="confirmation-cancel" @click="resolveConfirmation(false)">{{ confirmation.cancelLabel || t(confirmation.notice ? 'keyEditor.confirm' : 'keyEditor.cancel') }}</button>
-            <button v-if="!confirmation.notice" class="confirmation-accept" @click="resolveConfirmation(true)">{{ confirmation.acceptLabel || t('keyEditor.confirm') }}</button>
+            <button v-if="!confirmation.notice" class="confirmation-accept" :disabled="!!confirmation.requiredText && typedText !== confirmation.requiredText" @click="resolveConfirmation(true, typedText)">{{ confirmation.acceptLabel || t('keyEditor.confirm') }}</button>
           </div>
         </div>
       </section>
@@ -38,10 +42,12 @@ import { useSettingsStore } from '../../stores/settings.js'
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 const cancelButton = ref(null)
+const typedText = ref('')
 let disposeEscape = null
 let previousFocus = null
 watch(confirmation, async (current) => {
   disposeEscape?.()
+  typedText.value = ''
   if (current) {
     previousFocus = document.activeElement
     disposeEscape = registerEscapeHandler(() => resolveConfirmation(false))
@@ -60,7 +66,7 @@ function trapKeys(event) {
   if (event.key === 'Escape') { event.preventDefault(); resolveConfirmation(false) }
   if (event.key === 'Tab') {
     event.preventDefault()
-    const buttons = [...event.currentTarget.querySelectorAll('button')]
+    const buttons = [...event.currentTarget.querySelectorAll('button:not(:disabled), input')]
     const direction = event.shiftKey ? -1 : 1
     buttons[(buttons.indexOf(document.activeElement) + direction + buttons.length) % buttons.length]?.focus()
   }
@@ -145,6 +151,9 @@ onBeforeUnmount(() => { disposeEscape?.(); resolveConfirmation(false) })
   cursor: pointer;
   transition: background 120ms, border-color 120ms, box-shadow 120ms;
 }
+.confirmation-typed { display: grid; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--dialog-text); }
+.confirmation-typed input { padding: 8px; border: 1px solid var(--dialog-border); border-radius: 6px; background: var(--dialog-bg); color: var(--dialog-text); user-select: text; }
+.confirmation-accept:disabled { opacity: .45; cursor: not-allowed; }
 .confirmation-cancel { background: var(--dialog-bg); color: var(--dialog-text); }
 .confirmation-cancel:hover { background: var(--dialog-footer); border-color: #94a3b8; }
 .confirmation-buttons .confirmation-accept { background: var(--dialog-accent); border-color: var(--dialog-accent); color: #fff; }

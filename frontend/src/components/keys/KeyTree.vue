@@ -351,6 +351,7 @@ import { useRowVirtualizer } from '../../utils/virtualList.js'
 import { exportKeysToFile, cancelKeyExport, copyKeysToConnection, copyKeysToDatabase, getDatabases, getConnectionDB, importKeysFromFile } from '../../api/wails.js'
 import { registerEscapeHandler } from '../../utils/shortcuts.js'
 import { askConfirmation } from '../../utils/confirm.js'
+import { confirmProductionOperation } from '../../utils/productionSafety.js'
 
 const { t } = useI18n()
 const workspaceStore = useWorkspaceStore()
@@ -680,7 +681,10 @@ async function copyToDB(db) {
   const keys = [...workspaceStore.selectedKeys]
   if (!keys.length) return
   const connID = workspaceStore.activeConnID
+  const sourceDB = workspaceStore.currentDB
+  if (!await confirmProductionOperation(activeConn.value, db, 'copy', keys.length)) return
   if (!await askConfirmation(transferMessage(activeConn.value?.name || connID, db, false))) return
+  if (workspaceStore.activeConnID !== connID || workspaceStore.currentDB !== sourceDB || await getConnectionDB(connID) !== sourceDB) return
   try {
     const result = await copyKeysToDatabase(connID, keys, db, false)
     connectionsStore.showGlobalToast(result?.message || t('keyTree.copyFailed'), !!result?.success)
@@ -722,8 +726,10 @@ async function copyTo(target) {
   const srcID = workspaceStore.activeConnID
   try {
     const db = await getConnectionDB(target.id)
+    const sourceDB = workspaceStore.currentDB
+    if (!await confirmProductionOperation(target, db, 'copy', keys.length)) return
     if (!await askConfirmation(transferMessage(target.name || target.id, db, true))) return
-    if (await getConnectionDB(target.id) !== db) throw new Error(t('keyTree.transferTargetChanged'))
+    if (workspaceStore.activeConnID !== srcID || workspaceStore.currentDB !== sourceDB || await getConnectionDB(srcID) !== sourceDB || await getConnectionDB(target.id) !== db) throw new Error(t('keyTree.transferTargetChanged'))
     const result = await copyKeysToConnection(srcID, target.id, keys, false)
     if (result?.success) {
       // 目标连接的缓存里没有新数据，切过去时重新加载
@@ -840,6 +846,7 @@ async function importKeys() {
   if (readOnly.value || !workspaceStore.activeConnID) return
   const connID = workspaceStore.activeConnID
   const db = workspaceStore.currentDB
+  if (!await confirmProductionOperation(activeConn.value, db, 'import', '—')) return
   if (!await askConfirmation(transferMessage(activeConn.value?.name || connID, db, true))) return
   try {
     if (await getConnectionDB(connID) !== db) throw new Error(t('keyTree.transferTargetChanged'))

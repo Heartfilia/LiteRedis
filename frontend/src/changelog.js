@@ -1,7 +1,33 @@
 // 每个版本「更新内容」弹窗的文案。发布前在这里补一条即可：
 //   key 用不带 v 的版本号（与 AppVersion 去掉 v 后一致）
-//   dev 环境不看 key，总是拿最新加的一条来预览
-// 没有对应条目的版本会退回 GitHub Release 说明（含提交列表兜底）。
+//   新条目提供 { zh, en }；历史中文字符串保留原文，不作为英文说明使用
+// dev / local 预览使用独立的 PENDING_RELEASE_NOTES，不代表已有正式版本发布。
+// 没有对应条目或语言的版本会退回 GitHub Release 说明（含提交列表兜底）。
+
+export const PENDING_RELEASE_NOTES = {
+  zh: `## 尚未发布（v0.8.3 之后）
+* 顶部连接 Tab 暂不开放：隐藏设置入口与标签栏，连接继续通过侧栏切换，保留既有配置以便后续优化
+* String / Hash 保存冲突可主动查看打开时内容、当前草稿和 Redis 最新有界快照；不自动覆盖，草稿保留，截断/二进制/删除/类型变化明确提示
+* 搜索条件收藏入口暂时隐藏，释放搜索区空间；保留本机收藏数据和功能实现，原有搜索历史与置顶记录不受影响
+* 超大 String 支持按原始字节跳转与翻页，每次最多 64KiB，仅供只读查看；跨 UTF-8 边界或二进制段以 Base64 保留字节，不作为一致性快照
+* 连接表单新增分阶段诊断与脱敏报告：实际检查传输、代理、已信任 SSH、TLS、Redis 认证/PING；未知 SSH 指纹不会自动信任，Cluster 仅检查种子节点
+* 命令台新增本机命令模板与参数预览，安全引用独立参数，填入后需手动执行，继续受生产确认、只读与结果未知保护；不保存参数值
+* 连接新增开发、测试、生产环境标识，左侧连接状态点后显示紧凑 D/T/P 标签，移除顶部环境展示条；生产批量删除、TTL、改前缀、导入/复制目标和命令台高风险操作增加输入式确认，环境标签不改变只读保护模式
+* 设置中的「安装说明」升级为「软件说明」，快捷键指示移入二级菜单，按全局操作、命令面板和命令台分组展示
+* 当前版本的「新功能」说明支持中英文，可随时从设置中重新查看，不必等待首次启动提示
+`,
+  en: `## Unreleased (after v0.8.3)
+* Top connection tabs are temporarily unavailable: the setting and tab bar are hidden, sidebar switching remains available, and saved preferences are retained for future improvements
+* String / Hash save conflicts offer an opt-in comparison of original content, your draft and a bounded current Redis snapshot. Drafts are preserved without automatic overwrite, with explicit truncation/binary/deletion/type-change markers
+* The saved-search entry is temporarily hidden to keep the search area compact. Existing local data and implementation are retained; search history and pinned entries are unaffected
+* Large Strings support byte-offset navigation and paging, reading at most 64KiB per request in read-only mode. Split UTF-8 and binary ranges use Base64 to preserve bytes; reads are not a consistent snapshot
+* Connection forms offer staged diagnosis and sanitized reports for transport, proxies, trusted SSH, TLS and Redis authentication/PING. Unknown SSH fingerprints are never trusted automatically; Cluster checks cover the seed only
+* Local command templates provide parameter previews and safe standalone argument quoting. Prepared commands require manual execution and retain production, read-only and uncertain-result safeguards; parameter values are not saved
+* Connections can be labeled Development, Staging or Production, with compact D/T/P badges after sidebar status dots instead of a top banner. High-risk production batches, import/copy targets and console operations require typed confirmation, independently of read-only protection
+* Installation instructions in Settings become Software guide, with keyboard shortcuts in a submenu grouped by global actions, command palette, and console
+* What's New for the current version is available in Chinese and English and can be reopened from Settings at any time, without waiting for a first-launch prompt
+`,
+}
 
 export const RELEASE_NOTES = {
   '0.7.0': `## 连接与标签
@@ -103,11 +129,6 @@ export const RELEASE_NOTES = {
 ## 连接图标
 * 图标内字符支持自定义，最多 4 个字符，按每行 2 个显示；留空仍使用连接名称首字，图标底图尺寸保持不变
 
-## 版本检查
-* 正式版检查更新改为读取 GitHub \`/releases/latest\` 的网页跳转地址，不再调用 GitHub API，不受每 IP 60 次/小时的配额限制，也不需要 token
-* 更新包和 SHA256SUMS 直接按发布产物名从 \`releases/download\` 下载，下载链路同样不依赖 API
-* 预览版（beta）仍通过 release 列表获取测试版；本地内置更新说明继续优先使用，避免不必要的网络请求
-
 ## 应用包更新代理
 * 首次使用时代理地址预填 http://127.0.0.1:1081，不用手动输入；已经保存过的地址保持不变
 
@@ -115,4 +136,32 @@ export const RELEASE_NOTES = {
 * 超过 5MB 的 string 只展示前 2000 个字符，不再先下载 5MB 内容，避免打开大 key 时界面卡住
 * 超大 key 为只读预览：无法编辑、复制、格式化和保存，避免复制或保存不完整内容；提示会明确说明只读原因
 `,
+  '0.8.2': {
+    zh: `## v0.7.6 至 v0.8.2 更新概览
+* SSH 账号独立管理：保存、编辑、测试和复用账号，兼容旧连接配置迁移；被连接引用的账号不可直接删除
+* 连接右键支持「复制连接」，保留配置与分组，同组重名自动编号，创建后打开副本供修改
+* 支持导入 AnotherRedisDesktopManager（.ano）和 Tiny RDM（.zip）的连接配置，导入前预览、按地址与 SSH 路由去重，不覆盖已有连接；不支持的配置明确提示
+* 连接图标可自定义最多 4 个字符，每行显示 2 个，留空仍使用连接名称首字
+* 应用包更新代理默认预填 http://127.0.0.1:1081，已保存的地址保持不变
+* 超过 5MB 的 String 只读取并展示前 2000 个字符；超大 key 为只读预览，禁止编辑、复制、格式化和保存，避免误用不完整内容
+`,
+    en: `## Updates from v0.7.6 through v0.8.2
+* Manage SSH accounts separately: save, edit, test, and reuse accounts, with migration of legacy connection settings. Accounts referenced by connections cannot be deleted directly
+* Duplicate Connection is available in the connection context menu, preserving settings and groups, numbering duplicate names, and opening the copy for editing
+* Import connections from AnotherRedisDesktopManager (.ano) and Tiny RDM (.zip), with a preview and deduplication by address and SSH route. Existing connections are never overwritten, and unsupported settings are reported
+* Customize connection icons with up to 4 characters, displayed 2 per row; leaving the field empty uses the first character of the connection name
+* The application update proxy defaults to http://127.0.0.1:1081; previously saved addresses are preserved
+* Strings larger than 5MB only load and display the first 2000 characters. Large keys are read-only: editing, copying, formatting, and saving are disabled to avoid using incomplete content
+`,
+  },
+  '0.8.3': {
+    zh: `## 更新检查与下载
+* 正式版检查更新改为读取 GitHub /releases/latest 的网页跳转，安装包与 SHA256SUMS 直接按发布产物名下载，不再依赖 GitHub API 配额或 token
+* beta / rc 预览版仍通过 release 列表检查更新；本地工程包按稳定通道检查
+`,
+    en: `## Update checks and downloads
+* Stable updates read the GitHub /releases/latest redirect and download packages and SHA256SUMS directly by asset name, without GitHub API quotas or tokens
+* beta / rc previews still check the release list; local engineering builds check the stable channel
+`,
+  },
 }

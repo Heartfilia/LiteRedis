@@ -8,6 +8,7 @@ type ConnectionConfig struct {
 	Name             string     `json:"name"`
 	SortOrder        int        `json:"sort_order"`
 	Group            string     `json:"group,omitempty"`
+	Environment      string     `json:"environment,omitempty"` // 环境标签：空/development/staging/production，与保护模式独立
 	Host             string     `json:"host"`
 	Port             int        `json:"port"`
 	Password         string     `json:"password"`
