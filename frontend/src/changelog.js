@@ -4,8 +4,8 @@
 // dev / local 预览使用独立的 PENDING_RELEASE_NOTES，不代表已有正式版本发布。
 // 没有对应条目或语言的版本会退回 GitHub Release 说明（含提交列表兜底）。
 
-export const PENDING_RELEASE_NOTES = {
-  zh: `## 尚未发布（v0.8.3 之后）
+const RELEASE_084_NOTES = {
+  zh: `## v0.8.4 更新内容（相较 v0.8.3）
 * 顶部连接 Tab 暂不开放：隐藏设置入口与标签栏，连接继续通过侧栏切换，保留既有配置以便后续优化
 * String / Hash 保存冲突可主动查看打开时内容、当前草稿和 Redis 最新有界快照；不自动覆盖，草稿保留，截断/二进制/删除/类型变化明确提示
 * 搜索条件收藏入口暂时隐藏，释放搜索区空间；保留本机收藏数据和功能实现，原有搜索历史与置顶记录不受影响
@@ -16,7 +16,7 @@ export const PENDING_RELEASE_NOTES = {
 * 设置中的「安装说明」升级为「软件说明」，快捷键指示移入二级菜单，按全局操作、命令面板和命令台分组展示
 * 当前版本的「新功能」说明支持中英文，可随时从设置中重新查看，不必等待首次启动提示
 `,
-  en: `## Unreleased (after v0.8.3)
+  en: `## What’s new in v0.8.4 (since v0.8.3)
 * Top connection tabs are temporarily unavailable: the setting and tab bar are hidden, sidebar switching remains available, and saved preferences are retained for future improvements
 * String / Hash save conflicts offer an opt-in comparison of original content, your draft and a bounded current Redis snapshot. Drafts are preserved without automatic overwrite, with explicit truncation/binary/deletion/type-change markers
 * The saved-search entry is temporarily hidden to keep the search area compact. Existing local data and implementation are retained; search history and pinned entries are unaffected
@@ -29,7 +29,11 @@ export const PENDING_RELEASE_NOTES = {
 `,
 }
 
+// 本地工程包预览当前准备发布的说明；下一轮开发再创建独立待发布条目。
+export const PENDING_RELEASE_NOTES = { ...RELEASE_084_NOTES }
+
 export const RELEASE_NOTES = {
+  '0.8.4': RELEASE_084_NOTES,
   '0.7.0': `## 连接与标签
 * 新增顶部连接标签栏：多个连接并排切换，可拖拽排序、中键关闭，每个连接保留自己的浏览状态（默认关闭，在 设置 → 其他设置 里开启）
 * 折叠侧栏的按钮只在有已连接的 Redis 时出现；折叠状态下所有连接断开会自动恢复原状

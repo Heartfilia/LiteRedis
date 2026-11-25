@@ -48,12 +48,12 @@ test('local 包预览待发布日志并保留原本 local 版本标识', () => {
 })
 
 test('未知正式版本不可回退到待发布或最新版本，预览正式版也需精确匹配', () => {
-  for (const version of ['0.8.4', 'v9.9.9', '0.8', '0.8.2-beta.1', 'constructor', '__proto__']) {
+  for (const version of ['0.8.5', 'v9.9.9', '0.8', '0.8.2-beta.1', 'constructor', '__proto__']) {
     assert.equal(getLocalReleaseNotes(version), null)
     assert.equal(getLocalReleaseNotes(version, 'en'), null)
     assert.equal(validateReleaseNotes(version), false)
   }
-  assert.equal(Object.hasOwn(RELEASE_NOTES, '0.8.4'), false)
+  assert.equal(Object.hasOwn(RELEASE_NOTES, '0.8.5'), false)
 })
 
 test('历史中文字符串保持原文，缺少英文翻译时返回 null', () => {
@@ -116,3 +116,13 @@ test('CI 拒绝任何一门语言为空或缺失的条目，查询也不回退�
     delete RELEASE_NOTES[key]
   }
 })
+
+ test('v0.8.4 has exact bilingual release notes and passes the CI gate', () => {
+   assert.equal(validateReleaseNotes('v0.8.4'), true)
+   for (const language of ['zh', 'en']) {
+     const notes = getLocalReleaseNotes('v0.8.4', language)
+     assert.match(notes.body, /0\.8\.4/)
+     assert.match(notes.body, /D\/T\/P/)
+     assert.equal(notes.url, 'https://github.com/Heartfilia/LiteRedis/releases/tag/v0.8.4')
+   }
+ })
