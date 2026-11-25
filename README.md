@@ -183,6 +183,7 @@ Redis、SSH 和代理凭据保存在当前系统用户的 LiteRedis 配置目录
 
 | 环节 | 行为 |
 |---|---|
+| 检查 | 读取 `releases/latest` 的网页 302 跳转获取 tag，不调用 GitHub API，不需要 token |
 | 校验 | 安装包对照 Release 里的 `SHA256SUMS` 做 SHA-256 校验，不匹配直接拒绝安装 |
 | macOS | 挂载 dmg → 复制 `.app` → 进程退出后原子替换 → 自动重新打开（必须从 `.app` 运行，在 dmg 里直接跑无法替换） |
 | Windows | 原地替换 `LiteRedis.exe`（允许重命名运行中的 exe），随后自动重启 |
@@ -195,13 +196,10 @@ Redis、SSH 和代理凭据保存在当前系统用户的 LiteRedis 配置目录
 
 设置 → 应用包更新代理，**只对下面两类请求生效**，数据库连接完全不受影响：
 
-1. 检查最新版本（访问 `api.github.com`）
-2. 下载安装包与校验文件
+1. 检查最新版本（读取 `github.com/Heartfilia/LiteRedis/releases/latest` 的网页 302 跳转）
+2. 下载安装包与校验文件（`github.com/.../releases/download/`）
 
-两个容易踩的坑：
-
-- 未认证的 GitHub API **每个 IP 每小时只有 60 次**配额。走代理时用的是代理节点出口 IP，共享节点很容易被用光；提示"IP 访问限制"时等待约 1 小时再试
-- 浏览器能打开 `github.com` 不代表 API 可用——网页浏览不消耗 API 配额，两者是分开的
+正式版检查和下载都不走 GitHub API，因此不受未认证 API 每 IP 60 次/小时的限制，也不需要配置 token。只有预览版（beta）检查更新、以及需要从 GitHub 拉取版本说明时仍会调用少量 API；失败不会影响正常使用。
 
 请求失败时错误信息会注明"本次经代理 … 访问"，方便确认代理是否真的生效。
 

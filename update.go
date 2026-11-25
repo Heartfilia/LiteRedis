@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -131,6 +132,15 @@ func releaseNotesAPIURL(version string) string {
 }
 
 const releasesRepoAPI = "https://api.github.com/repos/Heartfilia/LiteRedis"
+
+// 版本检测只访问 GitHub 的网页重定向，不调用 API：/releases/latest 会 302 到
+// /releases/tag/<tag>，从 Location 里取 tag 即可，完全不受 API 配额限制。
+const (
+	latestReleaseRedirectURL = "https://github.com/Heartfilia/LiteRedis/releases/latest"
+	releaseDownloadBaseURL   = "https://github.com/Heartfilia/LiteRedis/releases/download/"
+)
+
+var releaseTagPathPattern = regexp.MustCompile(`(?i)^/Heartfilia/LiteRedis/releases/tag/([^/]+)/?$`)
 
 var compareLinkPattern = regexp.MustCompile(`github\.com/[^\s)]+/compare/([^\s)]+)`)
 
@@ -321,6 +331,15 @@ func isPrereleaseVersion(version string) bool {
 	return canonical != "" && semver.Prerelease(canonical) != ""
 }
 
+// usesStableUpdateChannel 正式版和 -local 工程测试包都检查稳定通道；
+// 只有真正的 beta/rc 预览版才需要拉 release 列表。
+func usesStableUpdateChannel(version string) bool {
+	if !isPrereleaseVersion(version) {
+		return true
+	}
+	return strings.HasPrefix(strings.ToLower(semver.Prerelease(canonicalSemver(version))), "-local")
+}
+
 func (a *App) CheckLatestRelease() VersionInfo {
 	info := VersionInfo{Version: AppVersion}
 	release, err := fetchLatestRelease(a.ctx, AppVersion)
@@ -441,21 +460,105 @@ func (a *App) StartUpdate() UpdateResult {
 	}
 }
 
+// fetchLatestReleaseTag 读取 /releases/latest 的 302 Location，从中解析 tag。
+// 只信任 github.com 的跳转，避免代理返回任意地址。
+func fetchLatestReleaseTag(ctx context.Context, latestURL string) (string, string, error) {
+	client, err := newUpdateHTTPClient(12 * time.Second)
+	if err != nil {
+		return "", "", err
+	}
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, latestURL, nil)
+	if err != nil {
+		return "", "", err
+	}
+	req.Header.Set("User-Agent", "LiteRedis-updater")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+	case http.StatusNotFound:
+		return "", "", fmt.Errorf("还没有已发布版本")
+	default:
+		return "", "", fmt.Errorf("检查更新失败：GitHub 返回 %s", resp.Status)
+	}
+
+	loc, err := resp.Location()
+	if err != nil {
+		return "", "", fmt.Errorf("检查更新失败：GitHub 未返回版本跳转地址")
+	}
+	if !strings.EqualFold(loc.Scheme, "https") || !strings.EqualFold(loc.Host, "github.com") {
+		return "", "", fmt.Errorf("检查更新失败：GitHub 返回了意外的跳转地址")
+	}
+	m := releaseTagPathPattern.FindStringSubmatch(loc.Path)
+	if len(m) != 2 {
+		return "", "", fmt.Errorf("检查更新失败：无法从跳转地址解析版本号")
+	}
+	tag := m[1]
+	if canonicalSemver(tag) == "" {
+		return "", "", fmt.Errorf("检查更新失败：发布 tag %q 不是有效版本号", tag)
+	}
+	return tag, loc.String(), nil
+}
+
+// releaseAssetsForPlatform 按 .github/workflows/release.yml 的产物名拼接下载地址。
+// 更新检查和下载都不再依赖 GitHub API，因此不会消耗 API 配额。
+func releaseAssetsForPlatform(tag, goos, goarch string) []ReleaseAsset {
+	var names []string
+	switch goos {
+	case "darwin":
+		if goarch == "arm64" {
+			names = []string{"LiteRedis-macos-arm64.dmg"}
+		}
+	case "linux":
+		if goarch == "amd64" {
+			names = []string{"LiteRedis-linux-amd64.tar.gz"}
+		}
+	case "windows":
+		if goarch == "amd64" {
+			// 与发布工作流一致：优先裸 exe 实现原地替换，安装包作为手动兜底。
+			names = []string{"LiteRedis.exe", "LiteRedis-amd64-installer.exe"}
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	base := releaseDownloadBaseURL + url.PathEscape(tag) + "/"
+	assets := make([]ReleaseAsset, 0, len(names)+1)
+	for _, name := range names {
+		assets = append(assets, ReleaseAsset{Name: name, BrowserDownloadURL: base + name})
+	}
+	assets = append(assets, ReleaseAsset{Name: "SHA256SUMS", BrowserDownloadURL: base + "SHA256SUMS"})
+	return assets
+}
+
+func releaseAssets(tag string) []ReleaseAsset {
+	return releaseAssetsForPlatform(tag, runtime.GOOS, runtime.GOARCH)
+}
+
 func fetchLatestRelease(ctx context.Context, currentVersion string) (ReleaseInfo, error) {
-	const (
-		latestReleaseAPI = "https://api.github.com/repos/Heartfilia/LiteRedis/releases/latest"
-		allReleasesAPI   = "https://api.github.com/repos/Heartfilia/LiteRedis/releases?per_page=100"
-	)
-	if !isPrereleaseVersion(currentVersion) {
-		var release ReleaseInfo
-		if err := fetchGitHubReleaseJSON(ctx, latestReleaseAPI, &release); err != nil {
+	return fetchLatestReleaseFrom(ctx, currentVersion, latestReleaseRedirectURL)
+}
+
+func fetchLatestReleaseFrom(ctx context.Context, currentVersion, latestURL string) (ReleaseInfo, error) {
+	// 预览版仍走 release 列表，保证 beta 用户能收到更新的测试版；
+	// 正式版和 -local 工程测试包只访问 /releases/latest 的网页跳转，不消耗 API 配额。
+	if usesStableUpdateChannel(currentVersion) {
+		tag, releaseURL, err := fetchLatestReleaseTag(ctx, latestURL)
+		if err != nil {
 			return ReleaseInfo{}, err
 		}
-		return release, nil
+		return ReleaseInfo{TagName: tag, Name: tag, HTMLURL: releaseURL, Assets: releaseAssets(tag)}, nil
 	}
 
 	var releases []ReleaseInfo
-	if err := fetchGitHubReleaseJSON(ctx, allReleasesAPI, &releases); err != nil {
+	if err := fetchGitHubReleaseJSON(ctx, releasesRepoAPI+"/releases?per_page=100", &releases); err != nil {
 		return ReleaseInfo{}, err
 	}
 	release, ok := selectLatestRelease(releases, true)

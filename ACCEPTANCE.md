@@ -20,6 +20,15 @@
 
 ## 可复现命令
 
+### 更新检查改用网页重定向（2026-11-20）
+
+- 正式版 `CheckLatestRelease` 不再请求 `api.github.com`：改为请求 `https://github.com/Heartfilia/LiteRedis/releases/latest`，不跟随跳转，只读取 302 的 `Location`；校验主机必须是 `github.com`、路径必须是 `/releases/tag/<tag>`，再用 tag 做 semver 比较。该路径不受未认证 API 每 IP 60 次/小时的限制，也不需要 token。
+- `StartUpdate` 不再拉取 release JSON 资产列表：按 `.github/workflows/release.yml` 的固定产物名拼接 `releases/download/<tag>/<asset>`，`SHA256SUMS` 同样直连下载；资产大小未知时用响应 `Content-Length` 计算进度，安装包完整性仍由 SHA-256SUMS 校验。
+- 预览版（如 `-beta`）仍走 release 列表，保证 beta 用户能收到测试版；`-local` 工程测试包按稳定通道处理，便于直接验证新端点；本地 `changelog.js` 仍优先于网络说明。
+- 新增 5 项 Go 测试：合法/异常跳转解析、404、稳定版无 API 路径、各平台资产名与下载地址、`-local`/beta 通道选择。
+- 验证：`go test -race ./...`、`go vet ./...`、104 项前端单测、80 项 Playwright、lint/build、`git diff --check` 通过。本机访问 github.com 超时，真实端点未联网验证，重定向逻辑通过 httptest 覆盖。
+- 已打包工程测试包到 `build/bin/LiteRedis.app`，构建标识 `0.7.5-local.update-redirect2.20261120.141236`，macOS arm64，本地 ad-hoc 签名校验通过，可执行文件 SHA256 `759bdb3f8423d75fa84cb7cee58d4227ab9cbb7d694c13986dda0b4d2036f900`。快照与旧包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-update-redirect2-build-20261120-141236`。未替换或启动 `/Applications` 中的应用，未提交或推送。
+
 ### 超大 String 只读预览（2026-11-18）
 
 - 后端读取 string 时先在同一 pipeline 里取 TYPE / TTL / STRLEN 和前 8001 字节：超过 5MB 的值只返回前 2000 个字符，不再传输 5MB 内容；8KB 到 5MB 之间的值再补一次有上限的读取，保持原有可编辑行为。

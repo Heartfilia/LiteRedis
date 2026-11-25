@@ -281,6 +281,125 @@ func TestDownloadFileWithProgress(t *testing.T) {
 	}
 }
 
+func TestUsesStableUpdateChannel(t *testing.T) {
+	cases := []struct {
+		version string
+		want    bool
+	}{
+		{"0.7.5", true},
+		{"v0.7.5", true},
+		{"0.7.5-local.update-redirect.20261120", true},
+		{"0.7.6-beta.1", false},
+		{"0.7.6-rc.2", false},
+		{"dev", true},
+	}
+	for _, test := range cases {
+		if got := usesStableUpdateChannel(test.version); got != test.want {
+			t.Fatalf("usesStableUpdateChannel(%q) = %v, want %v", test.version, got, test.want)
+		}
+	}
+}
+
+func TestFetchLatestReleaseTagFollowsRedirect(t *testing.T) {
+	releaseURL := "https://github.com/Heartfilia/LiteRedis/releases/tag/v0.8.1"
+	cases := []struct {
+		name      string
+		location  string
+		wantTag   string
+		wantURL   string
+		wantError bool
+	}{
+		{name: "valid", location: releaseURL, wantTag: "v0.8.1", wantURL: releaseURL},
+		{name: "missing tag", location: "https://github.com/Heartfilia/LiteRedis/releases", wantError: true},
+		{name: "non semver", location: "https://github.com/Heartfilia/LiteRedis/releases/tag/nightly", wantError: true},
+		{name: "untrusted host", location: "https://example.com/Heartfilia/LiteRedis/releases/tag/v0.8.1", wantError: true},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, test.location, http.StatusFound)
+			}))
+			defer server.Close()
+
+			tag, gotURL, err := fetchLatestReleaseTag(context.Background(), server.URL+"/latest")
+			if test.wantError {
+				if err == nil {
+					t.Fatalf("expected error, got tag=%q url=%q", tag, gotURL)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tag != test.wantTag || gotURL != test.wantURL {
+				t.Fatalf("tag=%q url=%q, want %q %q", tag, gotURL, test.wantTag, test.wantURL)
+			}
+		})
+	}
+}
+
+func TestFetchLatestReleaseTagHandlesMissingOrNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	if _, _, err := fetchLatestReleaseTag(context.Background(), server.URL+"/latest"); err == nil {
+		t.Fatal("expected error for 404")
+	}
+}
+
+func TestFetchLatestReleaseStableUsesRedirectWithoutAPI(t *testing.T) {
+	releaseURL := "https://github.com/Heartfilia/LiteRedis/releases/tag/v0.8.1"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, releaseURL, http.StatusFound)
+	}))
+	defer server.Close()
+
+	release, err := fetchLatestReleaseFrom(context.Background(), "0.7.5", server.URL+"/latest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if release.TagName != "v0.8.1" || release.HTMLURL != releaseURL {
+		t.Fatalf("release = %+v", release)
+	}
+	for _, asset := range release.Assets {
+		if strings.Contains(asset.BrowserDownloadURL, "api.github.com") {
+			t.Fatalf("stable update still uses API asset: %s", asset.BrowserDownloadURL)
+		}
+	}
+}
+
+func TestReleaseAssetsForPlatformAvoidsGitHubAPI(t *testing.T) {
+	const downloadPrefix = "https://github.com/Heartfilia/LiteRedis/releases/download/v9.9.9/"
+	cases := []struct {
+		goos, goarch string
+		wantNames    []string
+	}{
+		{"darwin", "arm64", []string{"LiteRedis-macos-arm64.dmg", "SHA256SUMS"}},
+		{"darwin", "amd64", nil},
+		{"linux", "amd64", []string{"LiteRedis-linux-amd64.tar.gz", "SHA256SUMS"}},
+		{"windows", "amd64", []string{"LiteRedis.exe", "LiteRedis-amd64-installer.exe", "SHA256SUMS"}},
+	}
+	for _, test := range cases {
+		assets := releaseAssetsForPlatform("v9.9.9", test.goos, test.goarch)
+		if len(assets) != len(test.wantNames) {
+			t.Fatalf("%s/%s assets = %+v", test.goos, test.goarch, assets)
+		}
+		for i, asset := range assets {
+			if asset.Name != test.wantNames[i] {
+				t.Fatalf("%s/%s asset[%d] = %q, want %q", test.goos, test.goarch, i, asset.Name, test.wantNames[i])
+			}
+			if !strings.HasPrefix(asset.BrowserDownloadURL, downloadPrefix) {
+				t.Fatalf("unexpected download url: %s", asset.BrowserDownloadURL)
+			}
+			if strings.Contains(asset.BrowserDownloadURL, "api.github.com") {
+				t.Fatalf("asset download still uses API: %s", asset.BrowserDownloadURL)
+			}
+		}
+	}
+}
+
 func TestFetchGitHubReleaseJSONCachesResponses(t *testing.T) {
 	resetReleaseCacheForTest()
 	defer resetReleaseCacheForTest()

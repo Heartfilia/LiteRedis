@@ -1,6 +1,14 @@
 # LiteRedis 项目交接说明
 
-最后更新：2026-11-18
+最后更新：2026-11-20
+
+## 最新补充（2026-11-20，更新检查改用网页重定向）
+
+- 正式版检查更新不再调用 GitHub API：请求 `releases/latest` 后只读取 302 的 `Location`，校验 `github.com` 主机与 `/releases/tag/<tag>` 路径，再做 semver 比较，因此不受每 IP 60 次/小时限制，也不需要 token。
+- 更新包下载也不再依赖 release JSON：按发布工作流固定产物名拼接 `releases/download/<tag>/<asset>`，`SHA256SUMS` 直连下载；进度使用 `Content-Length`，完整性仍用 SHA-256 校验。
+- 预览版仍走 release 列表；`-local` 工程测试包按稳定通道处理，便于验证新端点；`changelog.js` 内置说明仍优先，避免不必要的网络请求。
+- 验证：新增 5 项 Go 测试覆盖跳转解析、404、稳定版无 API 路径、平台资产名和通道选择；`go test -race ./...`、`go vet ./...`、104 项前端单测、80 项 Playwright、lint/build、`git diff --check` 通过。本机访问 github.com 超时，真实端点未联网验证。尚未提交或推送。
+- 已打包工程测试包 `build/bin/LiteRedis.app`（`0.7.5-local.update-redirect2.20261120.141236`，SHA256 `759bdb3f8423d75fa84cb7cee58d4227ab9cbb7d694c13986dda0b4d2036f900`），快照与旧包备份位于 `/private/var/folders/hb/xgj26dls1c91mc9fp63lfkm40000gn/T/opencode/literedis-update-redirect2-build-20261120-141236`；未启动、未替换 `/Applications`。
 
 ## 最新补充（2026-11-18，超大 String 只读预览）
 
